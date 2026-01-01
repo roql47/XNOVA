@@ -700,6 +700,7 @@ class GameNotifier extends StateNotifier<GameState> {
       await loadFleet();
       return response;
     } catch (e) {
+      print('🔴 정찰 API 에러: $e');
       return null;
     }
   }

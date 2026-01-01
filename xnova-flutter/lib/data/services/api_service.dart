@@ -190,11 +190,32 @@ class ApiService {
 
   // ===== 정찰 =====
   Future<SpyResponse> spyOnPlanet(String targetCoord, int probeCount) async {
-    final response = await _dio.post('galaxy/spy', data: {
-      'targetCoord': targetCoord,
-      'probeCount': probeCount,
-    });
-    return SpyResponse.fromJson(response.data);
+    try {
+      final response = await _dio.post('galaxy/spy', data: {
+        'targetCoord': targetCoord,
+        'probeCount': probeCount,
+      });
+      return SpyResponse.fromJson(response.data);
+    } on DioException catch (e) {
+      print('🔴 정찰 API DioException: ${e.response?.data}');
+      // 서버에서 에러 응답을 보낸 경우
+      if (e.response?.data != null && e.response!.data is Map) {
+        return SpyResponse.fromJson(e.response!.data);
+      }
+      // NestJS 기본 에러 응답 처리
+      if (e.response?.data != null && e.response!.data is Map) {
+        final data = e.response!.data as Map<String, dynamic>;
+        final message = data['message'];
+        String errorMsg = '알 수 없는 오류';
+        if (message is String) {
+          errorMsg = message;
+        } else if (message is List) {
+          errorMsg = message.join(', ');
+        }
+        return SpyResponse(success: false, error: errorMsg);
+      }
+      return SpyResponse(success: false, error: '네트워크 오류가 발생했습니다.');
+    }
   }
 
   // ===== 랭킹 =====

@@ -112,12 +112,35 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                     ),
-                    Text(
-                      '태양계 $_system',
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 13,
+                    Text('태양계:', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                    const SizedBox(width: 4),
+                    SizedBox(
+                      width: 50,
+                      child: TextField(
+                        controller: TextEditingController(text: '$_system'),
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                        decoration: InputDecoration(
+                          contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                          isDense: true,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(4),
+                            borderSide: BorderSide(color: AppColors.panelBorder),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(4),
+                            borderSide: BorderSide(color: AppColors.accent),
+                          ),
+                        ),
+                        onSubmitted: (value) {
+                          final s = int.tryParse(value);
+                          if (s != null && s >= 1 && s <= 499) {
+                            setState(() => _system = s);
+                            _search();
+                          }
+                        },
                       ),
                     ),
                     IconButton(

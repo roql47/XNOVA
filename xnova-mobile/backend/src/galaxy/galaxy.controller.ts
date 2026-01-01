@@ -1,9 +1,14 @@
 import { Controller, Get, Post, Param, Body, UseGuards, Request, Query } from '@nestjs/common';
+import { IsString, IsNumber, Min } from 'class-validator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GalaxyService } from './galaxy.service';
 
 class SpyRequestDto {
+  @IsString()
   targetCoord: string;
+
+  @IsNumber()
+  @Min(1)
   probeCount: number;
 }
 

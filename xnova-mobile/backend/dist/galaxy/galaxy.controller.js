@@ -14,12 +14,22 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GalaxyController = void 0;
 const common_1 = require("@nestjs/common");
+const class_validator_1 = require("class-validator");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const galaxy_service_1 = require("./galaxy.service");
 class SpyRequestDto {
     targetCoord;
     probeCount;
 }
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], SpyRequestDto.prototype, "targetCoord", void 0);
+__decorate([
+    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.Min)(1),
+    __metadata("design:type", Number)
+], SpyRequestDto.prototype, "probeCount", void 0);
 let GalaxyController = class GalaxyController {
     galaxyService;
     constructor(galaxyService) {
