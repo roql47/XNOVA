@@ -472,6 +472,9 @@ class _SpyReportDetail extends StatelessWidget {
     final targetCoord = report['targetCoord'] ?? '?:?:?';
     final probesLost = report['probesLost'] ?? 0;
     final probesSurvived = report['probesSurvived'] ?? 0;
+    final stScore = report['stScore'] ?? 0;
+    final mySpyLevel = report['mySpyLevel'] ?? 0;
+    final targetSpyLevel = report['targetSpyLevel'] ?? 0;
     final resources = report['resources'] as Map<String, dynamic>?;
     final fleet = report['fleet'] as Map<String, dynamic>?;
     final defense = report['defense'] as Map<String, dynamic>?;
@@ -510,6 +513,16 @@ class _SpyReportDetail extends StatelessWidget {
                   color: probesLost > 0 ? AppColors.negative : AppColors.positive,
                   fontSize: 11,
                 ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'ST 점수: $stScore (내 정탐: Lv.$mySpyLevel / 상대: Lv.$targetSpyLevel)',
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '※ ST≥2: 함대, ST≥3: 방어, ST≥5: 건물, ST≥7: 연구',
+                style: TextStyle(color: AppColors.textMuted.withOpacity(0.7), fontSize: 9),
               ),
             ],
           ),

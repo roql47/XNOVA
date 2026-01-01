@@ -115,7 +115,7 @@ export const FLEET_DATA = {
   },
   espionageProbe: {
     cost: { metal: 0, crystal: 1000, deuterium: 0 },
-    stats: { attack: 0, shield: 0, hull: 1000, speed: 100000000, cargo: 0, fuelConsumption: 1 },
+    stats: { attack: 0, shield: 0, hull: 1000, speed: 10000000, cargo: 0, fuelConsumption: 1 },
     rapidFire: {},
     requirements: { shipyard: 3, combustionDrive: 3, espionageTech: 2 },
   },

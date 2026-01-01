@@ -30,6 +30,9 @@ export interface SpyReport {
     research?: Record<string, number>;
     probesLost: number;
     probesSurvived: number;
+    stScore: number;
+    mySpyLevel: number;
+    targetSpyLevel: number;
 }
 export declare class GalaxyService {
     private userModel;
@@ -70,6 +73,7 @@ export declare class GalaxyService {
         error?: undefined;
     }>;
     private getTotalFleetCount;
+    private calculateCurrentResources;
     private generateSpyReport;
     private filterNonZero;
     private formatSpyReportContent;

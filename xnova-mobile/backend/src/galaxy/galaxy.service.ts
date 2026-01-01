@@ -27,6 +27,9 @@ export interface SpyReport {
   research?: Record<string, number>;
   probesLost: number;
   probesSurvived: number;
+  stScore: number;
+  mySpyLevel: number;
+  targetSpyLevel: number;
 }
 
 @Injectable()
@@ -199,23 +202,22 @@ export class GalaxyService {
     const spyerChance = Math.random() * 100;
     const probesDestroyed = targetChance >= spyerChance;
 
-    // 정찰 위성 소모
-    attacker.fleet.espionageProbe -= probeCount;
-
-    // 파괴된 경우 데브리 생성
+    // 파괴된 경우 데브리 생성, 아닌 경우 귀환
     let probesLost = 0;
     let probesSurvived = probeCount;
     if (probesDestroyed) {
       probesLost = probeCount;
       probesSurvived = 0;
+      // 정찰 위성 소모 (파괴된 경우만)
+      attacker.fleet.espionageProbe -= probeCount;
       // 정찰 위성 1대당 300 크리스탈 잔해
       await this.updateDebris(targetCoord, 0, probeCount * 300);
+      await attacker.save();
     }
-
-    await attacker.save();
+    // 파괴되지 않은 경우: 정찰 위성 유지 (귀환)
 
     // 정찰 보고서 생성
-    const report = this.generateSpyReport(target, stScore, probesLost, probesSurvived, targetCoord);
+    const report = this.generateSpyReport(target, stScore, probesLost, probesSurvived, targetCoord, mySpyLevel, targetSpyLevel);
 
     // 공격자에게 정찰 보고서 메시지 전송
     await this.messageService.createMessage({
@@ -268,6 +270,60 @@ export class GalaxyService {
     );
   }
 
+  // 실시간 자원 계산 (정찰용)
+  private calculateCurrentResources(target: UserDocument): { metal: number; crystal: number; deuterium: number; energy: number } {
+    const now = new Date();
+    const lastUpdate = target.lastResourceUpdate || now;
+    const elapsedSeconds = (now.getTime() - lastUpdate.getTime()) / 1000;
+
+    const mines = target.mines || {};
+    const fleet = target.fleet || {};
+    
+    // 에너지 계산
+    const solarPlantLevel = mines.solarPlant || 0;
+    const fusionLevel = mines.fusionReactor || 0;
+    const satelliteCount = fleet.solarSatellite || 0;
+    const planetTemperature = target.planetInfo?.temperature ?? 50;
+
+    // 에너지 생산량
+    const solarEnergy = solarPlantLevel > 0 ? Math.floor(20 * solarPlantLevel * Math.pow(1.1, solarPlantLevel)) : 0;
+    const satelliteEnergy = satelliteCount > 0 ? Math.floor((planetTemperature / 4 + 20) * satelliteCount) : 0;
+    const fusionEnergy = fusionLevel > 0 ? Math.floor(30 * fusionLevel * Math.pow(1.05, fusionLevel)) : 0;
+    const energyProduction = solarEnergy + satelliteEnergy + fusionEnergy;
+
+    // 에너지 소비량
+    const metalMineLevel = mines.metalMine || 0;
+    const crystalMineLevel = mines.crystalMine || 0;
+    const deuteriumMineLevel = mines.deuteriumMine || 0;
+    
+    let energyConsumption = 0;
+    if (metalMineLevel > 0) energyConsumption += Math.floor(10 * metalMineLevel * Math.pow(1.1, metalMineLevel));
+    if (crystalMineLevel > 0) energyConsumption += Math.floor(10 * crystalMineLevel * Math.pow(1.1, crystalMineLevel));
+    if (deuteriumMineLevel > 0) energyConsumption += Math.floor(20 * deuteriumMineLevel * Math.pow(1.05, deuteriumMineLevel));
+
+    // 에너지 비율
+    let energyRatio = 1.0;
+    if (energyProduction < energyConsumption) {
+      energyRatio = Math.max(0.1, energyProduction / energyConsumption);
+    }
+
+    // 자원 생산량 (시간당)
+    const metalProduction = Math.floor(90 * (metalMineLevel + 1) * Math.pow(1.1, metalMineLevel + 1)) * energyRatio;
+    const crystalProduction = Math.floor(60 * (crystalMineLevel + 1) * Math.pow(1.1, crystalMineLevel + 1)) * energyRatio;
+    const deuteriumProduction = Math.floor(30 * (deuteriumMineLevel + 1) * Math.pow(1.1, deuteriumMineLevel + 1)) * energyRatio;
+    const fusionConsumption = fusionLevel > 0 ? Math.floor(10 * fusionLevel * Math.pow(1.1, fusionLevel)) : 0;
+
+    // 경과 시간에 따른 자원 계산
+    const hoursElapsed = elapsedSeconds / 3600;
+    
+    return {
+      metal: (target.resources?.metal || 0) + metalProduction * hoursElapsed,
+      crystal: (target.resources?.crystal || 0) + crystalProduction * hoursElapsed,
+      deuterium: (target.resources?.deuterium || 0) + (deuteriumProduction - fusionConsumption) * hoursElapsed,
+      energy: energyProduction - energyConsumption,
+    };
+  }
+
   // 정찰 보고서 생성
   private generateSpyReport(
     target: UserDocument,
@@ -275,21 +331,27 @@ export class GalaxyService {
     probesLost: number,
     probesSurvived: number,
     targetCoord: string,
+    mySpyLevel: number,
+    targetSpyLevel: number,
   ): SpyReport {
     const report: SpyReport = {
       targetCoord,
       targetName: target.playerName,
       probesLost,
       probesSurvived,
+      stScore,
+      mySpyLevel,
+      targetSpyLevel,
     };
 
-    // ST ≤ 1: 자원만
+    // ST ≤ 1: 자원만 (실시간 계산)
     if (stScore >= 1) {
+      const currentResources = this.calculateCurrentResources(target);
       report.resources = {
-        metal: target.resources?.metal || 0,
-        crystal: target.resources?.crystal || 0,
-        deuterium: target.resources?.deuterium || 0,
-        energy: target.resources?.energy || 0,
+        metal: currentResources.metal,
+        crystal: currentResources.crystal,
+        deuterium: currentResources.deuterium,
+        energy: currentResources.energy,
       };
     }
 
@@ -335,7 +397,9 @@ export class GalaxyService {
   private formatSpyReportContent(report: SpyReport): string {
     let content = `=== 정찰 보고서 ===\n`;
     content += `대상: ${report.targetName} [${report.targetCoord}]\n`;
-    content += `정찰 위성: ${report.probesSurvived}대 귀환, ${report.probesLost}대 손실\n\n`;
+    content += `정찰 위성: ${report.probesSurvived}대 귀환, ${report.probesLost}대 손실\n`;
+    content += `ST 점수: ${report.stScore} (내 정탐기술: Lv.${report.mySpyLevel}, 상대 정탐기술: Lv.${report.targetSpyLevel})\n`;
+    content += `※ ST≥2: 함대, ST≥3: 방어, ST≥5: 건물, ST≥7: 연구\n\n`;
 
     if (report.resources) {
       content += `【 자원 현황 】\n`;
