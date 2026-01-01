@@ -3,13 +3,12 @@ class ApiConstants {
   // 🔧 배포 시 이 부분만 수정하세요!
   // ============================================
   
-  // 프로덕션 서버 주소 (Lightsail 배포 후 변경)
-  // 예: 'http://13.125.xxx.xxx:3000/api/'
-  static const String prodBaseUrl = 'http://YOUR_LIGHTSAIL_IP:3000/api/';
-  static const String prodSocketUrl = 'http://YOUR_LIGHTSAIL_IP:3000';
+  // 프로덕션 서버 주소 (Lightsail)
+  static const String prodBaseUrl = 'http://43.203.238.19:3000/api/';
+  static const String prodSocketUrl = 'http://43.203.238.19:3000';
   
-  // true로 변경하면 프로덕션 서버 사용
-  static const bool isProduction = false;
+  // 프로덕션 서버 사용
+  static const bool isProduction = true;
   
   // ============================================
   
