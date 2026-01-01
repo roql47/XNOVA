@@ -2,6 +2,9 @@ import { Model } from 'mongoose';
 import { UserDocument } from '../../user/schemas/user.schema';
 import { ResourcesService } from './resources.service';
 import { FleetService } from './fleet.service';
+import { MessageService } from '../../message/message.service';
+import { GalaxyService } from '../../galaxy/galaxy.service';
+import { BattleReportService, OGameRoundInfo, BattleParticipant } from './battle-report.service';
 export interface BattleResult {
     attackerWon: boolean;
     defenderWon: boolean;
@@ -13,7 +16,7 @@ export interface BattleResult {
     survivingDefenderFleet: Record<string, number>;
     survivingDefenderDefense: Record<string, number>;
     restoredDefenses: Record<string, number>;
-    rounds: any[];
+    rounds: OGameRoundInfo[];
     attackerLosses: {
         metal: number;
         crystal: number;
@@ -33,16 +36,32 @@ export interface BattleResult {
         crystal: number;
         deuterium: number;
     };
+    moonChance: number;
+    moonCreated: boolean;
+    battleSeed?: number;
+    battleTime?: Date;
+    before?: {
+        attackers: BattleParticipant[];
+        defenders: BattleParticipant[];
+    };
 }
 export declare class BattleService {
     private userModel;
     private resourcesService;
     private fleetService;
-    constructor(userModel: Model<UserDocument>, resourcesService: ResourcesService, fleetService: FleetService);
+    private messageService;
+    private galaxyService;
+    private battleReportService;
+    constructor(userModel: Model<UserDocument>, resourcesService: ResourcesService, fleetService: FleetService, messageService: MessageService, galaxyService: GalaxyService, battleReportService: BattleReportService);
+    private calculateAttackPower;
+    private calculateMaxShield;
+    private calculateHull;
     private performAttack;
     private checkExploded;
     private checkRapidFire;
+    private checkFastDraw;
     simulateBattle(attackerFleet: Record<string, number>, defenderFleet: Record<string, number>, defenderDefense: Record<string, number>, attackerResearch?: Record<string, number>, defenderResearch?: Record<string, number>): BattleResult;
+    private createParticipantSnapshot;
     private countRemainingUnits;
     calculateDistance(coordA: string, coordB: string): number;
     calculateLoot(resources: {
@@ -64,11 +83,25 @@ export declare class BattleService {
         distance: number;
     }>;
     getAttackStatus(userId: string): Promise<any>;
+    startRecycle(attackerId: string, targetCoord: string, fleet: Record<string, number>): Promise<{
+        message: string;
+        travelTime: number;
+        arrivalTime: Date;
+    }>;
+    processRecycleArrival(userId: string): Promise<{
+        metalLoot: number;
+        crystalLoot: number;
+    } | null>;
     processAttackArrival(attackerId: string): Promise<{
         battleResult: BattleResult;
         attacker: any;
         defender: any;
     } | null>;
+    processIncomingAttacks(userId: string): Promise<Array<{
+        battleResult: BattleResult;
+        attacker: any;
+        defender: any;
+    }>>;
     processFleetReturn(userId: string): Promise<{
         returnedFleet: Record<string, number>;
         loot: Record<string, number>;

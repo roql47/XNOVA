@@ -12,18 +12,16 @@ class BuildingsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final gameState = ref.watch(gameProvider);
     
-    // 카테고리별로 건물 분류
-    final mines = gameState.buildings.where((b) => b.category == 'mine').toList();
-    final facilities = gameState.buildings.where((b) => b.category == 'facility').toList();
+    final mines = gameState.buildings.where((b) => b.category == 'mines').toList();
+    final facilities = gameState.buildings.where((b) => b.category == 'facilities').toList();
 
     return RefreshIndicator(
       onRefresh: () => ref.read(gameProvider.notifier).loadBuildings(),
-      color: AppColors.ogameGreen,
-      backgroundColor: AppColors.panelBackground,
+      color: AppColors.accent,
+      backgroundColor: AppColors.surface,
       child: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          // 건설 진행 중
           if (gameState.constructionProgress != null)
             _ConstructionProgressCard(
               progress: gameState.constructionProgress!,
@@ -31,9 +29,8 @@ class BuildingsTab extends ConsumerWidget {
               onCancel: () => ref.read(gameProvider.notifier).cancelBuilding(),
             ),
           
-          // 광산
           if (mines.isNotEmpty) ...[
-            const _SectionHeader(emoji: '⛏️', title: '자원 생산'),
+            const _SectionHeader(icon: Icons.precision_manufacturing, title: '자원 생산'),
             ...mines.map((building) => _BuildingCard(
               building: building,
               resources: gameState.resources,
@@ -42,10 +39,9 @@ class BuildingsTab extends ConsumerWidget {
             )),
           ],
           
-          // 시설
           if (facilities.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const _SectionHeader(emoji: '🏭', title: '시설'),
+            const _SectionHeader(icon: Icons.apartment, title: '시설'),
             ...facilities.map((building) => _BuildingCard(
               building: building,
               resources: gameState.resources,
@@ -60,25 +56,26 @@ class BuildingsTab extends ConsumerWidget {
 }
 
 class _SectionHeader extends StatelessWidget {
-  final String emoji;
+  final IconData icon;
   final String title;
 
-  const _SectionHeader({required this.emoji, required this.title});
+  const _SectionHeader({required this.icon, required this.title});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 10, left: 2),
       child: Row(
         children: [
-          Text(emoji, style: const TextStyle(fontSize: 18)),
+          Icon(icon, size: 16, color: AppColors.textMuted),
           const SizedBox(width: 8),
           Text(
             title,
             style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
+              color: AppColors.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
             ),
           ),
         ],
@@ -104,51 +101,53 @@ class _ConstructionProgressCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.ogameGreen.withOpacity(0.1),
+          color: AppColors.accent.withOpacity(0.08),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.ogameGreen.withOpacity(0.3)),
+          border: Border.all(color: AppColors.accent.withOpacity(0.2)),
         ),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.construction, color: AppColors.ogameGreen, size: 20),
+                Icon(Icons.construction, color: AppColors.accent, size: 16),
                 const SizedBox(width: 8),
                 const Text(
                   '건설 중',
                   style: TextStyle(
-                    color: AppColors.ogameGreen,
-                    fontWeight: FontWeight.bold,
+                    color: AppColors.accent,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
               progress.name,
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Row(
               children: [
-                const Icon(Icons.timer, size: 16, color: AppColors.warningOrange),
-                const SizedBox(width: 8),
+                Icon(Icons.schedule, size: 14, color: AppColors.textMuted),
+                const SizedBox(width: 6),
                 if (progress.finishDateTime != null)
                   ProgressTimer(
                     finishTime: progress.finishDateTime!,
                     onComplete: onComplete,
                   ),
                 const Spacer(),
-                TextButton(
-                  onPressed: onCancel,
+                GestureDetector(
+                  onTap: onCancel,
                   child: const Text(
                     '취소',
-                    style: TextStyle(color: AppColors.errorRed, fontSize: 12),
+                    style: TextStyle(color: AppColors.negative, fontSize: 12),
                   ),
                 ),
               ],
@@ -160,7 +159,7 @@ class _ConstructionProgressCard extends StatelessWidget {
   }
 }
 
-class _BuildingCard extends StatelessWidget {
+class _BuildingCard extends StatefulWidget {
   final BuildingInfo building;
   final GameResources resources;
   final bool isConstructing;
@@ -173,11 +172,18 @@ class _BuildingCard extends StatelessWidget {
     required this.onUpgrade,
   });
 
+  @override
+  State<_BuildingCard> createState() => _BuildingCardState();
+}
+
+class _BuildingCardState extends State<_BuildingCard> {
+  bool _isExpanded = false;
+
   bool get canAfford {
-    if (building.upgradeCost == null) return false;
-    return resources.metal >= building.upgradeCost!.metal &&
-           resources.crystal >= building.upgradeCost!.crystal &&
-           resources.deuterium >= building.upgradeCost!.deuterium;
+    if (widget.building.upgradeCost == null) return false;
+    return widget.resources.metal >= widget.building.upgradeCost!.metal &&
+           widget.resources.crystal >= widget.building.upgradeCost!.crystal &&
+           widget.resources.deuterium >= widget.building.upgradeCost!.deuterium;
   }
 
   @override
@@ -192,51 +198,105 @@ class _BuildingCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // 헤더
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: const BoxDecoration(
-                color: AppColors.panelHeader,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(7),
-                  topRight: Radius.circular(7),
+            InkWell(
+              onTap: () => setState(() => _isExpanded = !_isExpanded),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(7),
+                topRight: Radius.circular(7),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: const BoxDecoration(
+                  color: AppColors.panelHeader,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(7),
+                    topRight: Radius.circular(7),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.building.name,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        'Lv.${widget.building.level}',
+                        style: const TextStyle(
+                          color: AppColors.accent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      _isExpanded ? Icons.expand_less : Icons.expand_more,
+                      size: 16,
+                      color: AppColors.textMuted,
+                    ),
+                  ],
                 ),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      building.name,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.ogameGreen.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'Lv.${building.level}',
-                      style: const TextStyle(
-                        color: AppColors.ogameGreen,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ),
-            // 컨텐츠
+            if (_isExpanded)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  border: Border(bottom: BorderSide(color: AppColors.panelBorder)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (widget.building.production != null)
+                      _DetailRow(
+                        label: widget.building.type == 'solarPlant' ? '에너지 생산량' : '자원 생산량',
+                        currentValue: '+${_formatAmount(widget.building.production!)}/h',
+                        nextValue: widget.building.nextProduction != null 
+                            ? '+${_formatAmount(widget.building.nextProduction!)}/h' 
+                            : null,
+                        isPositive: true,
+                      ),
+                    if (widget.building.consumption != null && widget.building.consumption! > 0)
+                      _DetailRow(
+                        label: widget.building.type == 'fusionReactor' ? '듀테륨 소모량' : '에너지 소모량',
+                        currentValue: '-${_formatAmount(widget.building.consumption!)}',
+                        nextValue: widget.building.nextConsumption != null 
+                            ? '-${_formatAmount(widget.building.nextConsumption!)}' 
+                            : null,
+                        isPositive: false,
+                      ),
+                  ],
+                ),
+              ),
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
-                  // 비용
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: _buildBuildingImage(widget.building.type),
+                  ),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,35 +304,40 @@ class _BuildingCard extends StatelessWidget {
                         const Text(
                           '업그레이드 비용',
                           style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 11,
+                            color: AppColors.textMuted,
+                            fontSize: 10,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        if (building.upgradeCost != null)
+                        const SizedBox(height: 6),
+                        if (widget.building.upgradeCost != null)
                           CostDisplay(
-                            metal: building.upgradeCost!.metal,
-                            crystal: building.upgradeCost!.crystal,
-                            deuterium: building.upgradeCost!.deuterium,
-                            currentMetal: resources.metal,
-                            currentCrystal: resources.crystal,
-                            currentDeuterium: resources.deuterium,
+                            metal: widget.building.upgradeCost!.metal,
+                            crystal: widget.building.upgradeCost!.crystal,
+                            deuterium: widget.building.upgradeCost!.deuterium,
+                            currentMetal: widget.resources.metal,
+                            currentCrystal: widget.resources.crystal,
+                            currentDeuterium: widget.resources.deuterium,
                           ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '⏱️ ${_formatTime(building.upgradeTime)}',
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 11,
-                          ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(Icons.schedule, size: 12, color: AppColors.textMuted),
+                            const SizedBox(width: 4),
+                            Text(
+                              _formatTime(widget.building.upgradeTime),
+                              style: const TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
-                  // 버튼
                   GameButton(
                     text: '업그레이드',
-                    onPressed: (!isConstructing && canAfford) ? onUpgrade : null,
+                    onPressed: (!widget.isConstructing && canAfford) ? widget.onUpgrade : null,
                     icon: Icons.arrow_upward,
                   ),
                 ],
@@ -282,6 +347,94 @@ class _BuildingCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatAmount(int amount) {
+    if (amount >= 1000000) return '${(amount / 1000000).toStringAsFixed(1)}M';
+    if (amount >= 1000) return '${(amount / 1000).toStringAsFixed(1)}K';
+    return amount.toString();
+  }
+
+  Widget _buildBuildingImage(String type) {
+    String? assetPath;
+    switch (type) {
+      case 'metalMine':
+        assetPath = 'assets/images/metalmine.webp';
+        break;
+      case 'crystalMine':
+        assetPath = 'assets/images/crystalmine.webp';
+        break;
+      case 'deuteriumMine':
+      case 'deuteriumSynthesizer':
+        assetPath = 'assets/images/deuterium_synthesizer.webp';
+        break;
+      case 'solarPlant':
+        assetPath = 'assets/images/solarplant.webp';
+        break;
+      case 'fusionReactor':
+        assetPath = 'assets/images/fusion_reactor.webp';
+        break;
+      case 'robotFactory':
+      case 'roboticsFactory':
+        assetPath = 'assets/images/robotics_factory.webp';
+        break;
+      case 'nanoFactory':
+      case 'naniteFactory':
+        assetPath = 'assets/images/nanite_factory.webp';
+        break;
+      case 'shipyard':
+        assetPath = 'assets/images/shipyard.webp';
+        break;
+      case 'metalStorage':
+        assetPath = 'assets/images/metal_storage.webp';
+        break;
+      case 'crystalStorage':
+        assetPath = 'assets/images/crystal_storage.webp';
+        break;
+      case 'deuteriumTank':
+        assetPath = 'assets/images/deuterium_tank.webp';
+        break;
+      case 'researchLaboratory':
+      case 'researchLab':
+        assetPath = 'assets/images/research_rab.webp';
+        break;
+      case 'terraformer':
+        assetPath = 'assets/images/terraformer.webp';
+        break;
+      case 'allianceDepot':
+        assetPath = 'assets/images/alliance_depot.webp';
+        break;
+      case 'missileSilo':
+        assetPath = 'assets/images/missile_silo.webp';
+        break;
+      case 'spaceDock':
+        assetPath = 'assets/images/space_dock.webp';
+        break;
+      case 'lunarBase':
+        assetPath = 'assets/images/lunar_base.webp';
+        break;
+      case 'sensorPhalanx':
+        assetPath = 'assets/images/sensor_phalanx.webp';
+        break;
+      case 'jumpGate':
+        assetPath = 'assets/images/jump_gate.webp';
+        break;
+    }
+
+    if (assetPath != null) {
+      return Image.asset(
+        assetPath,
+        width: 72,
+        height: 72,
+        cacheWidth: 144,
+        cacheHeight: 144,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => 
+            const Icon(Icons.apartment, size: 32, color: AppColors.textMuted),
+      );
+    }
+
+    return const Icon(Icons.apartment, size: 32, color: AppColors.textMuted);
   }
 
   String _formatTime(double seconds) {
@@ -295,3 +448,51 @@ class _BuildingCard extends StatelessWidget {
   }
 }
 
+class _DetailRow extends StatelessWidget {
+  final String label;
+  final String currentValue;
+  final String? nextValue;
+  final bool isPositive;
+
+  const _DetailRow({
+    required this.label,
+    required this.currentValue,
+    this.nextValue,
+    required this.isPositive,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isPositive ? AppColors.positive : AppColors.negative;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+          ),
+          Row(
+            children: [
+              Text(
+                currentValue,
+                style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+              ),
+              if (nextValue != null) ...[
+                const SizedBox(width: 6),
+                Icon(Icons.arrow_forward, size: 10, color: AppColors.textMuted),
+                const SizedBox(width: 6),
+                Text(
+                  nextValue!,
+                  style: TextStyle(color: color.withOpacity(0.7), fontSize: 11, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

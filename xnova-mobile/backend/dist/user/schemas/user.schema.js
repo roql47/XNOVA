@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserSchema = exports.User = exports.ReturnProgress = exports.AttackProgress = exports.ProgressInfo = exports.Defense = exports.Fleet = exports.ResearchLevels = exports.Facilities = exports.Mines = exports.Resources = void 0;
+exports.UserSchema = exports.User = exports.ReturnProgress = exports.AttackProgress = exports.ProgressInfo = exports.Defense = exports.Fleet = exports.ResearchLevels = exports.PlanetInfo = exports.Facilities = exports.Mines = exports.Resources = void 0;
 const mongoose_1 = require("@nestjs/mongoose");
 let Resources = class Resources {
     metal;
@@ -73,6 +73,15 @@ let Facilities = class Facilities {
     shipyard;
     researchLab;
     nanoFactory;
+    terraformer;
+    allianceDepot;
+    missileSilo;
+    metalStorage;
+    crystalStorage;
+    deuteriumTank;
+    lunarBase;
+    sensorPhalanx;
+    jumpGate;
 };
 exports.Facilities = Facilities;
 __decorate([
@@ -91,9 +100,86 @@ __decorate([
     (0, mongoose_1.Prop)({ default: 0 }),
     __metadata("design:type", Number)
 ], Facilities.prototype, "nanoFactory", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 0 }),
+    __metadata("design:type", Number)
+], Facilities.prototype, "terraformer", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 0 }),
+    __metadata("design:type", Number)
+], Facilities.prototype, "allianceDepot", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 0 }),
+    __metadata("design:type", Number)
+], Facilities.prototype, "missileSilo", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 0 }),
+    __metadata("design:type", Number)
+], Facilities.prototype, "metalStorage", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 0 }),
+    __metadata("design:type", Number)
+], Facilities.prototype, "crystalStorage", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 0 }),
+    __metadata("design:type", Number)
+], Facilities.prototype, "deuteriumTank", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 0 }),
+    __metadata("design:type", Number)
+], Facilities.prototype, "lunarBase", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 0 }),
+    __metadata("design:type", Number)
+], Facilities.prototype, "sensorPhalanx", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 0 }),
+    __metadata("design:type", Number)
+], Facilities.prototype, "jumpGate", void 0);
 exports.Facilities = Facilities = __decorate([
     (0, mongoose_1.Schema)({ _id: false })
 ], Facilities);
+let PlanetInfo = class PlanetInfo {
+    maxFields;
+    usedFields;
+    temperature;
+    planetType;
+    isMoon;
+    planetName;
+    diameter;
+};
+exports.PlanetInfo = PlanetInfo;
+__decorate([
+    (0, mongoose_1.Prop)({ default: 163 }),
+    __metadata("design:type", Number)
+], PlanetInfo.prototype, "maxFields", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 0 }),
+    __metadata("design:type", Number)
+], PlanetInfo.prototype, "usedFields", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 50 }),
+    __metadata("design:type", Number)
+], PlanetInfo.prototype, "temperature", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 'normaltemp' }),
+    __metadata("design:type", String)
+], PlanetInfo.prototype, "planetType", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: false }),
+    __metadata("design:type", Boolean)
+], PlanetInfo.prototype, "isMoon", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: '' }),
+    __metadata("design:type", String)
+], PlanetInfo.prototype, "planetName", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 12800 }),
+    __metadata("design:type", Number)
+], PlanetInfo.prototype, "diameter", void 0);
+exports.PlanetInfo = PlanetInfo = __decorate([
+    (0, mongoose_1.Schema)({ _id: false })
+], PlanetInfo);
 let ResearchLevels = class ResearchLevels {
     energyTech;
     laserTech;
@@ -408,11 +494,13 @@ exports.ReturnProgress = ReturnProgress = __decorate([
 let User = class User {
     email;
     password;
+    googleId;
     playerName;
     coordinate;
     resources;
     mines;
     facilities;
+    planetInfo;
     researchLevels;
     fleet;
     defense;
@@ -431,9 +519,13 @@ __decorate([
     __metadata("design:type", String)
 ], User.prototype, "email", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ required: true }),
+    (0, mongoose_1.Prop)({ required: false }),
     __metadata("design:type", String)
 ], User.prototype, "password", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ unique: true, sparse: true }),
+    __metadata("design:type", String)
+], User.prototype, "googleId", void 0);
 __decorate([
     (0, mongoose_1.Prop)({ required: true }),
     __metadata("design:type", String)
@@ -454,6 +546,10 @@ __decorate([
     (0, mongoose_1.Prop)({ type: Facilities, default: () => ({}) }),
     __metadata("design:type", Facilities)
 ], User.prototype, "facilities", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: PlanetInfo, default: () => ({}) }),
+    __metadata("design:type", PlanetInfo)
+], User.prototype, "planetInfo", void 0);
 __decorate([
     (0, mongoose_1.Prop)({ type: ResearchLevels, default: () => ({}) }),
     __metadata("design:type", ResearchLevels)

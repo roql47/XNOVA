@@ -12,11 +12,31 @@ export interface BuildingInfo {
         deuterium?: number;
     } | null;
     upgradeTime: number;
+    production?: number;
+    consumption?: number;
+    nextProduction?: number;
+    nextConsumption?: number;
 }
 export declare class BuildingsService {
     private userModel;
     private resourcesService;
     constructor(userModel: Model<UserDocument>, resourcesService: ResourcesService);
+    extractPlanetPosition(coordinate: string): number;
+    generatePlanetFields(position: number, isHomeWorld?: boolean): {
+        maxFields: number;
+        temperature: number;
+        planetType: string;
+    };
+    calculateUsedFields(user: UserDocument): number;
+    getTerraformerBonus(terraformerLevel: number): number;
+    getMaxFields(user: UserDocument): number;
+    isFieldsFull(user: UserDocument): boolean;
+    getFieldInfo(user: UserDocument): {
+        used: number;
+        max: number;
+        remaining: number;
+        percentage: number;
+    };
     getUpgradeCost(buildingType: string, currentLevel: number): {
         metal: number;
         crystal: number;
@@ -26,6 +46,18 @@ export declare class BuildingsService {
     getBuildings(userId: string): Promise<{
         buildings: BuildingInfo[];
         constructionProgress: import("../../user/schemas/user.schema").ProgressInfo | null;
+        fieldInfo: {
+            used: number;
+            max: number;
+            remaining: number;
+            percentage: number;
+        };
+        planetInfo: {
+            temperature: number;
+            planetType: string;
+            planetName: string;
+            diameter: number;
+        };
     } | null>;
     startUpgrade(userId: string, buildingType: string): Promise<{
         message: string;

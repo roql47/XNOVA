@@ -36,9 +36,9 @@ export class ResearchService {
 
   // 연구 시간 계산 - XNOVA.js getResearchTime 마이그레이션
   getResearchTime(metal: number, crystal: number, labLevel: number): number {
-    // 연구 시간(초) = (메탈 + 크리스탈) / (20000 × (1 + 연구소 레벨))
+    // 연구 시간(초) = (메탈 + 크리스탈) / (20000 × (1 + 연구소 레벨)) - 10배 상향
     const hours = (metal + crystal) / (20000 * (1 + labLevel));
-    return hours * 3600; // 초 단위로 반환
+    return hours * 3600 * 10; // 초 단위로 반환 (10배)
   }
 
   // 연구 요구사항 확인

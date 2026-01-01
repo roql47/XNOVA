@@ -20,41 +20,83 @@ const user_schema_1 = require("../../user/schemas/user.schema");
 const resources_service_1 = require("./resources.service");
 const fleet_service_1 = require("./fleet.service");
 const game_data_1 = require("../constants/game-data");
+const message_service_1 = require("../../message/message.service");
+const galaxy_service_1 = require("../../galaxy/galaxy.service");
+const battle_report_service_1 = require("./battle-report.service");
+const FLEET_IN_DEBRIS = 0.3;
+const DEFENSE_IN_DEBRIS = 0;
 let BattleService = class BattleService {
     userModel;
     resourcesService;
     fleetService;
-    constructor(userModel, resourcesService, fleetService) {
+    messageService;
+    galaxyService;
+    battleReportService;
+    constructor(userModel, resourcesService, fleetService, messageService, galaxyService, battleReportService) {
         this.userModel = userModel;
         this.resourcesService = resourcesService;
         this.fleetService = fleetService;
+        this.messageService = messageService;
+        this.galaxyService = galaxyService;
+        this.battleReportService = battleReportService;
     }
-    performAttack(attackingUnit, targetUnit) {
-        const attackPower = attackingUnit.attack;
-        const shieldStrength = targetUnit.shield;
-        if (attackPower < (shieldStrength / 100)) {
-            return;
+    calculateAttackPower(baseAttack, weaponsTech) {
+        return Math.floor(baseAttack * (10 + weaponsTech) / 10);
+    }
+    calculateMaxShield(baseShield, shieldTech) {
+        return Math.floor(baseShield * (10 + shieldTech) / 10);
+    }
+    calculateHull(structure, armorTech) {
+        return Math.floor(structure * 0.1 * (10 + armorTech) / 10);
+    }
+    performAttack(attacker, target) {
+        const result = { absorbed: 0, hullDamage: 0 };
+        if (target.exploded) {
+            return result;
         }
-        if (attackPower <= shieldStrength) {
-            targetUnit.shield -= attackPower;
-            return;
+        const attackPower = attacker.attack;
+        if (target.shield === 0) {
+            target.hull -= attackPower;
+            result.hullDamage = attackPower;
+            if (target.hull < 0)
+                target.hull = 0;
+            return result;
         }
-        else {
-            const remainingDamage = attackPower - shieldStrength;
-            targetUnit.shield = 0;
-            targetUnit.hp -= remainingDamage;
-            if (targetUnit.hp < 0) {
-                targetUnit.hp = 0;
-            }
+        const shieldOnePercent = target.maxShield * 0.01;
+        if (attackPower < shieldOnePercent) {
+            return result;
         }
+        const depleted = Math.floor(attackPower / shieldOnePercent);
+        const shieldDamage = depleted * shieldOnePercent;
+        if (target.shield >= shieldDamage) {
+            target.shield -= shieldDamage;
+            result.absorbed = attackPower;
+            return result;
+        }
+        const remainingDamage = attackPower - target.shield;
+        result.absorbed = target.shield;
+        target.shield = 0;
+        target.hull -= remainingDamage;
+        result.hullDamage = remainingDamage;
+        if (target.hull < 0)
+            target.hull = 0;
+        return result;
     }
     checkExploded(unit) {
-        if (unit.hp <= 0) {
+        if (unit.exploded)
             return true;
+        if (unit.hull <= 0)
+            return true;
+        if (unit.hull > unit.maxHull * 0.7) {
+            return false;
         }
-        if (unit.hp <= unit.maxHP * 0.7) {
-            const explosionProbability = 1 - (unit.hp / unit.maxHP);
-            return Math.random() < explosionProbability;
+        if (unit.shield > 0) {
+            return false;
+        }
+        const explosionChance = Math.floor((unit.hull * 100) / unit.maxHull);
+        const random = Math.floor(Math.random() * 100);
+        if (random >= explosionChance || unit.hull <= 0) {
+            return true;
         }
         return false;
     }
@@ -63,16 +105,30 @@ let BattleService = class BattleService {
         if (!rapidFireValue || rapidFireValue <= 1) {
             return false;
         }
-        const rapidFireProbability = (rapidFireValue - 1) / rapidFireValue;
-        return Math.random() < rapidFireProbability;
+        const threshold = Math.floor(1000 / rapidFireValue);
+        const random = Math.floor(Math.random() * 1000) + 1;
+        return random > threshold;
+    }
+    checkFastDraw(attackerUnits, defenderUnits) {
+        for (const unit of attackerUnits) {
+            if (unit.hull < unit.maxHull) {
+                return false;
+            }
+        }
+        for (const unit of defenderUnits) {
+            if (unit.hull < unit.maxHull) {
+                return false;
+            }
+        }
+        return true;
     }
     simulateBattle(attackerFleet, defenderFleet, defenderDefense, attackerResearch = {}, defenderResearch = {}) {
-        const attackerWeaponBonus = 1 + (attackerResearch.weaponsTech || 0) * 0.1;
-        const attackerShieldBonus = 1 + (attackerResearch.shieldTech || 0) * 0.1;
-        const attackerArmorBonus = 1 + (attackerResearch.armorTech || 0) * 0.1;
-        const defenderWeaponBonus = 1 + (defenderResearch.weaponsTech || 0) * 0.1;
-        const defenderShieldBonus = 1 + (defenderResearch.shieldTech || 0) * 0.1;
-        const defenderArmorBonus = 1 + (defenderResearch.armorTech || 0) * 0.1;
+        const attackerWeaponsTech = attackerResearch.weaponsTech || 0;
+        const attackerShieldTech = attackerResearch.shieldTech || 0;
+        const attackerArmorTech = attackerResearch.armorTech || 0;
+        const defenderWeaponsTech = defenderResearch.weaponsTech || 0;
+        const defenderShieldTech = defenderResearch.shieldTech || 0;
+        const defenderArmorTech = defenderResearch.armorTech || 0;
         const result = {
             attackerWon: false,
             defenderWon: false,
@@ -89,27 +145,33 @@ let BattleService = class BattleService {
             defenderLosses: { metal: 0, crystal: 0, deuterium: 0 },
             debris: { metal: 0, crystal: 0 },
             loot: { metal: 0, crystal: 0, deuterium: 0 },
+            moonChance: 0,
+            moonCreated: false,
         };
         let attackerUnits = [];
         for (const type in attackerFleet) {
             if (attackerFleet[type] > 0 && game_data_1.FLEET_DATA[type]) {
                 const fleetStats = game_data_1.FLEET_DATA[type].stats;
                 const rapidFire = game_data_1.FLEET_DATA[type].rapidFire || {};
-                const attack = Math.floor(fleetStats.attack * attackerWeaponBonus);
-                const shield = Math.floor(fleetStats.shield * attackerShieldBonus);
-                const hp = Math.floor(fleetStats.hull * attackerArmorBonus);
+                const structure = fleetStats.hull;
+                const attack = this.calculateAttackPower(fleetStats.attack, attackerWeaponsTech);
+                const maxShield = this.calculateMaxShield(fleetStats.shield, attackerShieldTech);
+                const maxHull = this.calculateHull(structure, attackerArmorTech);
                 for (let i = 0; i < attackerFleet[type]; i++) {
                     attackerUnits.push({
                         id: `attacker_${type}_${i}`,
                         type,
                         side: 'attacker',
                         attack,
-                        shield,
-                        maxShield: shield,
-                        hp,
-                        maxHP: hp,
+                        baseAttack: fleetStats.attack,
+                        shield: maxShield,
+                        maxShield,
+                        hull: maxHull,
+                        maxHull,
+                        structure,
                         rapidFire,
                         isDefense: false,
+                        exploded: false,
                     });
                 }
             }
@@ -119,21 +181,25 @@ let BattleService = class BattleService {
             if (defenderFleet[type] > 0 && game_data_1.FLEET_DATA[type]) {
                 const fleetStats = game_data_1.FLEET_DATA[type].stats;
                 const rapidFire = game_data_1.FLEET_DATA[type].rapidFire || {};
-                const attack = Math.floor(fleetStats.attack * defenderWeaponBonus);
-                const shield = Math.floor(fleetStats.shield * defenderShieldBonus);
-                const hp = Math.floor(fleetStats.hull * defenderArmorBonus);
+                const structure = fleetStats.hull;
+                const attack = this.calculateAttackPower(fleetStats.attack, defenderWeaponsTech);
+                const maxShield = this.calculateMaxShield(fleetStats.shield, defenderShieldTech);
+                const maxHull = this.calculateHull(structure, defenderArmorTech);
                 for (let i = 0; i < defenderFleet[type]; i++) {
                     defenderUnits.push({
                         id: `defender_${type}_${i}`,
                         type,
                         side: 'defender',
                         attack,
-                        shield,
-                        maxShield: shield,
-                        hp,
-                        maxHP: hp,
+                        baseAttack: fleetStats.attack,
+                        shield: maxShield,
+                        maxShield,
+                        hull: maxHull,
+                        maxHull,
+                        structure,
                         rapidFire,
                         isDefense: false,
+                        exploded: false,
                     });
                 }
             }
@@ -141,21 +207,25 @@ let BattleService = class BattleService {
         for (const type in defenderDefense) {
             if (defenderDefense[type] > 0 && game_data_1.DEFENSE_DATA[type]) {
                 const defenseStats = game_data_1.DEFENSE_DATA[type].stats;
-                const attack = Math.floor(defenseStats.attack * defenderWeaponBonus);
-                const shield = Math.floor(defenseStats.shield * defenderShieldBonus);
-                const hp = Math.floor(defenseStats.hull * defenderArmorBonus);
+                const structure = defenseStats.hull;
+                const attack = this.calculateAttackPower(defenseStats.attack, defenderWeaponsTech);
+                const maxShield = this.calculateMaxShield(defenseStats.shield, defenderShieldTech);
+                const maxHull = this.calculateHull(structure, defenderArmorTech);
                 for (let i = 0; i < defenderDefense[type]; i++) {
                     defenderUnits.push({
                         id: `defense_${type}_${i}`,
                         type,
                         side: 'defender',
                         attack,
-                        shield,
-                        maxShield: shield,
-                        hp,
-                        maxHP: hp,
+                        baseAttack: defenseStats.attack,
+                        shield: maxShield,
+                        maxShield,
+                        hull: maxHull,
+                        maxHull,
+                        structure,
                         rapidFire: {},
                         isDefense: true,
+                        exploded: false,
                     });
                 }
             }
@@ -164,17 +234,16 @@ let BattleService = class BattleService {
         for (let round = 0; round < MAX_ROUNDS; round++) {
             const roundInfo = {
                 round: round + 1,
-                attackerTotalDamage: 0,
-                defenderTotalDamage: 0,
-                attackerShieldAbsorbed: 0,
-                defenderShieldAbsorbed: 0,
-                attackerHullDamage: 0,
-                defenderHullDamage: 0,
+                ashoot: 0,
+                apower: 0,
+                dabsorb: 0,
+                dshoot: 0,
+                dpower: 0,
+                aabsorb: 0,
+                attackers: [],
+                defenders: [],
                 destroyedAttackerShips: {},
                 destroyedDefenderShips: {},
-                remainingAttackerFleet: {},
-                remainingDefenderFleet: {},
-                remainingDefenderDefense: {},
                 rapidFireCount: 0,
             };
             if (attackerUnits.length === 0 || defenderUnits.length === 0) {
@@ -182,92 +251,152 @@ let BattleService = class BattleService {
                 result.rounds.push(roundInfo);
                 break;
             }
-            const allUnits = [...attackerUnits.map(u => ({ ...u })), ...defenderUnits.map(u => ({ ...u }))];
-            for (let i = allUnits.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [allUnits[i], allUnits[j]] = [allUnits[j], allUnits[i]];
-            }
-            for (const attackingUnit of allUnits) {
-                const targetUnits = attackingUnit.side === 'attacker' ? defenderUnits : attackerUnits;
-                if (targetUnits.length === 0)
-                    continue;
-                if (attackingUnit.hp <= 0)
-                    continue;
-                let fireCount = 1;
-                while (fireCount > 0 && targetUnits.length > 0) {
-                    const targetIndex = Math.floor(Math.random() * targetUnits.length);
-                    if (targetIndex < 0 || targetIndex >= targetUnits.length)
-                        continue;
-                    const targetUnit = targetUnits[targetIndex];
-                    if (!targetUnit || targetUnit.hp <= 0) {
-                        targetUnits.splice(targetIndex, 1);
-                        continue;
-                    }
-                    const initialShield = targetUnit.shield;
-                    const initialHp = targetUnit.hp;
-                    this.performAttack(attackingUnit, targetUnit);
-                    const shieldDamage = Math.max(0, initialShield - targetUnit.shield);
-                    const hullDamage = Math.max(0, initialHp - targetUnit.hp);
-                    if (attackingUnit.side === 'attacker') {
-                        roundInfo.attackerTotalDamage += (shieldDamage + hullDamage);
-                        roundInfo.defenderShieldAbsorbed += shieldDamage;
-                        roundInfo.defenderHullDamage += hullDamage;
-                    }
-                    else {
-                        roundInfo.defenderTotalDamage += (shieldDamage + hullDamage);
-                        roundInfo.attackerShieldAbsorbed += shieldDamage;
-                        roundInfo.attackerHullDamage += hullDamage;
-                    }
-                    if (targetUnit.hp > 0 && this.checkExploded(targetUnit)) {
-                        targetUnit.hp = 0;
-                        if (attackingUnit.side === 'attacker') {
-                            roundInfo.destroyedDefenderShips[targetUnit.type] = (roundInfo.destroyedDefenderShips[targetUnit.type] || 0) + 1;
-                            if (!targetUnit.isDefense && game_data_1.FLEET_DATA[targetUnit.type]) {
-                                const cost = game_data_1.FLEET_DATA[targetUnit.type].cost;
-                                result.debris.metal += Math.floor((cost.metal || 0) * 0.3);
-                                result.debris.crystal += Math.floor((cost.crystal || 0) * 0.3);
-                                result.defenderLosses.metal += (cost.metal || 0);
-                                result.defenderLosses.crystal += (cost.crystal || 0);
-                                result.defenderLosses.deuterium += (cost.deuterium || 0);
-                            }
-                            else if (game_data_1.DEFENSE_DATA[targetUnit.type]) {
-                                const cost = game_data_1.DEFENSE_DATA[targetUnit.type].cost;
-                                result.defenderLosses.metal += (cost.metal || 0);
-                                result.defenderLosses.crystal += (cost.crystal || 0);
-                                result.defenderLosses.deuterium += (cost.deuterium || 0);
-                            }
-                        }
-                        else {
-                            roundInfo.destroyedAttackerShips[targetUnit.type] = (roundInfo.destroyedAttackerShips[targetUnit.type] || 0) + 1;
-                            if (game_data_1.FLEET_DATA[targetUnit.type]) {
-                                const cost = game_data_1.FLEET_DATA[targetUnit.type].cost;
-                                result.debris.metal += Math.floor((cost.metal || 0) * 0.3);
-                                result.debris.crystal += Math.floor((cost.crystal || 0) * 0.3);
-                                result.attackerLosses.metal += (cost.metal || 0);
-                                result.attackerLosses.crystal += (cost.crystal || 0);
-                                result.attackerLosses.deuterium += (cost.deuterium || 0);
-                            }
-                        }
-                    }
-                    if (targetUnit.hp <= 0 || this.checkRapidFire(attackingUnit, targetUnit)) {
-                        fireCount++;
-                        roundInfo.rapidFireCount++;
-                    }
-                    if (targetUnit.hp <= 0) {
-                        targetUnits.splice(targetIndex, 1);
-                    }
-                    fireCount--;
-                }
-            }
-            attackerUnits = attackerUnits.filter(unit => unit.hp > 0);
-            defenderUnits = defenderUnits.filter(unit => unit.hp > 0);
-            this.countRemainingUnits(attackerUnits, defenderUnits, roundInfo);
-            result.rounds.push(roundInfo);
             for (const unit of attackerUnits) {
                 unit.shield = unit.maxShield;
             }
             for (const unit of defenderUnits) {
                 unit.shield = unit.maxShield;
+            }
+            const attackerHullsBefore = attackerUnits.map(u => u.hull);
+            const defenderHullsBefore = defenderUnits.map(u => u.hull);
+            for (const attackingUnit of attackerUnits) {
+                if (attackingUnit.exploded || attackingUnit.hull <= 0)
+                    continue;
+                if (defenderUnits.filter(u => !u.exploded && u.hull > 0).length === 0)
+                    break;
+                let fireCount = 1;
+                while (fireCount > 0) {
+                    const aliveTargets = defenderUnits.filter(u => !u.exploded && u.hull > 0);
+                    if (aliveTargets.length === 0)
+                        break;
+                    const targetIndex = Math.floor(Math.random() * aliveTargets.length);
+                    const targetUnit = aliveTargets[targetIndex];
+                    roundInfo.ashoot++;
+                    roundInfo.apower += attackingUnit.attack;
+                    const damageResult = this.performAttack(attackingUnit, targetUnit);
+                    roundInfo.dabsorb += damageResult.absorbed;
+                    if (targetUnit.hull > 0 && this.checkExploded(targetUnit)) {
+                        targetUnit.exploded = true;
+                        targetUnit.hull = 0;
+                        roundInfo.destroyedDefenderShips[targetUnit.type] =
+                            (roundInfo.destroyedDefenderShips[targetUnit.type] || 0) + 1;
+                        const data = targetUnit.isDefense ? game_data_1.DEFENSE_DATA[targetUnit.type] : game_data_1.FLEET_DATA[targetUnit.type];
+                        if (data) {
+                            const cost = data.cost;
+                            if (!targetUnit.isDefense) {
+                                result.debris.metal += Math.floor((cost.metal || 0) * FLEET_IN_DEBRIS);
+                                result.debris.crystal += Math.floor((cost.crystal || 0) * FLEET_IN_DEBRIS);
+                            }
+                            else {
+                                result.debris.metal += Math.floor((cost.metal || 0) * DEFENSE_IN_DEBRIS);
+                                result.debris.crystal += Math.floor((cost.crystal || 0) * DEFENSE_IN_DEBRIS);
+                            }
+                            result.defenderLosses.metal += (cost.metal || 0);
+                            result.defenderLosses.crystal += (cost.crystal || 0);
+                            result.defenderLosses.deuterium += (cost.deuterium || 0);
+                        }
+                    }
+                    else if (targetUnit.hull <= 0) {
+                        targetUnit.exploded = true;
+                        roundInfo.destroyedDefenderShips[targetUnit.type] =
+                            (roundInfo.destroyedDefenderShips[targetUnit.type] || 0) + 1;
+                        const data = targetUnit.isDefense ? game_data_1.DEFENSE_DATA[targetUnit.type] : game_data_1.FLEET_DATA[targetUnit.type];
+                        if (data) {
+                            const cost = data.cost;
+                            if (!targetUnit.isDefense) {
+                                result.debris.metal += Math.floor((cost.metal || 0) * FLEET_IN_DEBRIS);
+                                result.debris.crystal += Math.floor((cost.crystal || 0) * FLEET_IN_DEBRIS);
+                            }
+                            else {
+                                result.debris.metal += Math.floor((cost.metal || 0) * DEFENSE_IN_DEBRIS);
+                                result.debris.crystal += Math.floor((cost.crystal || 0) * DEFENSE_IN_DEBRIS);
+                            }
+                            result.defenderLosses.metal += (cost.metal || 0);
+                            result.defenderLosses.crystal += (cost.crystal || 0);
+                            result.defenderLosses.deuterium += (cost.deuterium || 0);
+                        }
+                    }
+                    if (this.checkRapidFire(attackingUnit, targetUnit)) {
+                        fireCount++;
+                        roundInfo.rapidFireCount++;
+                    }
+                    fireCount--;
+                }
+            }
+            for (const attackingUnit of defenderUnits) {
+                if (attackingUnit.exploded || attackingUnit.hull <= 0)
+                    continue;
+                if (attackerUnits.filter(u => !u.exploded && u.hull > 0).length === 0)
+                    break;
+                let fireCount = 1;
+                while (fireCount > 0) {
+                    const aliveTargets = attackerUnits.filter(u => !u.exploded && u.hull > 0);
+                    if (aliveTargets.length === 0)
+                        break;
+                    const targetIndex = Math.floor(Math.random() * aliveTargets.length);
+                    const targetUnit = aliveTargets[targetIndex];
+                    roundInfo.dshoot++;
+                    roundInfo.dpower += attackingUnit.attack;
+                    const damageResult = this.performAttack(attackingUnit, targetUnit);
+                    roundInfo.aabsorb += damageResult.absorbed;
+                    if (targetUnit.hull > 0 && this.checkExploded(targetUnit)) {
+                        targetUnit.exploded = true;
+                        targetUnit.hull = 0;
+                        roundInfo.destroyedAttackerShips[targetUnit.type] =
+                            (roundInfo.destroyedAttackerShips[targetUnit.type] || 0) + 1;
+                        const data = game_data_1.FLEET_DATA[targetUnit.type];
+                        if (data) {
+                            const cost = data.cost;
+                            result.debris.metal += Math.floor((cost.metal || 0) * FLEET_IN_DEBRIS);
+                            result.debris.crystal += Math.floor((cost.crystal || 0) * FLEET_IN_DEBRIS);
+                            result.attackerLosses.metal += (cost.metal || 0);
+                            result.attackerLosses.crystal += (cost.crystal || 0);
+                            result.attackerLosses.deuterium += (cost.deuterium || 0);
+                        }
+                    }
+                    else if (targetUnit.hull <= 0) {
+                        targetUnit.exploded = true;
+                        roundInfo.destroyedAttackerShips[targetUnit.type] =
+                            (roundInfo.destroyedAttackerShips[targetUnit.type] || 0) + 1;
+                        const data = game_data_1.FLEET_DATA[targetUnit.type];
+                        if (data) {
+                            const cost = data.cost;
+                            result.debris.metal += Math.floor((cost.metal || 0) * FLEET_IN_DEBRIS);
+                            result.debris.crystal += Math.floor((cost.crystal || 0) * FLEET_IN_DEBRIS);
+                            result.attackerLosses.metal += (cost.metal || 0);
+                            result.attackerLosses.crystal += (cost.crystal || 0);
+                            result.attackerLosses.deuterium += (cost.deuterium || 0);
+                        }
+                    }
+                    if (this.checkRapidFire(attackingUnit, targetUnit)) {
+                        fireCount++;
+                        roundInfo.rapidFireCount++;
+                    }
+                    fireCount--;
+                }
+            }
+            attackerUnits = attackerUnits.filter(unit => !unit.exploded && unit.hull > 0);
+            defenderUnits = defenderUnits.filter(unit => !unit.exploded && unit.hull > 0);
+            roundInfo.attackers = this.createParticipantSnapshot(attackerUnits, attackerWeaponsTech, attackerShieldTech, attackerArmorTech, 'attacker');
+            roundInfo.defenders = this.createParticipantSnapshot(defenderUnits, defenderWeaponsTech, defenderShieldTech, defenderArmorTech, 'defender');
+            result.rounds.push(roundInfo);
+            let noDamageDealt = true;
+            for (let i = 0; i < attackerUnits.length && i < attackerHullsBefore.length; i++) {
+                if (attackerUnits[i].hull < attackerHullsBefore[i]) {
+                    noDamageDealt = false;
+                    break;
+                }
+            }
+            if (noDamageDealt) {
+                for (let i = 0; i < defenderUnits.length && i < defenderHullsBefore.length; i++) {
+                    if (defenderUnits[i].hull < defenderHullsBefore[i]) {
+                        noDamageDealt = false;
+                        break;
+                    }
+                }
+            }
+            if (noDamageDealt && attackerUnits.length > 0 && defenderUnits.length > 0) {
+                break;
             }
         }
         const finalAttackerFleet = {};
@@ -301,51 +430,103 @@ let BattleService = class BattleService {
         }
         result.survivingAttackerFleet = finalAttackerFleet;
         result.survivingDefenderFleet = finalDefenderFleet;
-        result.survivingDefenderDefense = finalDefenderDefense;
+        result.survivingDefenderDefense = { ...finalDefenderDefense };
         const attackerSurvives = attackerUnits.length > 0;
-        const defenderSurvives = defenderUnits.some(unit => !unit.isDefense);
-        const onlyDefenseSurvives = defenderUnits.length > 0 && defenderUnits.every(unit => unit.isDefense);
-        if (!attackerSurvives && defenderSurvives) {
+        const defenderSurvives = defenderUnits.length > 0;
+        const defenderFleetSurvives = defenderUnits.some(unit => !unit.isDefense);
+        if (attackerSurvives && !defenderSurvives) {
+            result.attackerWon = true;
+        }
+        else if (!attackerSurvives && defenderSurvives) {
             result.defenderWon = true;
         }
-        else if (attackerSurvives && (!defenderSurvives || onlyDefenseSurvives)) {
+        else if (attackerSurvives && defenderSurvives && !defenderFleetSurvives) {
             result.attackerWon = true;
-            for (const type in result.initialDefenderDefense) {
-                const initialCount = result.initialDefenderDefense[type] || 0;
-                const surviveCount = finalDefenderDefense[type] || 0;
-                const destroyedCount = initialCount - surviveCount;
-                if (destroyedCount > 0) {
-                    let restoredCount = 0;
+        }
+        else {
+            result.draw = true;
+        }
+        for (const type in result.initialDefenderDefense) {
+            const initialCount = result.initialDefenderDefense[type] || 0;
+            const surviveCount = finalDefenderDefense[type] || 0;
+            const destroyedCount = initialCount - surviveCount;
+            if (destroyedCount > 0) {
+                let restoredCount = 0;
+                if (destroyedCount < 10) {
                     for (let i = 0; i < destroyedCount; i++) {
-                        if (Math.random() < 0.7) {
+                        if (Math.floor(Math.random() * 100) < 70) {
                             restoredCount++;
                         }
                     }
-                    if (restoredCount > 0) {
-                        result.restoredDefenses[type] = restoredCount;
-                        result.survivingDefenderDefense[type] += restoredCount;
+                }
+                else {
+                    const restorePercent = Math.floor(Math.random() * 21) + 60;
+                    restoredCount = Math.floor(destroyedCount * restorePercent / 100);
+                }
+                if (restoredCount > 0) {
+                    result.restoredDefenses[type] = restoredCount;
+                    result.survivingDefenderDefense[type] = (result.survivingDefenderDefense[type] || 0) + restoredCount;
+                    const defenseData = game_data_1.DEFENSE_DATA[type];
+                    if (defenseData) {
+                        result.defenderLosses.metal -= (defenseData.cost.metal || 0) * restoredCount;
+                        result.defenderLosses.crystal -= (defenseData.cost.crystal || 0) * restoredCount;
+                        result.defenderLosses.deuterium -= (defenseData.cost.deuterium || 0) * restoredCount;
                     }
                 }
             }
         }
-        else if (!attackerSurvives && !defenderSurvives) {
-            result.draw = true;
-        }
+        result.defenderLosses.metal = Math.max(0, result.defenderLosses.metal);
+        result.defenderLosses.crystal = Math.max(0, result.defenderLosses.crystal);
+        result.defenderLosses.deuterium = Math.max(0, result.defenderLosses.deuterium);
+        const totalDebris = result.debris.metal + result.debris.crystal;
+        result.moonChance = Math.min(20, Math.floor(totalDebris / 100000));
+        result.moonCreated = Math.random() < (result.moonChance / 100);
+        result.battleSeed = Math.floor(Math.random() * 1000000000);
+        result.battleTime = new Date();
         return result;
+    }
+    createParticipantSnapshot(units, weaponsTech, shieldTech, armorTech, side) {
+        const fleetCount = {};
+        const defenseCount = {};
+        for (const unit of units) {
+            if (!unit.exploded && unit.hull > 0) {
+                if (unit.isDefense) {
+                    defenseCount[unit.type] = (defenseCount[unit.type] || 0) + 1;
+                }
+                else {
+                    fleetCount[unit.type] = (fleetCount[unit.type] || 0) + 1;
+                }
+            }
+        }
+        const participant = {
+            name: side === 'attacker' ? '공격자' : '방어자',
+            id: side,
+            coordinate: '',
+            weaponsTech,
+            shieldTech,
+            armorTech,
+            fleet: fleetCount,
+            defense: side === 'defender' ? defenseCount : undefined,
+        };
+        return [participant];
     }
     countRemainingUnits(attackerUnits, defenderUnits, roundInfo) {
         const attackerCount = {};
         for (const unit of attackerUnits) {
-            attackerCount[unit.type] = (attackerCount[unit.type] || 0) + 1;
+            if (!unit.exploded && unit.hull > 0) {
+                attackerCount[unit.type] = (attackerCount[unit.type] || 0) + 1;
+            }
         }
         const defenderFleetCount = {};
         const defenderDefenseCount = {};
         for (const unit of defenderUnits) {
-            if (unit.isDefense) {
-                defenderDefenseCount[unit.type] = (defenderDefenseCount[unit.type] || 0) + 1;
-            }
-            else {
-                defenderFleetCount[unit.type] = (defenderFleetCount[unit.type] || 0) + 1;
+            if (!unit.exploded && unit.hull > 0) {
+                if (unit.isDefense) {
+                    defenderDefenseCount[unit.type] = (defenderDefenseCount[unit.type] || 0) + 1;
+                }
+                else {
+                    defenderFleetCount[unit.type] = (defenderFleetCount[unit.type] || 0) + 1;
+                }
             }
         }
         roundInfo.remainingAttackerFleet = { ...attackerCount };
@@ -372,20 +553,19 @@ let BattleService = class BattleService {
         if (!battleResult.attackerWon) {
             return { metal: 0, crystal: 0, deuterium: 0 };
         }
-        const lootRatio = 0.3;
-        const loot = {
-            metal: Math.floor(resources.metal * lootRatio),
-            crystal: Math.floor(resources.crystal * lootRatio),
-            deuterium: Math.floor(resources.deuterium * lootRatio),
+        let m = Math.floor(resources.metal / 2);
+        let k = Math.floor(resources.crystal / 2);
+        let d = Math.floor(resources.deuterium / 2);
+        const mc = Math.min(Math.floor(capacity / 3), m);
+        const remainingAfterMetal = capacity - mc;
+        const kc = Math.min(Math.floor(remainingAfterMetal / 2), k);
+        const remainingAfterCrystal = remainingAfterMetal - kc;
+        const dc = Math.min(remainingAfterCrystal, d);
+        return {
+            metal: mc,
+            crystal: kc,
+            deuterium: dc,
         };
-        const totalLoot = loot.metal + loot.crystal + loot.deuterium;
-        if (totalLoot > capacity) {
-            const ratio = capacity / totalLoot;
-            loot.metal = Math.floor(loot.metal * ratio);
-            loot.crystal = Math.floor(loot.crystal * ratio);
-            loot.deuterium = Math.floor(loot.deuterium * ratio);
-        }
-        return loot;
     }
     async startAttack(attackerId, targetCoord, fleet) {
         const attacker = await this.resourcesService.updateResources(attackerId);
@@ -495,86 +675,334 @@ let BattleService = class BattleService {
         }
         return result;
     }
+    async startRecycle(attackerId, targetCoord, fleet) {
+        for (const type in fleet) {
+            if (fleet[type] > 0 && type !== 'recycler') {
+                throw new common_1.BadRequestException('수확 임무에는 수확선만 보낼 수 있습니다.');
+            }
+        }
+        if (!fleet.recycler || fleet.recycler <= 0) {
+            throw new common_1.BadRequestException('수확선을 선택해주세요.');
+        }
+        const attacker = await this.resourcesService.updateResources(attackerId);
+        if (!attacker) {
+            throw new common_1.BadRequestException('사용자를 찾을 수 없습니다.');
+        }
+        if (attacker.pendingAttack || attacker.pendingReturn) {
+            throw new common_1.BadRequestException('이미 함대가 활동 중입니다.');
+        }
+        if (!attacker.fleet.recycler || attacker.fleet.recycler < fleet.recycler) {
+            throw new common_1.BadRequestException(`수확선을 ${fleet.recycler}대 보유하고 있지 않습니다.`);
+        }
+        const distance = this.calculateDistance(attacker.coordinate, targetCoord);
+        const minSpeed = this.fleetService.getFleetSpeed(fleet);
+        const travelTime = (distance / minSpeed) * 3600;
+        const fuelConsumption = this.fleetService.calculateFuelConsumption(fleet, distance, travelTime);
+        if (attacker.resources.deuterium < fuelConsumption) {
+            throw new common_1.BadRequestException(`듀테륨이 부족합니다. 필요: ${fuelConsumption}, 보유: ${Math.floor(attacker.resources.deuterium)}`);
+        }
+        const debris = await this.galaxyService.getDebris(targetCoord);
+        if (!debris || (debris.metal <= 0 && debris.crystal <= 0)) {
+            throw new common_1.BadRequestException('해당 좌표에 수확할 데브리가 없습니다.');
+        }
+        attacker.resources.deuterium -= fuelConsumption;
+        attacker.fleet.recycler -= fleet.recycler;
+        const startTime = new Date();
+        const arrivalTime = new Date(startTime.getTime() + travelTime * 1000);
+        attacker.pendingAttack = {
+            targetCoord,
+            targetUserId: 'debris',
+            fleet,
+            capacity: this.fleetService.calculateTotalCapacity(fleet),
+            travelTime,
+            startTime,
+            arrivalTime,
+            battleCompleted: false,
+        };
+        attacker.markModified('fleet');
+        attacker.markModified('resources');
+        attacker.markModified('pendingAttack');
+        await attacker.save();
+        return {
+            message: `${targetCoord} 좌표로 수확선이 출격했습니다.`,
+            travelTime,
+            arrivalTime,
+        };
+    }
+    async processRecycleArrival(userId) {
+        const user = await this.userModel.findById(userId).exec();
+        if (!user || !user.pendingAttack || user.pendingAttack.targetUserId !== 'debris') {
+            return null;
+        }
+        if (user.pendingAttack.arrivalTime.getTime() > Date.now()) {
+            return null;
+        }
+        const targetCoord = user.pendingAttack.targetCoord;
+        const debris = await this.galaxyService.getDebris(targetCoord);
+        const capacity = user.pendingAttack.capacity;
+        let metalLoot = 0;
+        let crystalLoot = 0;
+        if (debris) {
+            const totalDebris = debris.metal + debris.crystal;
+            if (totalDebris <= capacity) {
+                metalLoot = debris.metal;
+                crystalLoot = debris.crystal;
+            }
+            else {
+                const ratio = capacity / totalDebris;
+                metalLoot = Math.floor(debris.metal * ratio);
+                crystalLoot = Math.floor(debris.crystal * ratio);
+            }
+            await this.galaxyService.consumeDebris(targetCoord, metalLoot, crystalLoot);
+        }
+        const travelTime = user.pendingAttack.travelTime;
+        const returnTime = new Date(Date.now() + travelTime * 1000);
+        user.pendingReturn = {
+            fleet: user.pendingAttack.fleet,
+            loot: { metal: metalLoot, crystal: crystalLoot, deuterium: 0 },
+            returnTime,
+        };
+        user.pendingAttack = null;
+        user.markModified('pendingReturn');
+        user.markModified('pendingAttack');
+        await user.save();
+        await this.messageService.createMessage({
+            receiverId: userId,
+            senderName: '수확 사령부',
+            title: `${targetCoord} 수확 보고서`,
+            content: `데브리 수확을 완료했습니다. 획득 자원: 메탈 ${metalLoot}, 크리스탈 ${crystalLoot}`,
+            type: 'system',
+            metadata: { loot: { metal: metalLoot, crystal: crystalLoot } },
+        });
+        return { metalLoot, crystalLoot };
+    }
     async processAttackArrival(attackerId) {
         const attacker = await this.userModel.findById(attackerId).exec();
         if (!attacker || !attacker.pendingAttack || attacker.pendingAttack.battleCompleted) {
             return null;
         }
-        if (attacker.pendingAttack.arrivalTime.getTime() > Date.now()) {
+        const pa = attacker.pendingAttack;
+        if (pa.fleet && pa.fleet.capacity !== undefined) {
+            const fleetObj = pa.fleet;
+            if (pa.capacity === undefined)
+                pa.capacity = fleetObj.capacity;
+            if (pa.travelTime === undefined)
+                pa.travelTime = fleetObj.travelTime;
+            if (pa.startTime === undefined && fleetObj.startTime)
+                pa.startTime = new Date(fleetObj.startTime);
+            if (pa.arrivalTime === undefined && fleetObj.arrivalTime)
+                pa.arrivalTime = new Date(fleetObj.arrivalTime);
+            const cleanFleet = {};
+            for (const key in fleetObj) {
+                if (game_data_1.FLEET_DATA[key]) {
+                    cleanFleet[key] = fleetObj[key];
+                }
+            }
+            pa.fleet = cleanFleet;
+            attacker.markModified('pendingAttack');
+        }
+        const arrivalTime = pa.arrivalTime instanceof Date ? pa.arrivalTime : new Date(pa.arrivalTime);
+        if (arrivalTime.getTime() > Date.now()) {
             return null;
         }
-        const target = await this.userModel.findById(attacker.pendingAttack.targetUserId).exec();
+        const target = await this.userModel.findById(pa.targetUserId).exec();
         if (!target) {
             return null;
         }
+        await this.resourcesService.updateResources(attackerId);
         await this.resourcesService.updateResources(target._id.toString());
+        const updatedAttacker = await this.userModel.findById(attackerId).exec();
+        const updatedTarget = await this.userModel.findById(target._id.toString()).exec();
+        if (!updatedAttacker || !updatedTarget || !updatedAttacker.pendingAttack)
+            return null;
         const attackerResearch = {
-            weaponsTech: attacker.researchLevels.weaponsTech || 0,
-            shieldTech: attacker.researchLevels.shieldTech || 0,
-            armorTech: attacker.researchLevels.armorTech || 0,
+            weaponsTech: updatedAttacker.researchLevels.weaponsTech || 0,
+            shieldTech: updatedAttacker.researchLevels.shieldTech || 0,
+            armorTech: updatedAttacker.researchLevels.armorTech || 0,
         };
         const defenderResearch = {
-            weaponsTech: target.researchLevels.weaponsTech || 0,
-            shieldTech: target.researchLevels.shieldTech || 0,
-            armorTech: target.researchLevels.armorTech || 0,
+            weaponsTech: updatedTarget.researchLevels.weaponsTech || 0,
+            shieldTech: updatedTarget.researchLevels.shieldTech || 0,
+            armorTech: updatedTarget.researchLevels.armorTech || 0,
         };
         const defenderFleet = {};
-        for (const key in target.fleet) {
-            defenderFleet[key] = target.fleet[key] || 0;
+        const targetFleetObj = updatedTarget.fleet.toObject ? updatedTarget.fleet.toObject() : updatedTarget.fleet;
+        for (const key in targetFleetObj) {
+            if (game_data_1.FLEET_DATA[key]) {
+                defenderFleet[key] = targetFleetObj[key] || 0;
+            }
         }
         const defenderDefense = {};
-        for (const key in target.defense) {
-            defenderDefense[key] = target.defense[key] || 0;
+        const targetDefenseObj = updatedTarget.defense.toObject ? updatedTarget.defense.toObject() : updatedTarget.defense;
+        for (const key in targetDefenseObj) {
+            if (game_data_1.DEFENSE_DATA[key]) {
+                defenderDefense[key] = targetDefenseObj[key] || 0;
+            }
         }
-        const battleResult = this.simulateBattle(attacker.pendingAttack.fleet, defenderFleet, defenderDefense, attackerResearch, defenderResearch);
+        const battleResult = this.simulateBattle(updatedAttacker.pendingAttack.fleet, defenderFleet, defenderDefense, attackerResearch, defenderResearch);
+        battleResult.before = {
+            attackers: [{
+                    name: updatedAttacker.playerName,
+                    id: attackerId,
+                    coordinate: updatedAttacker.coordinate,
+                    weaponsTech: attackerResearch.weaponsTech,
+                    shieldTech: attackerResearch.shieldTech,
+                    armorTech: attackerResearch.armorTech,
+                    fleet: { ...updatedAttacker.pendingAttack.fleet },
+                }],
+            defenders: [{
+                    name: updatedTarget.playerName,
+                    id: updatedTarget._id.toString(),
+                    coordinate: updatedTarget.coordinate,
+                    weaponsTech: defenderResearch.weaponsTech,
+                    shieldTech: defenderResearch.shieldTech,
+                    armorTech: defenderResearch.armorTech,
+                    fleet: defenderFleet,
+                    defense: defenderDefense,
+                }],
+        };
         const loot = this.calculateLoot({
-            metal: target.resources.metal,
-            crystal: target.resources.crystal,
-            deuterium: target.resources.deuterium,
-        }, battleResult, attacker.pendingAttack.capacity);
+            metal: updatedTarget.resources.metal,
+            crystal: updatedTarget.resources.crystal,
+            deuterium: updatedTarget.resources.deuterium,
+        }, battleResult, updatedAttacker.pendingAttack.capacity);
         battleResult.loot = loot;
         if (battleResult.attackerWon) {
             for (const key in battleResult.survivingDefenderFleet) {
-                target.fleet[key] = battleResult.survivingDefenderFleet[key];
+                if (game_data_1.FLEET_DATA[key]) {
+                    updatedTarget.fleet[key] = battleResult.survivingDefenderFleet[key];
+                }
+                if (game_data_1.DEFENSE_DATA[key]) {
+                    updatedTarget.defense[key] = battleResult.survivingDefenderDefense[key];
+                }
             }
-            for (const key in battleResult.survivingDefenderDefense) {
-                target.defense[key] = battleResult.survivingDefenderDefense[key];
-            }
-            target.resources.metal = Math.max(0, target.resources.metal - loot.metal);
-            target.resources.crystal = Math.max(0, target.resources.crystal - loot.crystal);
-            target.resources.deuterium = Math.max(0, target.resources.deuterium - loot.deuterium);
+            updatedTarget.resources.metal = Math.max(0, updatedTarget.resources.metal - loot.metal);
+            updatedTarget.resources.crystal = Math.max(0, updatedTarget.resources.crystal - loot.crystal);
+            updatedTarget.resources.deuterium = Math.max(0, updatedTarget.resources.deuterium - loot.deuterium);
         }
         else {
             for (const key in battleResult.survivingDefenderFleet) {
-                target.fleet[key] = battleResult.survivingDefenderFleet[key];
+                if (game_data_1.FLEET_DATA[key]) {
+                    updatedTarget.fleet[key] = battleResult.survivingDefenderFleet[key];
+                }
             }
             for (const key in battleResult.survivingDefenderDefense) {
-                target.defense[key] = battleResult.survivingDefenderDefense[key];
+                if (game_data_1.DEFENSE_DATA[key]) {
+                    updatedTarget.defense[key] = battleResult.survivingDefenderDefense[key];
+                }
             }
         }
-        const returnTime = new Date(Date.now() + attacker.pendingAttack.travelTime * 1000);
-        attacker.pendingAttack.battleCompleted = true;
-        attacker.pendingReturn = {
-            fleet: battleResult.survivingAttackerFleet,
-            loot,
-            returnTime,
-        };
-        target.incomingAttack = null;
-        await attacker.save();
-        await target.save();
+        const travelTime = updatedAttacker.pendingAttack.travelTime || 0;
+        const returnTime = new Date(Date.now() + travelTime * 1000);
+        if (battleResult.debris.metal > 0 || battleResult.debris.crystal > 0) {
+            await this.galaxyService.updateDebris(updatedTarget.coordinate, battleResult.debris.metal, battleResult.debris.crystal);
+        }
+        const hasSurvivingFleet = Object.values(battleResult.survivingAttackerFleet).some(count => count > 0);
+        if (hasSurvivingFleet) {
+            updatedAttacker.pendingReturn = {
+                fleet: battleResult.survivingAttackerFleet,
+                loot,
+                returnTime,
+            };
+            updatedAttacker.markModified('pendingReturn');
+        }
+        else {
+            updatedAttacker.pendingReturn = null;
+            updatedAttacker.markModified('pendingReturn');
+        }
+        updatedAttacker.pendingAttack = null;
+        updatedAttacker.markModified('pendingAttack');
+        updatedTarget.incomingAttack = null;
+        updatedTarget.markModified('incomingAttack');
+        updatedTarget.markModified('fleet');
+        updatedTarget.markModified('defense');
+        updatedTarget.markModified('resources');
+        await updatedTarget.save();
+        await updatedAttacker.save();
+        try {
+            const htmlReport = this.battleReportService.generateBattleReport(battleResult, loot, battleResult.restoredDefenses);
+            const shortReport = this.battleReportService.generateShortReport(battleResult);
+            const attackerTotalLoss = battleResult.attackerLosses.metal +
+                battleResult.attackerLosses.crystal +
+                battleResult.attackerLosses.deuterium;
+            const defenderTotalLoss = battleResult.defenderLosses.metal +
+                battleResult.defenderLosses.crystal +
+                battleResult.defenderLosses.deuterium;
+            const attackerContent = shortReport || htmlReport;
+            const attackerResultText = battleResult.attackerWon
+                ? '승리'
+                : battleResult.draw
+                    ? '무승부'
+                    : '패배';
+            await this.messageService.createMessage({
+                receiverId: attackerId,
+                senderName: '전투 지휘부',
+                title: `전투 보고서 [${updatedTarget.coordinate}] (방어자 손실: ${defenderTotalLoss.toLocaleString()}, 공격자 손실: ${attackerTotalLoss.toLocaleString()})`,
+                content: attackerContent,
+                type: 'battle',
+                metadata: {
+                    battleResult: this.battleReportService.formatBattleResultForApi(battleResult, battleResult.before.attackers[0], battleResult.before.defenders[0]),
+                    resultType: attackerResultText,
+                    isAttacker: true,
+                    defender: {
+                        playerName: updatedTarget.playerName,
+                        coordinate: updatedTarget.coordinate,
+                    },
+                },
+            });
+            const defenderResultText = battleResult.defenderWon
+                ? '승리'
+                : battleResult.draw
+                    ? '무승부'
+                    : '패배';
+            await this.messageService.createMessage({
+                receiverId: updatedTarget._id.toString(),
+                senderName: '방어 사령부',
+                title: `전투 보고서 [${updatedAttacker.coordinate}] (방어자 손실: ${defenderTotalLoss.toLocaleString()}, 공격자 손실: ${attackerTotalLoss.toLocaleString()})`,
+                content: htmlReport,
+                type: 'battle',
+                metadata: {
+                    battleResult: this.battleReportService.formatBattleResultForApi(battleResult, battleResult.before.attackers[0], battleResult.before.defenders[0]),
+                    resultType: defenderResultText,
+                    isAttacker: false,
+                    attacker: {
+                        playerName: updatedAttacker.playerName,
+                        coordinate: updatedAttacker.coordinate,
+                    },
+                },
+            });
+        }
+        catch (msgError) {
+            console.error('전투 보고서 생성 실패:', msgError);
+        }
         return {
             battleResult,
             attacker: {
                 id: attackerId,
-                coordinate: attacker.coordinate,
-                playerName: attacker.playerName,
+                coordinate: updatedAttacker.coordinate,
+                playerName: updatedAttacker.playerName,
             },
             defender: {
-                id: target._id.toString(),
-                coordinate: target.coordinate,
-                playerName: target.playerName,
+                id: updatedTarget._id.toString(),
+                coordinate: updatedTarget.coordinate,
+                playerName: updatedTarget.playerName,
             },
         };
+    }
+    async processIncomingAttacks(userId) {
+        const attackers = await this.userModel.find({
+            'pendingAttack.targetUserId': userId,
+            'pendingAttack.battleCompleted': false,
+            'pendingAttack.arrivalTime': { $lte: new Date() }
+        }).exec();
+        const results = [];
+        for (const attacker of attackers) {
+            const result = await this.processAttackArrival(attacker._id.toString());
+            if (result) {
+                results.push(result);
+            }
+        }
+        return results;
     }
     async processFleetReturn(userId) {
         const user = await this.userModel.findById(userId).exec();
@@ -594,7 +1022,19 @@ let BattleService = class BattleService {
         user.resources.deuterium += (loot.deuterium || 0);
         user.pendingReturn = null;
         user.pendingAttack = null;
+        user.markModified('pendingReturn');
+        user.markModified('pendingAttack');
+        user.markModified('fleet');
+        user.markModified('resources');
         await user.save();
+        await this.messageService.createMessage({
+            receiverId: userId,
+            senderName: '함대 사령부',
+            title: '함대 귀환 보고',
+            content: `함대가 무사히 귀환했습니다. 약탈한 자원: 메탈 ${loot.metal}, 크리스탈 ${loot.crystal}, 듀테륨 ${loot.deuterium}`,
+            type: 'system',
+            metadata: { returnedFleet, loot },
+        });
         return {
             returnedFleet,
             loot,
@@ -607,6 +1047,9 @@ exports.BattleService = BattleService = __decorate([
     __param(0, (0, mongoose_1.InjectModel)(user_schema_1.User.name)),
     __metadata("design:paramtypes", [mongoose_2.Model,
         resources_service_1.ResourcesService,
-        fleet_service_1.FleetService])
+        fleet_service_1.FleetService,
+        message_service_1.MessageService,
+        galaxy_service_1.GalaxyService,
+        battle_report_service_1.BattleReportService])
 ], BattleService);
 //# sourceMappingURL=battle.service.js.map

@@ -3,6 +3,7 @@ import { UserDocument } from '../../user/schemas/user.schema';
 export declare class ResourcesService {
     private userModel;
     constructor(userModel: Model<UserDocument>);
+    getSatelliteEnergy(satelliteCount: number, temperature: number): number;
     getResourceProduction(level: number, type: 'metal' | 'crystal' | 'deuterium'): number;
     getEnergyProduction(solarPlantLevel: number): number;
     getFusionEnergyProduction(fusionLevel: number): number;

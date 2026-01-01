@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/constants/game_constants.dart';
 import '../../../../providers/providers.dart';
 import '../../../../data/models/models.dart';
 import '../../../widgets/game_panel.dart';
@@ -13,8 +14,21 @@ class FleetMovementTab extends ConsumerStatefulWidget {
 }
 
 class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
-  final _targetController = TextEditingController();
+  late final TextEditingController _targetController;
   final Map<String, int> _selectedFleet = {};
+
+  @override
+  void initState() {
+    super.initState();
+    final navState = ref.read(navigationProvider);
+    _targetController = TextEditingController(text: navState.targetCoordinate);
+    
+    if (navState.targetCoordinate != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(navigationProvider.notifier).clearAttackTarget();
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -31,7 +45,6 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
     
     ref.read(gameProvider.notifier).attack(_targetController.text, fleet);
     
-    // 초기화
     _targetController.clear();
     setState(() => _selectedFleet.clear());
   }
@@ -46,70 +59,84 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
         await ref.read(gameProvider.notifier).loadFleet();
         await ref.read(gameProvider.notifier).loadBattleStatus();
       },
-      color: AppColors.ogameGreen,
-      backgroundColor: AppColors.panelBackground,
+      color: AppColors.accent,
+      backgroundColor: AppColors.surface,
       child: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          // 전투 상태
           if (gameState.battleStatus != null) ...[
             if (gameState.battleStatus!.pendingAttack != null)
               _BattleCard(
-                emoji: '⚔️',
+                icon: Icons.flight_takeoff,
                 title: '공격 진행 중',
                 target: gameState.battleStatus!.pendingAttack!.targetCoord,
                 fleet: gameState.battleStatus!.pendingAttack!.fleet,
-                remainingTime: gameState.battleStatus!.pendingAttack!.remainingTime,
+                finishTime: gameState.battleStatus!.pendingAttack!.finishDateTime,
+                onComplete: () => ref.read(gameProvider.notifier).processBattle(),
               ),
             if (gameState.battleStatus!.pendingReturn != null)
               _BattleCard(
-                emoji: '🔙',
+                icon: Icons.flight_land,
                 title: '귀환 중',
                 target: '본행성',
                 fleet: gameState.battleStatus!.pendingReturn!.fleet,
-                remainingTime: gameState.battleStatus!.pendingReturn!.remainingTime,
+                finishTime: gameState.battleStatus!.pendingReturn!.finishDateTime,
+                onComplete: () => ref.read(gameProvider.notifier).processBattle(),
                 loot: gameState.battleStatus!.pendingReturn!.loot,
               ),
             if (gameState.battleStatus!.incomingAttack != null)
               _IncomingAttackCard(
                 attackerCoord: gameState.battleStatus!.incomingAttack!.attackerCoord,
-                remainingTime: gameState.battleStatus!.incomingAttack!.remainingTime,
+                finishTime: gameState.battleStatus!.incomingAttack!.finishDateTime,
+                onComplete: () => ref.read(gameProvider.notifier).processBattle(),
               ),
           ],
           
-          // 공격 폼
           GamePanel(
-            emoji: '🎯',
+            icon: Icons.gps_fixed,
             title: '함대 출격',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // 목표 좌표
                 TextField(
                   controller: _targetController,
-                  style: const TextStyle(color: AppColors.textPrimary),
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
                   decoration: InputDecoration(
                     labelText: '목표 좌표',
+                    labelStyle: TextStyle(color: AppColors.textMuted, fontSize: 12),
                     hintText: '예: 1:100:5',
-                    prefixIcon: const Icon(Icons.location_on, color: AppColors.textSecondary),
+                    hintStyle: TextStyle(color: AppColors.textMuted.withOpacity(0.5)),
+                    prefixIcon: Icon(Icons.location_on, color: AppColors.textMuted, size: 18),
                     filled: true,
-                    fillColor: AppColors.ogameBlack,
+                    fillColor: AppColors.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: AppColors.panelBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: AppColors.panelBorder),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      borderSide: BorderSide(color: AppColors.accent),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 
-                // 함선 선택
                 if (availableShips.isEmpty)
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.ogameBlack,
+                      color: AppColors.surface,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
-                      '출격 가능한 함선이 없습니다.\n조선소에서 함선을 건조해주세요.',
+                      '출격 가능한 함선이 없습니다.\n조선소에서 함선을 건조하세요.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.textSecondary),
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 12),
                     ),
                   )
                 else
@@ -121,17 +148,32 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
                     },
                   )),
                 
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
                 
-                // 공격 버튼
-                ElevatedButton.icon(
-                  onPressed: availableShips.isNotEmpty ? _attack : null,
-                  icon: const Icon(Icons.rocket_launch),
-                  label: const Text('출격'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.errorRed,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                Material(
+                  color: availableShips.isNotEmpty ? AppColors.negative : AppColors.surface,
+                  borderRadius: BorderRadius.circular(6),
+                  child: InkWell(
+                    onTap: availableShips.isNotEmpty ? _attack : null,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.rocket_launch, size: 18, color: Colors.white.withOpacity(availableShips.isNotEmpty ? 1 : 0.5)),
+                          const SizedBox(width: 8),
+                          Text(
+                            '출격',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(availableShips.isNotEmpty ? 1 : 0.5),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -144,19 +186,21 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
 }
 
 class _BattleCard extends StatelessWidget {
-  final String emoji;
+  final IconData icon;
   final String title;
   final String target;
   final Map<String, int> fleet;
-  final double remainingTime;
+  final DateTime finishTime;
+  final VoidCallback onComplete;
   final Map<String, int>? loot;
 
   const _BattleCard({
-    required this.emoji,
+    required this.icon,
     required this.title,
     required this.target,
     required this.fleet,
-    required this.remainingTime,
+    required this.finishTime,
+    required this.onComplete,
     this.loot,
   });
 
@@ -164,74 +208,100 @@ class _BattleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: GamePanel(
-        emoji: emoji,
-        title: title,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.panelBackground,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.panelBorder),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              children: [
+                Icon(icon, size: 16, color: AppColors.accent),
+                const SizedBox(width: 8),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: AppColors.accent,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
             Text(
               '목표: $target',
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
               ),
             ),
             const SizedBox(height: 8),
-            // 함대 정보
             Wrap(
-              spacing: 8,
+              spacing: 6,
               runSpacing: 4,
-              children: fleet.entries.map((e) => Container(
+              children: fleet.entries.where((e) => e.value > 0).map((e) => Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.ogameBlack,
+                  color: AppColors.surface,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  '${e.key}: ${e.value}',
+                  '${GameConstants.getName(e.key)}: ${e.value}',
                   style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 11,
+                    color: AppColors.textMuted,
+                    fontSize: 10,
                   ),
                 ),
               )).toList(),
             ),
-            // 전리품
-            if (loot != null && loot!.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              const Text(
-                '전리품:',
-                style: TextStyle(
-                  color: AppColors.successGreen,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+            if (loot != null && loot!.values.any((v) => v > 0)) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.positive.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.positive.withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '약탈한 자원:',
+                      style: TextStyle(
+                        color: AppColors.positive,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        _LootItem(label: '메탈', value: loot!['metal'] ?? 0, color: AppColors.metalColor),
+                        const SizedBox(width: 12),
+                        _LootItem(label: '크리스탈', value: loot!['crystal'] ?? 0, color: AppColors.crystalColor),
+                        const SizedBox(width: 12),
+                        _LootItem(label: '중수소', value: loot!['deuterium'] ?? 0, color: AppColors.deuteriumColor),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 8,
-                children: loot!.entries.map((e) => Text(
-                  '${_getResourceName(e.key)}: ${e.value}',
-                  style: const TextStyle(
-                    color: AppColors.successGreen,
-                    fontSize: 11,
-                  ),
-                )).toList(),
-              ),
             ],
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Row(
               children: [
-                const Icon(Icons.timer, size: 16, color: AppColors.warningOrange),
-                const SizedBox(width: 8),
-                Text(
-                  _formatTime(remainingTime),
-                  style: const TextStyle(
-                    color: AppColors.warningOrange,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'monospace',
-                  ),
+                Icon(Icons.schedule, size: 14, color: AppColors.textMuted),
+                const SizedBox(width: 6),
+                ProgressTimer(
+                  finishTime: finishTime,
+                  onComplete: onComplete,
                 ),
               ],
             ),
@@ -241,31 +311,55 @@ class _BattleCard extends StatelessWidget {
     );
   }
 
-  String _getResourceName(String key) {
-    switch (key) {
-      case 'metal': return '금속';
-      case 'crystal': return '크리스탈';
-      case 'deuterium': return '중수소';
-      default: return key;
-    }
+}
+
+class _LootItem extends StatelessWidget {
+  final String label;
+  final int value;
+  final Color color;
+
+  const _LootItem({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(color: AppColors.textMuted, fontSize: 9),
+        ),
+        Text(
+          _formatNumber(value),
+          style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
   }
 
-  String _formatTime(double seconds) {
-    final duration = Duration(seconds: seconds.toInt());
-    final h = duration.inHours;
-    final m = duration.inMinutes % 60;
-    final s = duration.inSeconds % 60;
-    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+  String _formatNumber(int num) {
+    if (num >= 1000000) {
+      return '${(num / 1000000).toStringAsFixed(1)}M';
+    } else if (num >= 1000) {
+      return '${(num / 1000).toStringAsFixed(1)}K';
+    }
+    return num.toString();
   }
 }
 
 class _IncomingAttackCard extends StatelessWidget {
   final String attackerCoord;
-  final double remainingTime;
+  final DateTime finishTime;
+  final VoidCallback onComplete;
 
   const _IncomingAttackCard({
     required this.attackerCoord,
-    required this.remainingTime,
+    required this.finishTime,
+    required this.onComplete,
   });
 
   @override
@@ -274,49 +368,45 @@ class _IncomingAttackCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.errorRed.withOpacity(0.1),
+          color: AppColors.negative.withOpacity(0.08),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.errorRed),
+          border: Border.all(color: AppColors.negative.withOpacity(0.3)),
         ),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.warning, color: AppColors.errorRed),
+                Icon(Icons.warning_amber, color: AppColors.negative, size: 18),
                 const SizedBox(width: 8),
-                const Text(
-                  '🚨 적 공격 감지!',
+                Text(
+                  '적 공격 감지',
                   style: TextStyle(
-                    color: AppColors.errorRed,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                    color: AppColors.negative,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
               '공격자: $attackerCoord',
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Row(
               children: [
-                const Icon(Icons.timer, size: 16, color: AppColors.errorRed),
-                const SizedBox(width: 8),
-                Text(
-                  _formatTime(remainingTime),
-                  style: const TextStyle(
-                    color: AppColors.errorRed,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'monospace',
-                    fontSize: 18,
-                  ),
+                Icon(Icons.schedule, size: 14, color: AppColors.negative),
+                const SizedBox(width: 6),
+                ProgressTimer(
+                  finishTime: finishTime,
+                  onComplete: onComplete,
                 ),
               ],
             ),
@@ -324,14 +414,6 @@ class _IncomingAttackCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _formatTime(double seconds) {
-    final duration = Duration(seconds: seconds.toInt());
-    final h = duration.inHours;
-    final m = duration.inMinutes % 60;
-    final s = duration.inSeconds % 60;
-    return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 }
 
@@ -353,10 +435,10 @@ class _ShipSelector extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.ogameBlack,
-          borderRadius: BorderRadius.circular(8),
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(6),
           border: Border.all(
-            color: selectedCount > 0 ? AppColors.ogameGreen : AppColors.panelBorder,
+            color: selectedCount > 0 ? AppColors.accent.withOpacity(0.4) : AppColors.panelBorder,
           ),
         ),
         child: Row(
@@ -369,58 +451,63 @@ class _ShipSelector extends StatelessWidget {
                     ship.name,
                     style: const TextStyle(
                       color: AppColors.textPrimary,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
                     ),
                   ),
                   Text(
                     '보유: ${ship.count}',
                     style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 11,
+                      color: AppColors.textMuted,
+                      fontSize: 10,
                     ),
                   ),
                 ],
               ),
             ),
-            // 수량 조절
             Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.remove, size: 18),
+                  icon: const Icon(Icons.remove, size: 16),
                   onPressed: selectedCount > 0 
                       ? () => onChanged(selectedCount - 1)
                       : null,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textMuted,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 ),
                 Container(
-                  width: 50,
+                  width: 40,
                   alignment: Alignment.center,
                   child: Text(
                     '$selectedCount',
                     style: TextStyle(
-                      color: selectedCount > 0 ? AppColors.ogameGreen : AppColors.textSecondary,
-                      fontWeight: FontWeight.bold,
+                      color: selectedCount > 0 ? AppColors.accent : AppColors.textMuted,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
                     ),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.add, size: 18),
+                  icon: const Icon(Icons.add, size: 16),
                   onPressed: selectedCount < ship.count 
                       ? () => onChanged(selectedCount + 1)
                       : null,
-                  color: AppColors.textSecondary,
+                  color: AppColors.textMuted,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 ),
-                TextButton(
-                  onPressed: () => onChanged(ship.count),
-                  child: const Text(
-                    '전체',
-                    style: TextStyle(
-                      color: AppColors.ogameGreen,
-                      fontSize: 12,
+                GestureDetector(
+                  onTap: () => onChanged(ship.count),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Text(
+                      '전체',
+                      style: TextStyle(
+                        color: AppColors.accent,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                 ),
@@ -432,4 +519,3 @@ class _ShipSelector extends StatelessWidget {
     );
   }
 }
-

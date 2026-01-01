@@ -22,6 +22,12 @@ let ResourcesService = class ResourcesService {
     constructor(userModel) {
         this.userModel = userModel;
     }
+    getSatelliteEnergy(satelliteCount, temperature) {
+        if (satelliteCount <= 0)
+            return 0;
+        const energyPerSatellite = Math.floor(temperature / 4 + 20);
+        return energyPerSatellite * satelliteCount;
+    }
     getResourceProduction(level, type) {
         const effectiveLevel = level + 1;
         switch (type) {
@@ -75,9 +81,10 @@ let ResourcesService = class ResourcesService {
         const mines = user.mines;
         const fleet = user.fleet;
         const satelliteCount = fleet.solarSatellite || 0;
+        const planetTemperature = user.planetInfo?.temperature ?? 50;
         const fusionLevel = mines.fusionReactor || 0;
         const solarEnergy = this.getEnergyProduction(mines.solarPlant || 0);
-        const satelliteEnergy = satelliteCount * 25;
+        const satelliteEnergy = this.getSatelliteEnergy(satelliteCount, planetTemperature);
         const fusionEnergy = this.getFusionEnergyProduction(fusionLevel);
         const energyProduction = solarEnergy + satelliteEnergy + fusionEnergy;
         let energyConsumption = 0;
@@ -109,9 +116,10 @@ let ResourcesService = class ResourcesService {
         const mines = user.mines;
         const fleet = user.fleet;
         const satelliteCount = fleet.solarSatellite || 0;
+        const planetTemperature = user.planetInfo?.temperature ?? 50;
         const fusionLevel = mines.fusionReactor || 0;
         const solarEnergy = this.getEnergyProduction(mines.solarPlant || 0);
-        const satelliteEnergy = satelliteCount * 25;
+        const satelliteEnergy = this.getSatelliteEnergy(satelliteCount, planetTemperature);
         const fusionEnergy = this.getFusionEnergyProduction(fusionLevel);
         let energyConsumption = 0;
         energyConsumption += this.getEnergyConsumption(mines.metalMine || 0, 'metal');

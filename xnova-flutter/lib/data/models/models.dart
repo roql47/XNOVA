@@ -68,6 +68,63 @@ class UserInfo {
   );
 }
 
+// ===== Google 인증 관련 =====
+class GoogleAuthRequest {
+  final String idToken;
+
+  GoogleAuthRequest({required this.idToken});
+
+  Map<String, dynamic> toJson() => {'idToken': idToken};
+}
+
+class GoogleCompleteRequest {
+  final String idToken;
+  final String playerName;
+
+  GoogleCompleteRequest({required this.idToken, required this.playerName});
+
+  Map<String, dynamic> toJson() => {
+    'idToken': idToken,
+    'playerName': playerName,
+  };
+}
+
+class GoogleAuthResponse {
+  final bool needsNickname;
+  final String? email;
+  final String? suggestedName;
+  final String? message;
+  final UserInfo? user;
+  final String? accessToken;
+
+  GoogleAuthResponse({
+    this.needsNickname = false,
+    this.email,
+    this.suggestedName,
+    this.message,
+    this.user,
+    this.accessToken,
+  });
+
+  factory GoogleAuthResponse.fromJson(Map<String, dynamic> json) {
+    // 닉네임 설정이 필요한 경우
+    if (json['needsNickname'] == true) {
+      return GoogleAuthResponse(
+        needsNickname: true,
+        email: json['email'],
+        suggestedName: json['suggestedName'],
+      );
+    }
+    // 로그인 성공한 경우
+    return GoogleAuthResponse(
+      needsNickname: false,
+      message: json['message'],
+      user: json['user'] != null ? UserInfo.fromJson(json['user']) : null,
+      accessToken: json['accessToken'],
+    );
+  }
+}
+
 // ===== 자원 관련 =====
 class Resources {
   final int metal;
@@ -154,6 +211,10 @@ class BuildingInfo {
   final String category;
   final Cost? upgradeCost;
   final double upgradeTime;
+  final int? production;
+  final int? consumption;
+  final int? nextProduction;
+  final int? nextConsumption;
 
   BuildingInfo({
     required this.type,
@@ -162,6 +223,10 @@ class BuildingInfo {
     required this.category,
     this.upgradeCost,
     this.upgradeTime = 0,
+    this.production,
+    this.consumption,
+    this.nextProduction,
+    this.nextConsumption,
   });
 
   factory BuildingInfo.fromJson(Map<String, dynamic> json) => BuildingInfo(
@@ -171,6 +236,10 @@ class BuildingInfo {
     category: json['category'] ?? '',
     upgradeCost: json['upgradeCost'] != null ? Cost.fromJson(json['upgradeCost']) : null,
     upgradeTime: (json['upgradeTime'] ?? 0).toDouble(),
+    production: json['production']?.toInt(),
+    consumption: json['consumption']?.toInt(),
+    nextProduction: json['nextProduction']?.toInt(),
+    nextConsumption: json['nextConsumption']?.toInt(),
   );
 }
 
@@ -209,8 +278,15 @@ class ProgressInfo {
 class BuildingsResponse {
   final List<BuildingInfo> buildings;
   final ProgressInfo? constructionProgress;
+  final Map<String, dynamic>? fieldInfo;
+  final Map<String, dynamic>? planetInfo;
 
-  BuildingsResponse({required this.buildings, this.constructionProgress});
+  BuildingsResponse({
+    required this.buildings,
+    this.constructionProgress,
+    this.fieldInfo,
+    this.planetInfo,
+  });
 
   factory BuildingsResponse.fromJson(Map<String, dynamic> json) => BuildingsResponse(
     buildings: (json['buildings'] as List<dynamic>?)
@@ -219,6 +295,8 @@ class BuildingsResponse {
     constructionProgress: json['constructionProgress'] != null
         ? ProgressInfo.fromJson(json['constructionProgress'])
         : null,
+    fieldInfo: json['fieldInfo'] as Map<String, dynamic>?,
+    planetInfo: json['planetInfo'] as Map<String, dynamic>?,
   );
 }
 
@@ -515,6 +593,7 @@ class PlanetInfo {
   final String? playerId;
   final bool isOwnPlanet;
   final bool hasDebris;
+  final Map<String, dynamic>? debrisAmount;
   final bool hasMoon;
 
   PlanetInfo({
@@ -524,6 +603,7 @@ class PlanetInfo {
     this.playerId,
     this.isOwnPlanet = false,
     this.hasDebris = false,
+    this.debrisAmount,
     this.hasMoon = false,
   });
 
@@ -534,6 +614,7 @@ class PlanetInfo {
     playerId: json['playerId'],
     isOwnPlanet: json['isOwnPlanet'] ?? false,
     hasDebris: json['hasDebris'] ?? false,
+    debrisAmount: json['debrisAmount'],
     hasMoon: json['hasMoon'] ?? false,
   );
 }
@@ -626,13 +707,14 @@ class PendingAttackInfo {
   final Map<String, int> fleet;
   final double remainingTime;
   final bool battleCompleted;
+  final DateTime createdAt;
 
   PendingAttackInfo({
     required this.targetCoord,
     required this.fleet,
     required this.remainingTime,
     this.battleCompleted = false,
-  });
+  }) : createdAt = DateTime.now();
 
   factory PendingAttackInfo.fromJson(Map<String, dynamic> json) => PendingAttackInfo(
     targetCoord: json['targetCoord'] ?? '',
@@ -640,36 +722,45 @@ class PendingAttackInfo {
     remainingTime: (json['remainingTime'] ?? 0).toDouble(),
     battleCompleted: json['battleCompleted'] ?? false,
   );
+
+  DateTime get finishDateTime => createdAt.add(Duration(seconds: remainingTime.toInt()));
 }
 
 class PendingReturnInfo {
   final Map<String, int> fleet;
   final Map<String, int> loot;
   final double remainingTime;
+  final DateTime createdAt;
 
   PendingReturnInfo({
     required this.fleet,
     required this.loot,
     required this.remainingTime,
-  });
+  }) : createdAt = DateTime.now();
 
   factory PendingReturnInfo.fromJson(Map<String, dynamic> json) => PendingReturnInfo(
     fleet: Map<String, int>.from(json['fleet'] ?? {}),
     loot: Map<String, int>.from(json['loot'] ?? {}),
     remainingTime: (json['remainingTime'] ?? 0).toDouble(),
   );
+
+  DateTime get finishDateTime => createdAt.add(Duration(seconds: remainingTime.toInt()));
 }
 
 class IncomingAttackInfo {
   final String attackerCoord;
   final double remainingTime;
+  final DateTime createdAt;
 
-  IncomingAttackInfo({required this.attackerCoord, required this.remainingTime});
+  IncomingAttackInfo({required this.attackerCoord, required this.remainingTime})
+      : createdAt = DateTime.now();
 
   factory IncomingAttackInfo.fromJson(Map<String, dynamic> json) => IncomingAttackInfo(
     attackerCoord: json['attackerCoord'] ?? '',
     remainingTime: (json['remainingTime'] ?? 0).toDouble(),
   );
+
+  DateTime get finishDateTime => createdAt.add(Duration(seconds: remainingTime.toInt()));
 }
 
 // ===== 랭킹 관련 =====
@@ -816,6 +907,40 @@ class UserProfile {
     defenseProgress: json['defenseProgress'] != null
         ? ProgressInfo.fromJson(json['defenseProgress'])
         : null,
+  );
+}
+
+// ===== 메시지 관련 =====
+class Message {
+  final String id;
+  final String senderName;
+  final String title;
+  final String content;
+  final String type;
+  final bool isRead;
+  final DateTime createdAt;
+  final Map<String, dynamic>? metadata;
+
+  Message({
+    required this.id,
+    required this.senderName,
+    required this.title,
+    required this.content,
+    required this.type,
+    required this.isRead,
+    required this.createdAt,
+    this.metadata,
+  });
+
+  factory Message.fromJson(Map<String, dynamic> json) => Message(
+    id: json['_id'] ?? json['id'] ?? '',
+    senderName: json['senderName'] ?? '',
+    title: json['title'] ?? '',
+    content: json['content'] ?? '',
+    type: json['type'] ?? 'system',
+    isRead: json['isRead'] ?? false,
+    createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
+    metadata: json['metadata'],
   );
 }
 

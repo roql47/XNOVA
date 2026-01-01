@@ -18,6 +18,24 @@ export declare class Facilities {
     shipyard: number;
     researchLab: number;
     nanoFactory: number;
+    terraformer: number;
+    allianceDepot: number;
+    missileSilo: number;
+    metalStorage: number;
+    crystalStorage: number;
+    deuteriumTank: number;
+    lunarBase: number;
+    sensorPhalanx: number;
+    jumpGate: number;
+}
+export declare class PlanetInfo {
+    maxFields: number;
+    usedFields: number;
+    temperature: number;
+    planetType: string;
+    isMoon: boolean;
+    planetName: string;
+    diameter: number;
 }
 export declare class ResearchLevels {
     energyTech: number;
@@ -88,12 +106,14 @@ export declare class ReturnProgress {
 }
 export declare class User {
     email: string;
-    password: string;
+    password?: string;
+    googleId?: string;
     playerName: string;
     coordinate: string;
     resources: Resources;
     mines: Mines;
     facilities: Facilities;
+    planetInfo: PlanetInfo;
     researchLevels: ResearchLevels;
     fleet: Fleet;
     defense: Defense;
@@ -128,7 +148,16 @@ export declare const UserSchema: import("mongoose").Schema<User, import("mongoos
     }, "id"> & {
         id: string;
     }> | undefined;
-    password?: import("mongoose").SchemaDefinitionProperty<string, User, Document<unknown, {}, User, {
+    password?: import("mongoose").SchemaDefinitionProperty<string | undefined, User, Document<unknown, {}, User, {
+        id: string;
+    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
+        _id: import("mongoose").Types.ObjectId;
+    } & {
+        __v: number;
+    }, "id"> & {
+        id: string;
+    }> | undefined;
+    googleId?: import("mongoose").SchemaDefinitionProperty<string | undefined, User, Document<unknown, {}, User, {
         id: string;
     }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
         _id: import("mongoose").Types.ObjectId;
@@ -174,6 +203,15 @@ export declare const UserSchema: import("mongoose").Schema<User, import("mongoos
         id: string;
     }> | undefined;
     facilities?: import("mongoose").SchemaDefinitionProperty<Facilities, User, Document<unknown, {}, User, {
+        id: string;
+    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
+        _id: import("mongoose").Types.ObjectId;
+    } & {
+        __v: number;
+    }, "id"> & {
+        id: string;
+    }> | undefined;
+    planetInfo?: import("mongoose").SchemaDefinitionProperty<PlanetInfo, User, Document<unknown, {}, User, {
         id: string;
     }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
         _id: import("mongoose").Types.ObjectId;

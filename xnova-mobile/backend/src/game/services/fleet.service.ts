@@ -61,8 +61,8 @@ export class FleetService {
     const totalCost = (fleetData.cost.metal || 0) + (fleetData.cost.crystal || 0);
     const nanoBonus = Math.pow(2, nanoFactoryLevel);
 
-    // 1대당 건조 시간 (초)
-    const singleShipTime = totalCost / (25 * (1 + shipyardLevel) * nanoBonus);
+    // 1대당 건조 시간 (초) - 10배 상향
+    const singleShipTime = (totalCost / (25 * (1 + shipyardLevel) * nanoBonus)) * 10;
     
     return singleShipTime * quantity;
   }

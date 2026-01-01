@@ -15,63 +15,163 @@ class FleetTab extends ConsumerStatefulWidget {
 class _FleetTabState extends ConsumerState<FleetTab> {
   final Map<String, int> _quantities = {};
 
+  void _onBuild(String type) {
+    final qty = _quantities[type] ?? 1;
+    ref.read(gameProvider.notifier).buildFleet(type, qty);
+  }
+
+  void _dispatchFleet() {
+    final selectedShips = <String, int>{};
+    final gameState = ref.read(gameProvider);
+    
+    for (var ship in gameState.fleet) {
+      final qty = _quantities[ship.type] ?? 0;
+      if (qty > 0) {
+        selectedShips[ship.type] = qty;
+      }
+    }
+
+    if (selectedShips.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('출격시킬 함선을 선택하세요.')),
+      );
+      return;
+    }
+
+    _showDispatchDialog(selectedShips);
+  }
+
+  void _showDispatchDialog(Map<String, int> selectedShips) {
+    final coordController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.panelBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        title: const Text('함대 출격 설정', style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('목표 좌표를 입력하세요', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: coordController,
+              autofocus: true,
+              style: const TextStyle(color: AppColors.textPrimary, fontFamily: 'monospace'),
+              decoration: InputDecoration(
+                hintText: '예) 1:123:5',
+                hintStyle: TextStyle(color: AppColors.textMuted),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6)),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: AppColors.panelBorder),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(6),
+                  borderSide: BorderSide(color: AppColors.accent),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text('선택된 함대:', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+            const SizedBox(height: 4),
+            ...selectedShips.entries.map((e) => Text(
+              '${e.key}: ${e.value}척', 
+              style: TextStyle(color: AppColors.accent, fontSize: 11)
+            )),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('취소', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (coordController.text.isNotEmpty) {
+                ref.read(gameProvider.notifier).attack(coordController.text, selectedShips);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${coordController.text}로 함대가 출격했습니다')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.negative,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            child: const Text('출격 (공격)'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final gameState = ref.watch(gameProvider);
 
-    return RefreshIndicator(
-      onRefresh: () => ref.read(gameProvider.notifier).loadFleet(),
-      color: AppColors.ogameGreen,
-      backgroundColor: AppColors.panelBackground,
-      child: ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          // 조선소 레벨
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.panelBackground,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.panelBorder),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.rocket, color: AppColors.warningOrange),
-                const SizedBox(width: 8),
-                Text(
-                  '조선소 레벨: ${gameState.shipyardLevel}',
-                  style: const TextStyle(
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: gameState.fleet.any((s) => (_quantities[s.type] ?? 0) > 0)
+          ? FloatingActionButton.extended(
+              onPressed: _dispatchFleet,
+              backgroundColor: AppColors.negative,
+              icon: const Icon(Icons.send, size: 18),
+              label: const Text('함대 출격', style: TextStyle(fontSize: 13)),
+            )
+          : null,
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(gameProvider.notifier).loadFleet(),
+        color: AppColors.accent,
+        backgroundColor: AppColors.surface,
+        child: ListView(
+          padding: const EdgeInsets.all(12),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.panelBackground,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.panelBorder),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.rocket_launch, color: AppColors.accent, size: 18),
+                  const SizedBox(width: 10),
+                  Text(
+                    '조선소 레벨: ${gameState.shipyardLevel}',
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 13,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          
-          // 건조 진행 중
-          if (gameState.fleetProgress != null)
-            _FleetProgressCard(
-              progress: gameState.fleetProgress!,
-              onComplete: () => ref.read(gameProvider.notifier).completeFleet(),
-            ),
-          
-          // 함선 목록
-          ...gameState.fleet.map((ship) => _ShipCard(
-            ship: ship,
-            resources: gameState.resources,
-            isBuilding: gameState.fleetProgress != null,
-            quantity: _quantities[ship.type] ?? 1,
-            onQuantityChanged: (qty) {
-              setState(() => _quantities[ship.type] = qty);
-            },
-            onBuild: () {
-              final qty = _quantities[ship.type] ?? 1;
-              ref.read(gameProvider.notifier).buildFleet(ship.type, qty);
-            },
-          )),
-        ],
+            const SizedBox(height: 12),
+            
+            if (gameState.fleetProgress != null)
+              _FleetProgressCard(
+                progress: gameState.fleetProgress!,
+                onComplete: () => ref.read(gameProvider.notifier).completeFleet(),
+              ),
+            
+            ...gameState.fleet.map((ship) => _ShipCard(
+              ship: ship,
+              resources: gameState.resources,
+              isBuilding: gameState.fleetProgress != null,
+              quantity: _quantities[ship.type] ?? 0,
+              onQuantityChanged: (qty) {
+                setState(() => _quantities[ship.type] = qty);
+              },
+              onBuild: () => _onBuild(ship.type),
+            )),
+            const SizedBox(height: 80),
+          ],
+        ),
       ),
     );
   }
@@ -92,40 +192,42 @@ class _FleetProgressCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.warningOrange.withOpacity(0.1),
+          color: AppColors.accent.withOpacity(0.08),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.warningOrange.withOpacity(0.3)),
+          border: Border.all(color: AppColors.accent.withOpacity(0.2)),
         ),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.rocket_launch, color: AppColors.warningOrange, size: 20),
+                Icon(Icons.rocket_launch, color: AppColors.accent, size: 16),
                 const SizedBox(width: 8),
                 const Text(
                   '함선 건조 중',
                   style: TextStyle(
-                    color: AppColors.warningOrange,
-                    fontWeight: FontWeight.bold,
+                    color: AppColors.accent,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
               '${progress.name} x${progress.quantity ?? 1}',
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Row(
               children: [
-                const Icon(Icons.timer, size: 16, color: AppColors.warningOrange),
-                const SizedBox(width: 8),
+                Icon(Icons.schedule, size: 14, color: AppColors.textMuted),
+                const SizedBox(width: 6),
                 if (progress.finishDateTime != null)
                   ProgressTimer(
                     finishTime: progress.finishDateTime!,
@@ -158,9 +260,47 @@ class _ShipCard extends StatelessWidget {
   });
 
   bool get canAfford {
-    return resources.metal >= ship.cost.metal * quantity &&
-           resources.crystal >= ship.cost.crystal * quantity &&
-           resources.deuterium >= ship.cost.deuterium * quantity;
+    final qty = quantity > 0 ? quantity : 1;
+    return resources.metal >= ship.cost.metal * qty &&
+           resources.crystal >= ship.cost.crystal * qty &&
+           resources.deuterium >= ship.cost.deuterium * qty;
+  }
+
+  String? _getShipImagePath(String type) {
+    const shipImages = {
+      'smallCargo': 'assets/images/small_cargo_ship.webp',
+      'largeCargo': 'assets/images/large_cargo_ship.webp',
+      'lightFighter': 'assets/images/light_fighter.webp',
+      'heavyFighter': 'assets/images/heavy_fighter.webp',
+      'cruiser': 'assets/images/cruiser.webp',
+      'battleship': 'assets/images/battleship.webp',
+      'battlecruiser': 'assets/images/battlecruiser.jpg',
+      'bomber': 'assets/images/bomber.webp',
+      'destroyer': 'assets/images/destroyer.webp',
+      'deathstar': 'assets/images/deathstar.webp',
+      'colonyShip': 'assets/images/colony_ship.webp',
+      'recycler': 'assets/images/recycler.webp',
+      'espionageProbe': 'assets/images/espionage_probe.webp',
+      'solarSatellite': 'assets/images/solar_satellite.webp',
+    };
+    return shipImages[type];
+  }
+
+  String _formatBuildTime(double seconds) {
+    if (seconds <= 0) return '즉시';
+    
+    final totalSeconds = seconds.toInt();
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final secs = totalSeconds % 60;
+    
+    if (hours > 0) {
+      return '${hours}시간 ${minutes}분 ${secs}초';
+    } else if (minutes > 0) {
+      return '${minutes}분 ${secs}초';
+    } else {
+      return '${secs}초';
+    }
   }
 
   @override
@@ -176,14 +316,13 @@ class _ShipCard extends StatelessWidget {
             color: AppColors.panelBackground,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isDisabled ? AppColors.textDisabled : AppColors.panelBorder,
+              color: isDisabled ? AppColors.textMuted : AppColors.panelBorder,
             ),
           ),
           child: Column(
             children: [
-              // 헤더
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: const BoxDecoration(
                   color: AppColors.panelHeader,
                   borderRadius: BorderRadius.only(
@@ -198,64 +337,117 @@ class _ShipCard extends StatelessWidget {
                         ship.name,
                         style: const TextStyle(
                           color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
                         ),
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.warningOrange.withOpacity(0.2),
+                        color: AppColors.accent.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         '보유: ${ship.count}',
                         style: const TextStyle(
-                          color: AppColors.warningOrange,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                          color: AppColors.accent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-              // 컨텐츠
               Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 스탯
-                    Wrap(
-                      spacing: 16,
-                      runSpacing: 4,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _StatChip(icon: Icons.gps_fixed, label: '공격', value: ship.stats.attack),
-                        _StatChip(icon: Icons.shield, label: '방어', value: ship.stats.shield),
-                        _StatChip(icon: Icons.favorite, label: '내구', value: ship.stats.hull),
-                        _StatChip(icon: Icons.speed, label: '속도', value: ship.stats.speed),
-                        _StatChip(icon: Icons.inventory_2, label: '적재', value: ship.stats.cargo),
+                        // 함선 이미지
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: _getShipImagePath(ship.type) != null
+                              ? Image.asset(
+                                  _getShipImagePath(ship.type)!,
+                                  width: 100,
+                                  height: 100,
+                                  cacheWidth: 200,
+                                  cacheHeight: 200,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Container(
+                                        width: 100,
+                                        height: 100,
+                                        color: AppColors.surface,
+                                        child: const Icon(Icons.rocket_launch, size: 40, color: AppColors.textMuted),
+                                      ),
+                                )
+                              : Container(
+                                  width: 100,
+                                  height: 100,
+                                  color: AppColors.surface,
+                                  child: const Icon(Icons.rocket_launch, size: 40, color: AppColors.textMuted),
+                                ),
+                        ),
+                        const SizedBox(width: 14),
+                        // 스탯
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 4,
+                                children: [
+                                  _StatChip(icon: Icons.gps_fixed, value: ship.stats.attack),
+                                  _StatChip(icon: Icons.shield, value: ship.stats.shield),
+                                  _StatChip(icon: Icons.favorite, value: ship.stats.hull),
+                                  _StatChip(icon: Icons.speed, value: ship.stats.speed),
+                                  _StatChip(icon: Icons.inventory_2, value: ship.stats.cargo),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              // 건조 시간
+                              Row(
+                                children: [
+                                  Icon(Icons.schedule, size: 14, color: AppColors.textMuted),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '건조: ${_formatBuildTime(ship.buildTime)}',
+                                    style: const TextStyle(
+                                      color: AppColors.textMuted,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    // 요구사항 미충족 시
+                    const SizedBox(height: 10),
                     if (isDisabled && ship.missingRequirements.isNotEmpty) ...[
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: AppColors.errorRed.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
+                          color: AppColors.negative.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.lock, size: 14, color: AppColors.errorRed),
+                            Icon(Icons.lock, size: 14, color: AppColors.negative),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 ship.missingRequirements.join(', '),
                                 style: const TextStyle(
-                                  color: AppColors.errorRed,
+                                  color: AppColors.negative,
                                   fontSize: 11,
                                 ),
                               ),
@@ -263,7 +455,7 @@ class _ShipCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                     ],
                     Row(
                       children: [
@@ -272,17 +464,17 @@ class _ShipCard extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                '건조 비용 (x$quantity)',
+                                '건조 비용 (x${quantity > 0 ? quantity : 1})',
                                 style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 11,
+                                  color: AppColors.textMuted,
+                                  fontSize: 10,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 6),
                               CostDisplay(
-                                metal: ship.cost.metal * quantity,
-                                crystal: ship.cost.crystal * quantity,
-                                deuterium: ship.cost.deuterium * quantity,
+                                metal: ship.cost.metal * (quantity > 0 ? quantity : 1),
+                                crystal: ship.cost.crystal * (quantity > 0 ? quantity : 1),
+                                deuterium: ship.cost.deuterium * (quantity > 0 ? quantity : 1),
                                 currentMetal: resources.metal,
                                 currentCrystal: resources.crystal,
                                 currentDeuterium: resources.deuterium,
@@ -290,41 +482,35 @@ class _ShipCard extends StatelessWidget {
                             ],
                           ),
                         ),
-                        // 수량 조절
                         Row(
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.remove, size: 18),
+                              icon: const Icon(Icons.remove, size: 16),
                               onPressed: quantity > 1 
                                   ? () => onQuantityChanged(quantity - 1)
                                   : null,
-                              color: AppColors.textSecondary,
+                              color: AppColors.textMuted,
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 32,
-                                minHeight: 32,
-                              ),
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                             ),
                             Container(
-                              width: 40,
+                              width: 36,
                               alignment: Alignment.center,
                               child: Text(
-                                '$quantity',
+                                '${quantity > 0 ? quantity : 1}',
                                 style: const TextStyle(
                                   color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
                                 ),
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.add, size: 18),
-                              onPressed: () => onQuantityChanged(quantity + 1),
-                              color: AppColors.textSecondary,
+                              icon: const Icon(Icons.add, size: 16),
+                              onPressed: () => onQuantityChanged((quantity > 0 ? quantity : 1) + 1),
+                              color: AppColors.textMuted,
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 32,
-                                minHeight: 32,
-                              ),
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                             ),
                           ],
                         ),
@@ -351,12 +537,10 @@ class _ShipCard extends StatelessWidget {
 
 class _StatChip extends StatelessWidget {
   final IconData icon;
-  final String label;
   final int value;
 
   const _StatChip({
     required this.icon,
-    required this.label,
     required this.value,
   });
 
@@ -365,17 +549,16 @@ class _StatChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 12, color: AppColors.textSecondary),
-        const SizedBox(width: 2),
+        Icon(icon, size: 11, color: AppColors.textMuted),
+        const SizedBox(width: 3),
         Text(
           '$value',
           style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 11,
+            color: AppColors.textMuted,
+            fontSize: 10,
           ),
         ),
       ],
     );
   }
 }
-

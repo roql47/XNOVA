@@ -1,9 +1,10 @@
 import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/auth.dto';
+import { RegisterDto, GoogleAuthDto, GoogleCompleteDto, RefreshTokenDto, LogoutDto } from './dto/auth.dto';
 export declare class AuthController {
     private authService;
     constructor(authService: AuthService);
-    register(registerDto: RegisterDto): Promise<{
+    private getClientInfo;
+    register(registerDto: RegisterDto, req: any, userAgent: string, ip: string): Promise<{
         message: string;
         user: {
             id: import("mongoose").Types.ObjectId;
@@ -12,8 +13,10 @@ export declare class AuthController {
             coordinate: string;
         };
         accessToken: string;
+        refreshToken: string;
+        expiresIn: number;
     }>;
-    login(req: any): Promise<{
+    login(req: any, userAgent: string, ip: string): Promise<{
         message: string;
         user: {
             id: any;
@@ -22,6 +25,47 @@ export declare class AuthController {
             coordinate: any;
         };
         accessToken: string;
+        refreshToken: string;
+        expiresIn: number;
+    }>;
+    googleAuth(googleAuthDto: GoogleAuthDto, req: any, userAgent: string, ip: string): Promise<{
+        message: string;
+        user: {
+            id: any;
+            email: any;
+            playerName: any;
+            coordinate: any;
+        };
+        accessToken: string;
+        refreshToken: string;
+        expiresIn: number;
+    } | {
+        needsNickname: boolean;
+        email: string;
+        suggestedName: string;
+    }>;
+    completeGoogleSignup(googleCompleteDto: GoogleCompleteDto, req: any, userAgent: string, ip: string): Promise<{
+        message: string;
+        user: {
+            id: any;
+            email: any;
+            playerName: any;
+            coordinate: any;
+        };
+        accessToken: string;
+        refreshToken: string;
+        expiresIn: number;
+    }>;
+    refreshToken(refreshTokenDto: RefreshTokenDto, req: any, userAgent: string, ip: string): Promise<{
+        accessToken: string;
+        refreshToken: string;
+        expiresIn: number;
+    }>;
+    logout(req: any, logoutDto: LogoutDto, authHeader: string): Promise<{
+        message: string;
+    }>;
+    logoutAllDevices(req: any, authHeader: string): Promise<{
+        message: string;
     }>;
     getProfile(req: any): Promise<any>;
 }

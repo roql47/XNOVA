@@ -6,11 +6,13 @@ import '../../../providers/providers.dart';
 class LoginScreen extends ConsumerStatefulWidget {
   final VoidCallback onRegisterTap;
   final VoidCallback onLoginSuccess;
+  final VoidCallback onNicknameRequired;
 
   const LoginScreen({
     super.key,
     required this.onRegisterTap,
     required this.onLoginSuccess,
+    required this.onNicknameRequired,
   });
 
   @override
@@ -40,6 +42,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     if (success) {
       widget.onLoginSuccess();
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    final success = await ref.read(authProvider.notifier).signInWithGoogle();
+
+    if (success) {
+      widget.onLoginSuccess();
+    } else {
+      // 닉네임 설정이 필요한 경우
+      final authState = ref.read(authProvider);
+      if (authState.needsNickname) {
+        widget.onNicknameRequired();
+      }
     }
   }
 
@@ -213,6 +229,66 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
+                ),
+                const SizedBox(height: 24),
+                // 구분선
+                Row(
+                  children: [
+                    Expanded(
+                      child: Divider(
+                        color: AppColors.textMuted.withOpacity(0.3),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        '또는',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Divider(
+                        color: AppColors.textMuted.withOpacity(0.3),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                // 구글 로그인 버튼
+                OutlinedButton.icon(
+                  onPressed: authState.isLoading ? null : _signInWithGoogle,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.textPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    side: BorderSide(
+                      color: AppColors.panelBorder,
+                      width: 1,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    backgroundColor: AppColors.panelBackground,
+                  ),
+                  icon: Image.network(
+                    'https://www.google.com/favicon.ico',
+                    width: 20,
+                    height: 20,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.g_mobiledata,
+                      size: 24,
+                      color: Colors.white,
+                    ),
+                  ),
+                  label: const Text(
+                    'Google로 계속하기',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 24),
                 // 회원가입 링크

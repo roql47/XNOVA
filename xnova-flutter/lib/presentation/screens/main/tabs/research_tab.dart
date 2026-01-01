@@ -14,12 +14,11 @@ class ResearchTab extends ConsumerWidget {
 
     return RefreshIndicator(
       onRefresh: () => ref.read(gameProvider.notifier).loadResearch(),
-      color: AppColors.ogameGreen,
-      backgroundColor: AppColors.panelBackground,
+      color: AppColors.accent,
+      backgroundColor: AppColors.surface,
       child: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          // 연구소 레벨
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -29,13 +28,14 @@ class ResearchTab extends ConsumerWidget {
             ),
             child: Row(
               children: [
-                const Icon(Icons.science, color: AppColors.infoBlue),
-                const SizedBox(width: 8),
+                Icon(Icons.science, color: AppColors.accent, size: 18),
+                const SizedBox(width: 10),
                 Text(
                   '연구소 레벨: ${gameState.labLevel}',
                   style: const TextStyle(
                     color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
                   ),
                 ),
               ],
@@ -43,14 +43,12 @@ class ResearchTab extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           
-          // 연구 진행 중
           if (gameState.researchProgress != null)
             _ResearchProgressCard(
               progress: gameState.researchProgress!,
               onComplete: () => ref.read(gameProvider.notifier).completeResearch(),
             ),
           
-          // 연구 목록
           ...gameState.research.map((research) => _ResearchCard(
             research: research,
             resources: gameState.resources,
@@ -78,40 +76,42 @@ class _ResearchProgressCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.infoBlue.withOpacity(0.1),
+          color: AppColors.accent.withOpacity(0.08),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.infoBlue.withOpacity(0.3)),
+          border: Border.all(color: AppColors.accent.withOpacity(0.2)),
         ),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.science, color: AppColors.infoBlue, size: 20),
+                Icon(Icons.science, color: AppColors.accent, size: 16),
                 const SizedBox(width: 8),
                 const Text(
                   '연구 진행 중',
                   style: TextStyle(
-                    color: AppColors.infoBlue,
-                    fontWeight: FontWeight.bold,
+                    color: AppColors.accent,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
               progress.name,
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Row(
               children: [
-                const Icon(Icons.timer, size: 16, color: AppColors.warningOrange),
-                const SizedBox(width: 8),
+                Icon(Icons.schedule, size: 14, color: AppColors.textMuted),
+                const SizedBox(width: 6),
                 if (progress.finishDateTime != null)
                   ProgressTimer(
                     finishTime: progress.finishDateTime!,
@@ -146,6 +146,43 @@ class _ResearchCard extends StatelessWidget {
            resources.deuterium >= research.cost!.deuterium;
   }
 
+  String? _getResearchImagePath(String type) {
+    const researchImages = {
+      'energyTech': 'assets/images/engery_technology.webp',
+      'laserTech': 'assets/images/laser_technology.webp',
+      'ionTech': 'assets/images/ion_technology.webp',
+      'hyperspaceTech': 'assets/images/hyperspace_technology.webp',
+      'plasmaTech': 'assets/images/plasma_technology.webp',
+      'combustionDrive': 'assets/images/combustion_drive.webp',
+      'impulseDrive': 'assets/images/impulse_drive.webp',
+      'hyperspaceDrive': 'assets/images/hyperspace_drive.webp',
+      'espionageTech': 'assets/images/espionage_technology.webp',
+      'computerTech': 'assets/images/computer_technology.webp',
+      'astrophysics': 'assets/images/astrophysics.webp',
+      'intergalacticResearchNetwork': 'assets/images/intergalactic_research_network.webp',
+      'gravitonTech': 'assets/images/graviton_technology.webp',
+      'weaponsTech': 'assets/images/weapons_technology.webp',
+      'shieldTech': 'assets/images/shielding_technology.webp',
+      'armorTech': 'assets/images/armor_technology.webp',
+    };
+    return researchImages[type];
+  }
+
+  String _formatResearchTime(double seconds) {
+    if (seconds <= 0) return '즉시';
+    final totalSeconds = seconds.toInt();
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final secs = totalSeconds % 60;
+    if (hours > 0) {
+      return '${hours}시간 ${minutes}분 ${secs}초';
+    } else if (minutes > 0) {
+      return '${minutes}분 ${secs}초';
+    } else {
+      return '${secs}초';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDisabled = !research.requirementsMet;
@@ -159,14 +196,13 @@ class _ResearchCard extends StatelessWidget {
             color: AppColors.panelBackground,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isDisabled ? AppColors.textDisabled : AppColors.panelBorder,
+              color: isDisabled ? AppColors.textMuted : AppColors.panelBorder,
             ),
           ),
           child: Column(
             children: [
-              // 헤더
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: const BoxDecoration(
                   color: AppColors.panelHeader,
                   borderRadius: BorderRadius.only(
@@ -181,51 +217,105 @@ class _ResearchCard extends StatelessWidget {
                         research.name,
                         style: const TextStyle(
                           color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
                         ),
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.infoBlue.withOpacity(0.2),
+                        color: AppColors.accent.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         'Lv.${research.level}',
                         style: const TextStyle(
-                          color: AppColors.infoBlue,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                          color: AppColors.accent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-              // 컨텐츠
               Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 요구사항 미충족 시
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 연구 이미지
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: _getResearchImagePath(research.type) != null
+                              ? Image.asset(
+                                  _getResearchImagePath(research.type)!,
+                                  width: 100,
+                                  height: 100,
+                                  cacheWidth: 200,
+                                  cacheHeight: 200,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Container(
+                                        width: 100,
+                                        height: 100,
+                                        color: AppColors.surface,
+                                        child: const Icon(Icons.science, size: 40, color: AppColors.textMuted),
+                                      ),
+                                )
+                              : Container(
+                                  width: 100,
+                                  height: 100,
+                                  color: AppColors.surface,
+                                  child: const Icon(Icons.science, size: 40, color: AppColors.textMuted),
+                                ),
+                        ),
+                        const SizedBox(width: 14),
+                        // 연구 시간
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (research.researchTime > 0)
+                                Row(
+                                  children: [
+                                    Icon(Icons.schedule, size: 14, color: AppColors.textMuted),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '연구: ${_formatResearchTime(research.researchTime)}',
+                                      style: const TextStyle(
+                                        color: AppColors.textMuted,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
                     if (isDisabled && research.missingRequirements.isNotEmpty) ...[
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: AppColors.errorRed.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
+                          color: AppColors.negative.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.lock, size: 14, color: AppColors.errorRed),
+                            Icon(Icons.lock, size: 14, color: AppColors.negative),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 research.missingRequirements.join(', '),
                                 style: const TextStyle(
-                                  color: AppColors.errorRed,
+                                  color: AppColors.negative,
                                   fontSize: 11,
                                 ),
                               ),
@@ -233,7 +323,7 @@ class _ResearchCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                     ],
                     Row(
                       children: [
@@ -244,11 +334,11 @@ class _ResearchCard extends StatelessWidget {
                               const Text(
                                 '연구 비용',
                                 style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 11,
+                                  color: AppColors.textMuted,
+                                  fontSize: 10,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 6),
                               if (research.cost != null)
                                 CostDisplay(
                                   metal: research.cost!.metal,
@@ -258,13 +348,19 @@ class _ResearchCard extends StatelessWidget {
                                   currentCrystal: resources.crystal,
                                   currentDeuterium: resources.deuterium,
                                 ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '⏱️ ${_formatTime(research.researchTime)}',
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 11,
-                                ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(Icons.schedule, size: 12, color: AppColors.textMuted),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _formatTime(research.researchTime),
+                                    style: const TextStyle(
+                                      color: AppColors.textMuted,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -298,4 +394,3 @@ class _ResearchCard extends StatelessWidget {
     return '${duration.inSeconds}초';
   }
 }
-

@@ -19,12 +19,109 @@ const mongoose_2 = require("mongoose");
 const user_schema_1 = require("../../user/schemas/user.schema");
 const resources_service_1 = require("./resources.service");
 const game_data_1 = require("../constants/game-data");
+const FIELD_CONSUMING_BUILDINGS = [
+    'metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor',
+    'robotFactory', 'nanoFactory', 'shipyard', 'metalStorage', 'crystalStorage',
+    'deuteriumTank', 'researchLab', 'terraformer', 'allianceDepot', 'missileSilo',
+    'lunarBase', 'sensorPhalanx', 'jumpGate'
+];
+const PLANET_FIELD_RANGES = {
+    min: [40, 50, 55, 100, 95, 80, 115, 120, 125, 75, 80, 85, 60, 40, 50],
+    max: [90, 95, 95, 240, 240, 230, 180, 180, 190, 125, 120, 130, 160, 300, 150]
+};
+const PLANET_TEMP_RANGES = {
+    min: [40, 40, 40, 15, 15, 15, -10, -10, -10, -35, -35, -35, -60, -60, -60],
+    max: [140, 140, 140, 115, 115, 115, 90, 90, 90, 65, 65, 65, 50, 50, 50]
+};
+const PLANET_TYPES = [
+    'trocken', 'trocken', 'trocken',
+    'dschjungel', 'dschjungel', 'dschjungel',
+    'normaltemp', 'normaltemp', 'normaltemp',
+    'wasser', 'wasser', 'wasser',
+    'eis', 'eis', 'eis'
+];
 let BuildingsService = class BuildingsService {
     userModel;
     resourcesService;
     constructor(userModel, resourcesService) {
         this.userModel = userModel;
         this.resourcesService = resourcesService;
+    }
+    extractPlanetPosition(coordinate) {
+        const parts = coordinate.split(':');
+        if (parts.length !== 3)
+            return 7;
+        return parseInt(parts[2], 10) || 7;
+    }
+    generatePlanetFields(position, isHomeWorld = false) {
+        if (isHomeWorld) {
+            return {
+                maxFields: 163,
+                temperature: 50,
+                planetType: 'normaltemp'
+            };
+        }
+        const posIndex = Math.max(0, Math.min(14, position - 1));
+        const minFields = PLANET_FIELD_RANGES.min[posIndex];
+        const maxFields = PLANET_FIELD_RANGES.max[posIndex];
+        const randomFields = Math.floor(Math.random() * (maxFields - minFields + 1)) + minFields;
+        const minTemp = PLANET_TEMP_RANGES.min[posIndex];
+        const maxTemp = PLANET_TEMP_RANGES.max[posIndex];
+        const randomTemp = Math.floor(Math.random() * (maxTemp - minTemp + 1)) + minTemp;
+        return {
+            maxFields: randomFields,
+            temperature: randomTemp,
+            planetType: PLANET_TYPES[posIndex]
+        };
+    }
+    calculateUsedFields(user) {
+        let usedFields = 0;
+        if (user.mines) {
+            usedFields += user.mines.metalMine || 0;
+            usedFields += user.mines.crystalMine || 0;
+            usedFields += user.mines.deuteriumMine || 0;
+            usedFields += user.mines.solarPlant || 0;
+            usedFields += user.mines.fusionReactor || 0;
+        }
+        if (user.facilities) {
+            usedFields += user.facilities.robotFactory || 0;
+            usedFields += user.facilities.nanoFactory || 0;
+            usedFields += user.facilities.shipyard || 0;
+            usedFields += user.facilities.researchLab || 0;
+            usedFields += user.facilities.terraformer || 0;
+            usedFields += user.facilities.allianceDepot || 0;
+            usedFields += user.facilities.missileSilo || 0;
+            usedFields += user.facilities.metalStorage || 0;
+            usedFields += user.facilities.crystalStorage || 0;
+            usedFields += user.facilities.deuteriumTank || 0;
+            usedFields += user.facilities.lunarBase || 0;
+            usedFields += user.facilities.sensorPhalanx || 0;
+            usedFields += user.facilities.jumpGate || 0;
+        }
+        return usedFields;
+    }
+    getTerraformerBonus(terraformerLevel) {
+        return terraformerLevel * 5;
+    }
+    getMaxFields(user) {
+        const baseFields = user.planetInfo?.maxFields || 163;
+        const terraformerLevel = user.facilities?.terraformer || 0;
+        return baseFields + this.getTerraformerBonus(terraformerLevel);
+    }
+    isFieldsFull(user) {
+        const usedFields = this.calculateUsedFields(user);
+        const maxFields = this.getMaxFields(user);
+        return usedFields >= maxFields;
+    }
+    getFieldInfo(user) {
+        const usedFields = this.calculateUsedFields(user);
+        const maxFields = this.getMaxFields(user);
+        return {
+            used: usedFields,
+            max: maxFields,
+            remaining: maxFields - usedFields,
+            percentage: Math.round((usedFields / maxFields) * 100)
+        };
     }
     getUpgradeCost(buildingType, currentLevel) {
         const buildingData = game_data_1.BUILDING_COSTS[buildingType];
@@ -52,7 +149,7 @@ let BuildingsService = class BuildingsService {
         const totalCost = (cost.metal || 0) + (cost.crystal || 0);
         const nanoBonus = Math.pow(2, nanoFactoryLevel);
         const facilityBonus = 1 + robotFactoryLevel;
-        return (totalCost / (25 * facilityBonus * nanoBonus)) * 4;
+        return ((totalCost / (25 * facilityBonus * nanoBonus)) * 4) * 10;
     }
     async getBuildings(userId) {
         const user = await this.userModel.findById(userId).exec();
@@ -66,6 +163,38 @@ let BuildingsService = class BuildingsService {
             const level = mines[key] || 0;
             const cost = this.getUpgradeCost(key, level);
             const time = this.getConstructionTime(key, level, facilities.robotFactory || 0, facilities.nanoFactory || 0);
+            let production;
+            let consumption;
+            let nextProduction;
+            let nextConsumption;
+            if (key === 'metalMine') {
+                production = this.resourcesService.getResourceProduction(level, 'metal');
+                consumption = this.resourcesService.getEnergyConsumption(level, 'metal');
+                nextProduction = this.resourcesService.getResourceProduction(level + 1, 'metal');
+                nextConsumption = this.resourcesService.getEnergyConsumption(level + 1, 'metal');
+            }
+            else if (key === 'crystalMine') {
+                production = this.resourcesService.getResourceProduction(level, 'crystal');
+                consumption = this.resourcesService.getEnergyConsumption(level, 'crystal');
+                nextProduction = this.resourcesService.getResourceProduction(level + 1, 'crystal');
+                nextConsumption = this.resourcesService.getEnergyConsumption(level + 1, 'crystal');
+            }
+            else if (key === 'deuteriumMine') {
+                production = this.resourcesService.getResourceProduction(level, 'deuterium');
+                consumption = this.resourcesService.getEnergyConsumption(level, 'deuterium');
+                nextProduction = this.resourcesService.getResourceProduction(level + 1, 'deuterium');
+                nextConsumption = this.resourcesService.getEnergyConsumption(level + 1, 'deuterium');
+            }
+            else if (key === 'solarPlant') {
+                production = this.resourcesService.getEnergyProduction(level);
+                nextProduction = this.resourcesService.getEnergyProduction(level + 1);
+            }
+            else if (key === 'fusionReactor') {
+                production = this.resourcesService.getFusionEnergyProduction(level);
+                consumption = this.resourcesService.getFusionDeuteriumConsumption(level);
+                nextProduction = this.resourcesService.getFusionEnergyProduction(level + 1);
+                nextConsumption = this.resourcesService.getFusionDeuteriumConsumption(level + 1);
+            }
             buildingsInfo.push({
                 type: key,
                 name: game_data_1.NAME_MAPPING[key],
@@ -73,6 +202,10 @@ let BuildingsService = class BuildingsService {
                 category: 'mines',
                 upgradeCost: cost,
                 upgradeTime: time,
+                production,
+                consumption,
+                nextProduction,
+                nextConsumption,
             });
         }
         const facilityTypes = ['robotFactory', 'shipyard', 'researchLab', 'nanoFactory'];
@@ -89,9 +222,22 @@ let BuildingsService = class BuildingsService {
                 upgradeTime: time,
             });
         }
+        const fieldInfo = this.getFieldInfo(user);
         return {
             buildings: buildingsInfo,
             constructionProgress: user.constructionProgress,
+            fieldInfo: {
+                used: fieldInfo.used,
+                max: fieldInfo.max,
+                remaining: fieldInfo.remaining,
+                percentage: fieldInfo.percentage,
+            },
+            planetInfo: {
+                temperature: user.planetInfo?.temperature ?? 50,
+                planetType: user.planetInfo?.planetType ?? 'normaltemp',
+                planetName: user.planetInfo?.planetName ?? user.playerName,
+                diameter: user.planetInfo?.diameter ?? 12800,
+            },
         };
     }
     async startUpgrade(userId, buildingType) {
@@ -104,9 +250,17 @@ let BuildingsService = class BuildingsService {
             throw new common_1.BadRequestException(`이미 ${game_data_1.NAME_MAPPING[user.constructionProgress.name] || user.constructionProgress.name} 건설이 진행 중입니다. 완료까지 ${Math.ceil(remainingTime)}초 남았습니다.`);
         }
         const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
-        const isFacility = ['robotFactory', 'shipyard', 'researchLab', 'nanoFactory'].includes(buildingType);
+        const isFacility = ['robotFactory', 'shipyard', 'researchLab', 'nanoFactory', 'terraformer',
+            'allianceDepot', 'missileSilo', 'metalStorage', 'crystalStorage', 'deuteriumTank',
+            'lunarBase', 'sensorPhalanx', 'jumpGate'].includes(buildingType);
         if (!isMine && !isFacility) {
             throw new common_1.BadRequestException('알 수 없는 건물 유형입니다.');
+        }
+        if (FIELD_CONSUMING_BUILDINGS.includes(buildingType) && buildingType !== 'terraformer') {
+            if (this.isFieldsFull(user)) {
+                const fieldInfo = this.getFieldInfo(user);
+                throw new common_1.BadRequestException(`필드가 가득 찼습니다. (${fieldInfo.used}/${fieldInfo.max}) 테라포머를 건설하여 필드를 확장하세요.`);
+            }
         }
         const currentLevel = isMine
             ? (user.mines[buildingType] || 0)

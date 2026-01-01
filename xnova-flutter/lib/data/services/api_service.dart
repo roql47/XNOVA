@@ -51,6 +51,17 @@ class ApiService {
     return UserProfile.fromJson(response.data);
   }
 
+  // ===== Google 인증 =====
+  Future<GoogleAuthResponse> googleAuth(GoogleAuthRequest request) async {
+    final response = await _dio.post('auth/google', data: request.toJson());
+    return GoogleAuthResponse.fromJson(response.data);
+  }
+
+  Future<AuthResponse> completeGoogleSignup(GoogleCompleteRequest request) async {
+    final response = await _dio.post('auth/google/complete', data: request.toJson());
+    return AuthResponse.fromJson(response.data);
+  }
+
   // ===== 자원 =====
   Future<ResourcesResponse> getResources() async {
     final response = await _dio.get('game/resources');
@@ -137,6 +148,11 @@ class ApiService {
     return AttackResponse.fromJson(response.data);
   }
 
+  Future<AttackResponse> recycle(AttackRequest request) async {
+    final response = await _dio.post('game/battle/recycle', data: request.toJson());
+    return AttackResponse.fromJson(response.data);
+  }
+
   Future<BattleStatus> getBattleStatus() async {
     final response = await _dio.get('game/battle/status');
     return BattleStatus.fromJson(response.data);
@@ -145,6 +161,20 @@ class ApiService {
   Future<Map<String, dynamic>> processBattle() async {
     final response = await _dio.post('game/battle/process');
     return response.data;
+  }
+
+  // ===== 메시지 =====
+  Future<List<Message>> getMessages({int limit = 50}) async {
+    final response = await _dio.get('messages', queryParameters: {'limit': limit});
+    return (response.data as List).map((e) => Message.fromJson(e)).toList();
+  }
+
+  Future<void> markMessageAsRead(String id) async {
+    await _dio.post('messages/$id/read');
+  }
+
+  Future<void> deleteMessage(String id) async {
+    await _dio.delete('messages/$id');
   }
 
   // ===== 은하 =====

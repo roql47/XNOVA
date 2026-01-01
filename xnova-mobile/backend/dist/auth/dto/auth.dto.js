@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LoginDto = exports.RegisterDto = void 0;
+exports.LogoutDto = exports.RefreshTokenDto = exports.GoogleCompleteDto = exports.GoogleAuthDto = exports.LoginDto = exports.RegisterDto = void 0;
 const class_validator_1 = require("class-validator");
 class RegisterDto {
     email;
@@ -25,7 +25,9 @@ __decorate([
 __decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsNotEmpty)({ message: '비밀번호는 필수입니다.' }),
-    (0, class_validator_1.MinLength)(6, { message: '비밀번호는 최소 6자 이상이어야 합니다.' }),
+    (0, class_validator_1.MinLength)(8, { message: '비밀번호는 최소 8자 이상이어야 합니다.' }),
+    (0, class_validator_1.MaxLength)(100, { message: '비밀번호는 최대 100자까지 가능합니다.' }),
+    (0, class_validator_1.Matches)(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/, { message: '비밀번호는 대문자, 소문자, 숫자, 특수문자(@$!%*?&)를 각각 1개 이상 포함해야 합니다.' }),
     __metadata("design:type", String)
 ], RegisterDto.prototype, "password", void 0);
 __decorate([
@@ -50,4 +52,48 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)({ message: '비밀번호는 필수입니다.' }),
     __metadata("design:type", String)
 ], LoginDto.prototype, "password", void 0);
+class GoogleAuthDto {
+    idToken;
+}
+exports.GoogleAuthDto = GoogleAuthDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)({ message: 'Google ID 토큰은 필수입니다.' }),
+    __metadata("design:type", String)
+], GoogleAuthDto.prototype, "idToken", void 0);
+class GoogleCompleteDto {
+    idToken;
+    playerName;
+}
+exports.GoogleCompleteDto = GoogleCompleteDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)({ message: 'Google ID 토큰은 필수입니다.' }),
+    __metadata("design:type", String)
+], GoogleCompleteDto.prototype, "idToken", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)({ message: '플레이어 이름은 필수입니다.' }),
+    (0, class_validator_1.MinLength)(2, { message: '플레이어 이름은 최소 2자 이상이어야 합니다.' }),
+    (0, class_validator_1.MaxLength)(20, { message: '플레이어 이름은 최대 20자까지 가능합니다.' }),
+    __metadata("design:type", String)
+], GoogleCompleteDto.prototype, "playerName", void 0);
+class RefreshTokenDto {
+    refreshToken;
+}
+exports.RefreshTokenDto = RefreshTokenDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)({ message: 'Refresh Token은 필수입니다.' }),
+    __metadata("design:type", String)
+], RefreshTokenDto.prototype, "refreshToken", void 0);
+class LogoutDto {
+    refreshToken;
+}
+exports.LogoutDto = LogoutDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)({ message: 'Refresh Token은 필수입니다.' }),
+    __metadata("design:type", String)
+], LogoutDto.prototype, "refreshToken", void 0);
 //# sourceMappingURL=auth.dto.js.map

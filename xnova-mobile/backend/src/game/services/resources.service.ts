@@ -9,6 +9,14 @@ export class ResourcesService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
   ) {}
 
+  // 태양광 인공위성 에너지 계산
+  // 공식: 에너지 = (행성최대온도 / 4 + 20) × 위성 수
+  getSatelliteEnergy(satelliteCount: number, temperature: number): number {
+    if (satelliteCount <= 0) return 0;
+    const energyPerSatellite = Math.floor(temperature / 4 + 20);
+    return energyPerSatellite * satelliteCount;
+  }
+
   // 자원 생산량 계산 (시간당) - XNOVA.js getResourceProduction 마이그레이션
   getResourceProduction(level: number, type: 'metal' | 'crystal' | 'deuterium'): number {
     const effectiveLevel = level + 1;
@@ -72,13 +80,14 @@ export class ResourcesService {
     const mines = user.mines;
     const fleet = user.fleet;
     
-    // 태양광 위성 에너지 계산
+    // 태양광 위성 에너지 계산 (행성 온도 기반)
     const satelliteCount = fleet.solarSatellite || 0;
+    const planetTemperature = user.planetInfo?.temperature ?? 50;
     const fusionLevel = mines.fusionReactor || 0;
 
     // 에너지 생산량 계산
     const solarEnergy = this.getEnergyProduction(mines.solarPlant || 0);
-    const satelliteEnergy = satelliteCount * 25;
+    const satelliteEnergy = this.getSatelliteEnergy(satelliteCount, planetTemperature);
     const fusionEnergy = this.getFusionEnergyProduction(fusionLevel);
     const energyProduction = solarEnergy + satelliteEnergy + fusionEnergy;
 
@@ -124,12 +133,13 @@ export class ResourcesService {
     const mines = user.mines;
     const fleet = user.fleet;
     
-    // 에너지 계산
+    // 에너지 계산 (행성 온도 기반)
     const satelliteCount = fleet.solarSatellite || 0;
+    const planetTemperature = user.planetInfo?.temperature ?? 50;
     const fusionLevel = mines.fusionReactor || 0;
     
     const solarEnergy = this.getEnergyProduction(mines.solarPlant || 0);
-    const satelliteEnergy = satelliteCount * 25;
+    const satelliteEnergy = this.getSatelliteEnergy(satelliteCount, planetTemperature);
     const fusionEnergy = this.getFusionEnergyProduction(fusionLevel);
     
     let energyConsumption = 0;

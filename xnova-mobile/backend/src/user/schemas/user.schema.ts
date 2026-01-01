@@ -52,6 +52,59 @@ export class Facilities {
 
   @Prop({ default: 0 })
   nanoFactory: number;
+
+  @Prop({ default: 0 })
+  terraformer: number;
+
+  @Prop({ default: 0 })
+  allianceDepot: number;
+
+  @Prop({ default: 0 })
+  missileSilo: number;
+
+  @Prop({ default: 0 })
+  metalStorage: number;
+
+  @Prop({ default: 0 })
+  crystalStorage: number;
+
+  @Prop({ default: 0 })
+  deuteriumTank: number;
+
+  // 달 전용 건물
+  @Prop({ default: 0 })
+  lunarBase: number;
+
+  @Prop({ default: 0 })
+  sensorPhalanx: number;
+
+  @Prop({ default: 0 })
+  jumpGate: number;
+}
+
+// 행성 정보 스키마
+@Schema({ _id: false })
+export class PlanetInfo {
+  @Prop({ default: 163 })
+  maxFields: number;
+
+  @Prop({ default: 0 })
+  usedFields: number;
+
+  @Prop({ default: 50 })
+  temperature: number;  // 최고 온도
+
+  @Prop({ default: 'normaltemp' })
+  planetType: string;  // trocken, dschjungel, normaltemp, wasser, eis
+
+  @Prop({ default: false })
+  isMoon: boolean;
+
+  @Prop({ default: '' })
+  planetName: string;
+
+  @Prop({ default: 12800 })
+  diameter: number;
 }
 
 // 연구 레벨 스키마
@@ -248,8 +301,11 @@ export class User {
   @Prop({ required: true, unique: true })
   email: string;
 
-  @Prop({ required: true })
-  password: string;
+  @Prop({ required: false })
+  password?: string;
+
+  @Prop({ unique: true, sparse: true })
+  googleId?: string;
 
   @Prop({ required: true })
   playerName: string;
@@ -265,6 +321,9 @@ export class User {
 
   @Prop({ type: Facilities, default: () => ({}) })
   facilities: Facilities;
+
+  @Prop({ type: PlanetInfo, default: () => ({}) })
+  planetInfo: PlanetInfo;
 
   @Prop({ type: ResearchLevels, default: () => ({}) })
   researchLevels: ResearchLevels;

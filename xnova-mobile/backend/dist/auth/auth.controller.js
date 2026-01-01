@@ -18,16 +18,47 @@ const auth_service_1 = require("./auth.service");
 const auth_dto_1 = require("./dto/auth.dto");
 const local_auth_guard_1 = require("./guards/local-auth.guard");
 const jwt_auth_guard_1 = require("./guards/jwt-auth.guard");
+const throttler_1 = require("@nestjs/throttler");
 let AuthController = class AuthController {
     authService;
     constructor(authService) {
         this.authService = authService;
     }
-    async register(registerDto) {
-        return this.authService.register(registerDto);
+    getClientInfo(req, userAgent, ip) {
+        return {
+            userAgent: userAgent || req.headers['user-agent'] || 'unknown',
+            ipAddress: ip || req.ip || req.connection?.remoteAddress || 'unknown',
+        };
     }
-    async login(req) {
-        return this.authService.login(req.user);
+    async register(registerDto, req, userAgent, ip) {
+        const clientInfo = this.getClientInfo(req, userAgent, ip);
+        return this.authService.register(registerDto, clientInfo);
+    }
+    async login(req, userAgent, ip) {
+        const clientInfo = this.getClientInfo(req, userAgent, ip);
+        return this.authService.login(req.user, clientInfo);
+    }
+    async googleAuth(googleAuthDto, req, userAgent, ip) {
+        const clientInfo = this.getClientInfo(req, userAgent, ip);
+        return this.authService.googleAuth(googleAuthDto, clientInfo);
+    }
+    async completeGoogleSignup(googleCompleteDto, req, userAgent, ip) {
+        const clientInfo = this.getClientInfo(req, userAgent, ip);
+        return this.authService.completeGoogleSignup(googleCompleteDto, clientInfo);
+    }
+    async refreshToken(refreshTokenDto, req, userAgent, ip) {
+        const clientInfo = this.getClientInfo(req, userAgent, ip);
+        return this.authService.refreshTokens(refreshTokenDto.refreshToken, clientInfo);
+    }
+    async logout(req, logoutDto, authHeader) {
+        const accessToken = authHeader?.replace('Bearer ', '') || '';
+        await this.authService.logout(accessToken, logoutDto.refreshToken);
+        return { message: '로그아웃 되었습니다.' };
+    }
+    async logoutAllDevices(req, authHeader) {
+        const accessToken = authHeader?.replace('Bearer ', '') || '';
+        await this.authService.logoutAllDevices(req.user.userId, accessToken);
+        return { message: '모든 기기에서 로그아웃 되었습니다.' };
     }
     async getProfile(req) {
         return this.authService.getProfile(req.user.userId);
@@ -35,21 +66,81 @@ let AuthController = class AuthController {
 };
 exports.AuthController = AuthController;
 __decorate([
+    (0, throttler_1.Throttle)({ default: { limit: 3, ttl: 60000 } }),
     (0, common_1.Post)('register'),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
+    __param(2, (0, common_1.Headers)('user-agent')),
+    __param(3, (0, common_1.Ip)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [auth_dto_1.RegisterDto]),
+    __metadata("design:paramtypes", [auth_dto_1.RegisterDto, Object, String, String]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "register", null);
 __decorate([
+    (0, throttler_1.Throttle)({ default: { limit: 5, ttl: 60000 } }),
     (0, common_1.UseGuards)(local_auth_guard_1.LocalAuthGuard),
     (0, common_1.Post)('login'),
     __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Headers)('user-agent')),
+    __param(2, (0, common_1.Ip)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, String, String]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "login", null);
 __decorate([
+    (0, throttler_1.Throttle)({ default: { limit: 5, ttl: 60000 } }),
+    (0, common_1.Post)('google'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
+    __param(2, (0, common_1.Headers)('user-agent')),
+    __param(3, (0, common_1.Ip)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [auth_dto_1.GoogleAuthDto, Object, String, String]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "googleAuth", null);
+__decorate([
+    (0, throttler_1.Throttle)({ default: { limit: 3, ttl: 60000 } }),
+    (0, common_1.Post)('google/complete'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
+    __param(2, (0, common_1.Headers)('user-agent')),
+    __param(3, (0, common_1.Ip)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [auth_dto_1.GoogleCompleteDto, Object, String, String]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "completeGoogleSignup", null);
+__decorate([
+    (0, throttler_1.Throttle)({ default: { limit: 10, ttl: 60000 } }),
+    (0, common_1.Post)('refresh'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
+    __param(2, (0, common_1.Headers)('user-agent')),
+    __param(3, (0, common_1.Ip)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [auth_dto_1.RefreshTokenDto, Object, String, String]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "refreshToken", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Post)('logout'),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Headers)('authorization')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, auth_dto_1.LogoutDto, String]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "logout", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Post)('logout/all'),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Headers)('authorization')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "logoutAllDevices", null);
+__decorate([
+    (0, throttler_1.SkipThrottle)(),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Get)('profile'),
     __param(0, (0, common_1.Request)()),

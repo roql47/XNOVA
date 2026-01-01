@@ -10,20 +10,40 @@ import 'tabs/fleet_tab.dart';
 import 'tabs/defense_tab.dart';
 import 'tabs/fleet_movement_tab.dart';
 import 'tabs/galaxy_tab.dart';
+import 'tabs/messages_tab.dart';
+import 'tabs/techtree_tab.dart';
+import 'tabs/simulator_tab.dart';
 
-enum MainTab {
-  overview('🏠', '개요'),
-  buildings('🏗️', '건물'),
-  research('🔬', '연구'),
-  shipyard('🚀', '조선소'),
-  defense('🛡️', '방어'),
-  fleet('⚔️', '함대'),
-  galaxy('🌌', '은하계');
+extension MainTabExtension on MainTab {
+  IconData get icon {
+    switch (this) {
+      case MainTab.overview: return Icons.dashboard_outlined;
+      case MainTab.buildings: return Icons.apartment_outlined;
+      case MainTab.research: return Icons.science_outlined;
+      case MainTab.shipyard: return Icons.rocket_launch_outlined;
+      case MainTab.defense: return Icons.shield_outlined;
+      case MainTab.fleet: return Icons.flight_outlined;
+      case MainTab.galaxy: return Icons.blur_circular_outlined;
+      case MainTab.messages: return Icons.mail_outline;
+      case MainTab.techtree: return Icons.account_tree_outlined;
+      case MainTab.simulator: return Icons.analytics_outlined;
+    }
+  }
 
-  final String emoji;
-  final String label;
-
-  const MainTab(this.emoji, this.label);
+  String get label {
+    switch (this) {
+      case MainTab.overview: return '홈';
+      case MainTab.buildings: return '건물';
+      case MainTab.research: return '연구';
+      case MainTab.shipyard: return '조선소';
+      case MainTab.defense: return '방어';
+      case MainTab.fleet: return '함대';
+      case MainTab.galaxy: return '은하계';
+      case MainTab.messages: return '메시지';
+      case MainTab.techtree: return '테크트리';
+      case MainTab.simulator: return '시뮬레이터';
+    }
+  }
 }
 
 class MainScreen extends ConsumerStatefulWidget {
@@ -36,7 +56,6 @@ class MainScreen extends ConsumerStatefulWidget {
 }
 
 class _MainScreenState extends ConsumerState<MainScreen> {
-  MainTab _selectedTab = MainTab.overview;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
@@ -52,25 +71,23 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   Widget build(BuildContext context) {
     final gameState = ref.watch(gameProvider);
     final authState = ref.watch(authProvider);
+    final navState = ref.watch(navigationProvider);
 
     return Scaffold(
       key: _scaffoldKey,
-      backgroundColor: AppColors.ogameBlack,
-      drawer: _buildDrawer(authState, gameState),
+      backgroundColor: AppColors.background,
+      drawer: _buildDrawer(authState, gameState, navState),
       body: SafeArea(
         child: Column(
           children: [
-            // 상단 바
             _buildTopBar(gameState),
-            // 자원 바
             ResourceBar(
               resources: gameState.resources,
               production: gameState.production,
               energyRatio: gameState.energyRatio,
             ),
-            // 탭 컨텐츠
             Expanded(
-              child: _buildTabContent(),
+              child: _buildTabContent(navState.selectedTab),
             ),
           ],
         ),
@@ -80,38 +97,40 @@ class _MainScreenState extends ConsumerState<MainScreen> {
 
   Widget _buildTopBar(GameState gameState) {
     return Container(
-      color: AppColors.ogameDarkBlue,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      color: AppColors.surface,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.menu, color: AppColors.textPrimary),
+            icon: const Icon(Icons.menu, color: AppColors.textSecondary, size: 22),
             onPressed: () => _scaffoldKey.currentState?.openDrawer(),
           ),
           Expanded(
             child: Column(
               children: [
-                const Text(
+                Text(
                   'XNOVA',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.ogameGreen,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.accent,
+                    letterSpacing: 2,
                   ),
                 ),
                 if (gameState.coordinate != null)
                   Text(
-                    '[${gameState.coordinate}]',
+                    gameState.coordinate!,
                     style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
+                      fontSize: 10,
+                      color: AppColors.textMuted,
+                      letterSpacing: 1,
                     ),
                   ),
               ],
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, color: AppColors.textSecondary),
+            icon: const Icon(Icons.refresh, color: AppColors.textMuted, size: 20),
             onPressed: () => ref.read(gameProvider.notifier).loadAllData(),
           ),
         ],
@@ -119,83 +138,93 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     );
   }
 
-  Widget _buildDrawer(AuthState authState, GameState gameState) {
+  Widget _buildDrawer(AuthState authState, GameState gameState, NavigationState navState) {
     return Drawer(
       backgroundColor: AppColors.drawerBackground,
       child: Column(
         children: [
-          // 헤더
           Container(
             width: double.infinity,
             padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 16,
-              left: 16,
-              right: 16,
-              bottom: 16,
+              top: MediaQuery.of(context).padding.top + 24,
+              left: 20,
+              right: 20,
+              bottom: 20,
             ),
-            color: AppColors.panelHeader,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              border: Border(
+                bottom: BorderSide(color: AppColors.panelBorder, width: 1),
+              ),
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '🚀 XNOVA',
+                Text(
+                  'XNOVA',
                   style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.ogameGreen,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.accent,
+                    letterSpacing: 3,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 Text(
                   authState.user?.playerName ?? gameState.playerName ?? '',
                   style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                     color: AppColors.textPrimary,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
-                  '좌표: ${authState.user?.coordinate ?? gameState.coordinate ?? ''}',
+                  authState.user?.coordinate ?? gameState.coordinate ?? '',
                   style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                    color: AppColors.textMuted,
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 8),
-          const Divider(color: AppColors.panelBorder, height: 1),
-          const SizedBox(height: 8),
-          // 메뉴 아이템들
           Expanded(
             child: ListView(
-              padding: EdgeInsets.zero,
-              children: MainTab.values.map((tab) {
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: MainTab.values
+                  .where((tab) => tab != MainTab.simulator)  // 시뮬레이터 탭 숨김
+                  .map((tab) {
                 return _DrawerMenuItem(
                   tab: tab,
-                  isSelected: _selectedTab == tab,
+                  isSelected: navState.selectedTab == tab,
                   onTap: () {
-                    setState(() => _selectedTab = tab);
+                    ref.read(navigationProvider.notifier).setTab(tab);
                     Navigator.pop(context);
                   },
                 );
               }).toList(),
             ),
           ),
-          const Divider(color: AppColors.panelBorder, height: 1),
-          // 로그아웃
-          ListTile(
-            leading: const Icon(Icons.logout, color: AppColors.errorRed),
-            title: const Text(
-              '로그아웃',
-              style: TextStyle(color: AppColors.errorRed),
+          Container(
+            decoration: BoxDecoration(
+              border: Border(
+                top: BorderSide(color: AppColors.panelBorder, width: 1),
+              ),
             ),
-            onTap: () {
-              Navigator.pop(context);
-              ref.read(authProvider.notifier).logout();
-              widget.onLogout();
-            },
+            child: ListTile(
+              leading: const Icon(Icons.logout, color: AppColors.negative, size: 20),
+              title: const Text(
+                '로그아웃',
+                style: TextStyle(color: AppColors.negative, fontSize: 13),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                ref.read(authProvider.notifier).logout();
+                widget.onLogout();
+              },
+            ),
           ),
           SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
         ],
@@ -203,8 +232,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     );
   }
 
-  Widget _buildTabContent() {
-    switch (_selectedTab) {
+  Widget _buildTabContent(MainTab selectedTab) {
+    switch (selectedTab) {
       case MainTab.overview:
         return const OverviewTab();
       case MainTab.buildings:
@@ -219,6 +248,12 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         return const FleetMovementTab();
       case MainTab.galaxy:
         return const GalaxyTab();
+      case MainTab.messages:
+        return const MessagesTab();
+      case MainTab.techtree:
+        return const TechtreeTab();
+      case MainTab.simulator:
+        return const SimulatorTab();
     }
   }
 }
@@ -237,44 +272,39 @@ class _DrawerMenuItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      padding: const EdgeInsets.symmetric(vertical: 2),
       child: Material(
         color: isSelected ? AppColors.drawerItemSelected : Colors.transparent,
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(6),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(6),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(6),
               border: Border.all(
-                color: isSelected ? AppColors.ogameGreen : Colors.transparent,
+                color: isSelected ? AppColors.accent.withOpacity(0.3) : Colors.transparent,
               ),
             ),
             child: Row(
               children: [
-                Text(tab.emoji, style: const TextStyle(fontSize: 18)),
-                const SizedBox(width: 12),
+                Icon(
+                  tab.icon,
+                  size: 18,
+                  color: isSelected ? AppColors.accent : AppColors.textMuted,
+                ),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Text(
                     tab.label,
                     style: TextStyle(
-                      color: isSelected ? AppColors.ogameGreen : AppColors.textSecondary,
-                      fontSize: 14,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                      color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+                      fontSize: 13,
+                      fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
                     ),
                   ),
                 ),
-                if (isSelected)
-                  Container(
-                    width: 6,
-                    height: 6,
-                    decoration: const BoxDecoration(
-                      color: AppColors.ogameGreen,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
               ],
             ),
           ),
@@ -283,4 +313,3 @@ class _DrawerMenuItem extends StatelessWidget {
     );
   }
 }
-

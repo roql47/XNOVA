@@ -5,7 +5,10 @@ import { BuildingsService } from './services/buildings.service';
 import { ResearchService } from './services/research.service';
 import { FleetService } from './services/fleet.service';
 import { DefenseService } from './services/defense.service';
-import { BattleService, BattleResult } from './services/battle.service';
+import { BattleService } from './services/battle.service';
+import type { BattleResult } from './services/battle.service';
+import { BattleSimulatorService } from './services/battle-simulator.service';
+import type { SimulationRequest, SimulationConfig, BattleSlot } from './services/battle-simulator.service';
 
 @Controller('game')
 @UseGuards(JwtAuthGuard)
@@ -17,6 +20,7 @@ export class GameController {
     private fleetService: FleetService,
     private defenseService: DefenseService,
     private battleService: BattleService,
+    private battleSimulatorService: BattleSimulatorService,
   ) {}
 
   // ===== 자원 =====
@@ -105,6 +109,11 @@ export class GameController {
     return this.battleService.startAttack(req.user.userId, body.targetCoord, body.fleet);
   }
 
+  @Post('battle/recycle')
+  async recycle(@Request() req, @Body() body: { targetCoord: string; fleet: Record<string, number> }) {
+    return this.battleService.startRecycle(req.user.userId, body.targetCoord, body.fleet);
+  }
+
   @Get('battle/status')
   async getAttackStatus(@Request() req) {
     return this.battleService.getAttackStatus(req.user.userId);
@@ -114,17 +123,111 @@ export class GameController {
   async processBattle(@Request() req): Promise<{
     attackProcessed: boolean;
     attackResult: { battleResult: BattleResult; attacker: any; defender: any } | null;
+    recycleProcessed: boolean;
+    recycleResult: { metalLoot: number; crystalLoot: number } | null;
+    incomingProcessed: boolean;
+    incomingResults: any[];
     returnProcessed: boolean;
     returnResult: { returnedFleet: Record<string, number>; loot: Record<string, number> } | null;
   }> {
+    // 내가 보낸 공격 처리
     const attackResult = await this.battleService.processAttackArrival(req.user.userId);
+    // 데브리 수확 처리
+    const recycleResult = await this.battleService.processRecycleArrival(req.user.userId);
+    // 나에게 오는 공격 처리
+    const incomingResults = await this.battleService.processIncomingAttacks(req.user.userId);
+    // 내 함대 귀환 처리
     const returnResult = await this.battleService.processFleetReturn(req.user.userId);
     
     return {
       attackProcessed: attackResult !== null,
       attackResult,
+      recycleProcessed: recycleResult !== null,
+      recycleResult,
+      incomingProcessed: incomingResults.length > 0,
+      incomingResults,
       returnProcessed: returnResult !== null,
       returnResult,
+    };
+  }
+
+  // ===== 전투 시뮬레이터 =====
+
+  /**
+   * 전투 시뮬레이션 실행
+   * ACS(연합 공격) 지원, 다중 슬롯 지원
+   */
+  @Post('simulator/simulate')
+  async simulate(@Body() body: SimulationRequest) {
+    return this.battleSimulatorService.simulate(body);
+  }
+
+  /**
+   * 단순 전투 시뮬레이션 (싱글 슬롯)
+   */
+  @Post('simulator/simple')
+  async simulateSimple(@Body() body: {
+    attackerFleet: Record<string, number>;
+    attackerTech: { weaponsTech: number; shieldTech: number; armorTech: number };
+    defenderFleet: Record<string, number>;
+    defenderDefense: Record<string, number>;
+    defenderTech: { weaponsTech: number; shieldTech: number; armorTech: number };
+    config?: Partial<SimulationConfig>;
+  }) {
+    return this.battleSimulatorService.simulateSimple(
+      body.attackerFleet,
+      body.attackerTech,
+      body.defenderFleet,
+      body.defenderDefense,
+      body.defenderTech,
+      body.config,
+    );
+  }
+
+  /**
+   * 여러 번 시뮬레이션 실행 (통계용)
+   */
+  @Post('simulator/multiple')
+  async simulateMultiple(@Body() body: {
+    request: SimulationRequest;
+    iterations?: number;
+  }) {
+    return this.battleSimulatorService.simulateMultiple(
+      body.request,
+      body.iterations || 100,
+    );
+  }
+
+  /**
+   * 전투 소스 데이터 파싱
+   */
+  @Post('simulator/parse')
+  async parseSourceData(@Body() body: { sourceData: string }) {
+    return this.battleSimulatorService.parseBattleSourceData(body.sourceData);
+  }
+
+  /**
+   * 전투 소스 데이터 생성
+   */
+  @Post('simulator/generate-source')
+  async generateSourceData(@Body() body: {
+    attackers: BattleSlot[];
+    defenders: BattleSlot[];
+    config?: Partial<SimulationConfig>;
+  }) {
+    const config = {
+      rapidFire: true,
+      fleetInDebris: 30,
+      defenseInDebris: 0,
+      debug: false,
+      ...body.config,
+    };
+    return {
+      sourceData: this.battleSimulatorService.generateBattleSourceData(
+        body.attackers,
+        body.defenders,
+        config,
+      ),
     };
   }
 }

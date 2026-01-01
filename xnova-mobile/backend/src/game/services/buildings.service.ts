@@ -12,7 +12,40 @@ export interface BuildingInfo {
   category: string;
   upgradeCost: { metal: number; crystal: number; deuterium?: number } | null;
   upgradeTime: number;
+  production?: number;
+  consumption?: number;
+  nextProduction?: number;
+  nextConsumption?: number;
 }
+
+// 필드를 차지하는 건물 목록
+const FIELD_CONSUMING_BUILDINGS = [
+  'metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor',
+  'robotFactory', 'nanoFactory', 'shipyard', 'metalStorage', 'crystalStorage',
+  'deuteriumTank', 'researchLab', 'terraformer', 'allianceDepot', 'missileSilo',
+  'lunarBase', 'sensorPhalanx', 'jumpGate'
+];
+
+// 위치별 행성 필드 범위 (1~15 위치)
+const PLANET_FIELD_RANGES = {
+  min: [40, 50, 55, 100, 95, 80, 115, 120, 125, 75, 80, 85, 60, 40, 50],
+  max: [90, 95, 95, 240, 240, 230, 180, 180, 190, 125, 120, 130, 160, 300, 150]
+};
+
+// 위치별 온도 범위
+const PLANET_TEMP_RANGES = {
+  min: [40, 40, 40, 15, 15, 15, -10, -10, -10, -35, -35, -35, -60, -60, -60],
+  max: [140, 140, 140, 115, 115, 115, 90, 90, 90, 65, 65, 65, 50, 50, 50]
+};
+
+// 위치별 행성 타입
+const PLANET_TYPES = [
+  'trocken', 'trocken', 'trocken',       // 1-3: 건조
+  'dschjungel', 'dschjungel', 'dschjungel', // 4-6: 정글
+  'normaltemp', 'normaltemp', 'normaltemp', // 7-9: 온대
+  'wasser', 'wasser', 'wasser',           // 10-12: 물
+  'eis', 'eis', 'eis'                     // 13-15: 얼음
+];
 
 @Injectable()
 export class BuildingsService {
@@ -20,6 +53,108 @@ export class BuildingsService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private resourcesService: ResourcesService,
   ) {}
+
+  // 행성 위치에서 position 추출 (좌표 형식: "1:1:4")
+  extractPlanetPosition(coordinate: string): number {
+    const parts = coordinate.split(':');
+    if (parts.length !== 3) return 7; // 기본값: 온대 지역
+    return parseInt(parts[2], 10) || 7;
+  }
+
+  // 행성 생성 시 필드 수 결정 (랜덤)
+  generatePlanetFields(position: number, isHomeWorld: boolean = false): { maxFields: number; temperature: number; planetType: string } {
+    if (isHomeWorld) {
+      // 모행성은 기본 163 필드
+      return {
+        maxFields: 163,
+        temperature: 50,
+        planetType: 'normaltemp'
+      };
+    }
+
+    // 위치 인덱스 (0-14)
+    const posIndex = Math.max(0, Math.min(14, position - 1));
+    
+    // 랜덤 필드 수 결정
+    const minFields = PLANET_FIELD_RANGES.min[posIndex];
+    const maxFields = PLANET_FIELD_RANGES.max[posIndex];
+    const randomFields = Math.floor(Math.random() * (maxFields - minFields + 1)) + minFields;
+
+    // 랜덤 온도 결정
+    const minTemp = PLANET_TEMP_RANGES.min[posIndex];
+    const maxTemp = PLANET_TEMP_RANGES.max[posIndex];
+    const randomTemp = Math.floor(Math.random() * (maxTemp - minTemp + 1)) + minTemp;
+
+    return {
+      maxFields: randomFields,
+      temperature: randomTemp,
+      planetType: PLANET_TYPES[posIndex]
+    };
+  }
+
+  // 현재 사용 중인 필드 수 계산
+  calculateUsedFields(user: UserDocument): number {
+    let usedFields = 0;
+
+    // 광산 레벨 합산
+    if (user.mines) {
+      usedFields += user.mines.metalMine || 0;
+      usedFields += user.mines.crystalMine || 0;
+      usedFields += user.mines.deuteriumMine || 0;
+      usedFields += user.mines.solarPlant || 0;
+      usedFields += user.mines.fusionReactor || 0;
+    }
+
+    // 시설 레벨 합산
+    if (user.facilities) {
+      usedFields += user.facilities.robotFactory || 0;
+      usedFields += user.facilities.nanoFactory || 0;
+      usedFields += user.facilities.shipyard || 0;
+      usedFields += user.facilities.researchLab || 0;
+      usedFields += user.facilities.terraformer || 0;
+      usedFields += user.facilities.allianceDepot || 0;
+      usedFields += user.facilities.missileSilo || 0;
+      usedFields += user.facilities.metalStorage || 0;
+      usedFields += user.facilities.crystalStorage || 0;
+      usedFields += user.facilities.deuteriumTank || 0;
+      usedFields += user.facilities.lunarBase || 0;
+      usedFields += user.facilities.sensorPhalanx || 0;
+      usedFields += user.facilities.jumpGate || 0;
+    }
+
+    return usedFields;
+  }
+
+  // 테라포머 보너스 필드 계산 (레벨당 5 필드 추가)
+  getTerraformerBonus(terraformerLevel: number): number {
+    return terraformerLevel * 5;
+  }
+
+  // 최대 필드 수 계산 (기본 + 테라포머 보너스)
+  getMaxFields(user: UserDocument): number {
+    const baseFields = user.planetInfo?.maxFields || 163;
+    const terraformerLevel = user.facilities?.terraformer || 0;
+    return baseFields + this.getTerraformerBonus(terraformerLevel);
+  }
+
+  // 필드가 가득 찼는지 확인
+  isFieldsFull(user: UserDocument): boolean {
+    const usedFields = this.calculateUsedFields(user);
+    const maxFields = this.getMaxFields(user);
+    return usedFields >= maxFields;
+  }
+
+  // 필드 정보 조회
+  getFieldInfo(user: UserDocument): { used: number; max: number; remaining: number; percentage: number } {
+    const usedFields = this.calculateUsedFields(user);
+    const maxFields = this.getMaxFields(user);
+    return {
+      used: usedFields,
+      max: maxFields,
+      remaining: maxFields - usedFields,
+      percentage: Math.round((usedFields / maxFields) * 100)
+    };
+  }
 
   // 건물 업그레이드 비용 계산 - XNOVA.js getUpgradeCost 마이그레이션
   getUpgradeCost(buildingType: string, currentLevel: number): { metal: number; crystal: number; deuterium?: number } | null {
@@ -58,8 +193,8 @@ export class BuildingsService {
     const nanoBonus = Math.pow(2, nanoFactoryLevel);
     const facilityBonus = 1 + robotFactoryLevel;
 
-    // 건설 시간 (초)
-    return (totalCost / (25 * facilityBonus * nanoBonus)) * 4;
+    // 건설 시간 (초) - 10배 상향
+    return ((totalCost / (25 * facilityBonus * nanoBonus)) * 4) * 10;
   }
 
   // 건물 현황 조회
@@ -80,6 +215,36 @@ export class BuildingsService {
       const cost = this.getUpgradeCost(key, level);
       const time = this.getConstructionTime(key, level, facilities.robotFactory || 0, facilities.nanoFactory || 0);
       
+      let production: number | undefined;
+      let consumption: number | undefined;
+      let nextProduction: number | undefined;
+      let nextConsumption: number | undefined;
+
+      if (key === 'metalMine') {
+        production = this.resourcesService.getResourceProduction(level, 'metal');
+        consumption = this.resourcesService.getEnergyConsumption(level, 'metal');
+        nextProduction = this.resourcesService.getResourceProduction(level + 1, 'metal');
+        nextConsumption = this.resourcesService.getEnergyConsumption(level + 1, 'metal');
+      } else if (key === 'crystalMine') {
+        production = this.resourcesService.getResourceProduction(level, 'crystal');
+        consumption = this.resourcesService.getEnergyConsumption(level, 'crystal');
+        nextProduction = this.resourcesService.getResourceProduction(level + 1, 'crystal');
+        nextConsumption = this.resourcesService.getEnergyConsumption(level + 1, 'crystal');
+      } else if (key === 'deuteriumMine') {
+        production = this.resourcesService.getResourceProduction(level, 'deuterium');
+        consumption = this.resourcesService.getEnergyConsumption(level, 'deuterium');
+        nextProduction = this.resourcesService.getResourceProduction(level + 1, 'deuterium');
+        nextConsumption = this.resourcesService.getEnergyConsumption(level + 1, 'deuterium');
+      } else if (key === 'solarPlant') {
+        production = this.resourcesService.getEnergyProduction(level);
+        nextProduction = this.resourcesService.getEnergyProduction(level + 1);
+      } else if (key === 'fusionReactor') {
+        production = this.resourcesService.getFusionEnergyProduction(level);
+        consumption = this.resourcesService.getFusionDeuteriumConsumption(level);
+        nextProduction = this.resourcesService.getFusionEnergyProduction(level + 1);
+        nextConsumption = this.resourcesService.getFusionDeuteriumConsumption(level + 1);
+      }
+
       buildingsInfo.push({
         type: key,
         name: NAME_MAPPING[key],
@@ -87,6 +252,10 @@ export class BuildingsService {
         category: 'mines',
         upgradeCost: cost,
         upgradeTime: time,
+        production,
+        consumption,
+        nextProduction,
+        nextConsumption,
       });
     }
 
@@ -107,9 +276,24 @@ export class BuildingsService {
       });
     }
 
+    // 필드 정보 계산
+    const fieldInfo = this.getFieldInfo(user);
+
     return {
       buildings: buildingsInfo,
       constructionProgress: user.constructionProgress,
+      fieldInfo: {
+        used: fieldInfo.used,
+        max: fieldInfo.max,
+        remaining: fieldInfo.remaining,
+        percentage: fieldInfo.percentage,
+      },
+      planetInfo: {
+        temperature: user.planetInfo?.temperature ?? 50,
+        planetType: user.planetInfo?.planetType ?? 'normaltemp',
+        planetName: user.planetInfo?.planetName ?? user.playerName,
+        diameter: user.planetInfo?.diameter ?? 12800,
+      },
     };
   }
 
@@ -128,10 +312,20 @@ export class BuildingsService {
 
     // 건물 타입 확인
     const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
-    const isFacility = ['robotFactory', 'shipyard', 'researchLab', 'nanoFactory'].includes(buildingType);
+    const isFacility = ['robotFactory', 'shipyard', 'researchLab', 'nanoFactory', 'terraformer', 
+                        'allianceDepot', 'missileSilo', 'metalStorage', 'crystalStorage', 'deuteriumTank',
+                        'lunarBase', 'sensorPhalanx', 'jumpGate'].includes(buildingType);
 
     if (!isMine && !isFacility) {
       throw new BadRequestException('알 수 없는 건물 유형입니다.');
+    }
+
+    // 필드 체크 (테라포머 제외 - 테라포머는 필드를 늘려주므로 예외)
+    if (FIELD_CONSUMING_BUILDINGS.includes(buildingType) && buildingType !== 'terraformer') {
+      if (this.isFieldsFull(user)) {
+        const fieldInfo = this.getFieldInfo(user);
+        throw new BadRequestException(`필드가 가득 찼습니다. (${fieldInfo.used}/${fieldInfo.max}) 테라포머를 건설하여 필드를 확장하세요.`);
+      }
     }
 
     // 현재 레벨 확인

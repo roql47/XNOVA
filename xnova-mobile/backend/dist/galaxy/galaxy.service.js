@@ -17,42 +17,70 @@ const common_1 = require("@nestjs/common");
 const mongoose_1 = require("@nestjs/mongoose");
 const mongoose_2 = require("mongoose");
 const user_schema_1 = require("../user/schemas/user.schema");
+const debris_schema_1 = require("./schemas/debris.schema");
 let GalaxyService = class GalaxyService {
     userModel;
-    constructor(userModel) {
+    debrisModel;
+    constructor(userModel, debrisModel) {
         this.userModel = userModel;
+        this.debrisModel = debrisModel;
     }
     async getGalaxyMap(galaxy, system, currentUserId) {
         const pattern = new RegExp(`^${galaxy}:${system}:\\d+$`);
-        const players = await this.userModel.find({ coordinate: pattern }).exec();
+        const [players, debrisFields] = await Promise.all([
+            this.userModel.find({ coordinate: pattern }).exec(),
+            this.debrisModel.find({ coordinate: pattern }).exec(),
+        ]);
         const planets = [];
         for (let position = 1; position <= 15; position++) {
             const coord = `${galaxy}:${system}:${position}`;
             const player = players.find(p => p.coordinate === coord);
-            if (player) {
-                planets.push({
-                    position,
-                    coordinate: coord,
-                    playerName: player.playerName,
-                    playerId: player._id.toString(),
-                    isOwnPlanet: player._id.toString() === currentUserId,
-                    hasDebris: false,
-                    hasMoon: false,
-                });
-            }
-            else {
-                planets.push({
-                    position,
-                    coordinate: coord,
-                    playerName: null,
-                    playerId: null,
-                    isOwnPlanet: false,
-                    hasDebris: false,
-                    hasMoon: false,
-                });
-            }
+            const debris = debrisFields.find(d => d.coordinate === coord);
+            const info = {
+                position,
+                coordinate: coord,
+                playerName: player ? player.playerName : null,
+                playerId: player ? player._id.toString() : null,
+                isOwnPlanet: player ? player._id.toString() === currentUserId : false,
+                hasDebris: !!debris && (debris.metal > 0 || debris.crystal > 0),
+                debrisAmount: debris ? { metal: debris.metal, crystal: debris.crystal } : undefined,
+                hasMoon: false,
+            };
+            planets.push(info);
         }
         return planets;
+    }
+    async updateDebris(coordinate, metal, crystal) {
+        let debris = await this.debrisModel.findOne({ coordinate }).exec();
+        if (debris) {
+            debris.metal += metal;
+            debris.crystal += crystal;
+            await debris.save();
+        }
+        else if (metal > 0 || crystal > 0) {
+            debris = new this.debrisModel({
+                coordinate,
+                metal,
+                crystal,
+            });
+            await debris.save();
+        }
+    }
+    async getDebris(coordinate) {
+        return this.debrisModel.findOne({ coordinate }).exec();
+    }
+    async consumeDebris(coordinate, metal, crystal) {
+        const debris = await this.debrisModel.findOne({ coordinate }).exec();
+        if (debris) {
+            debris.metal = Math.max(0, debris.metal - metal);
+            debris.crystal = Math.max(0, debris.crystal - crystal);
+            if (debris.metal === 0 && debris.crystal === 0) {
+                await this.debrisModel.deleteOne({ coordinate }).exec();
+            }
+            else {
+                await debris.save();
+            }
+        }
     }
     async getPlayerInfo(targetUserId, currentUserId) {
         const target = await this.userModel.findById(targetUserId).exec();
@@ -88,6 +116,8 @@ exports.GalaxyService = GalaxyService;
 exports.GalaxyService = GalaxyService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(user_schema_1.User.name)),
-    __metadata("design:paramtypes", [mongoose_2.Model])
+    __param(1, (0, mongoose_1.InjectModel)(debris_schema_1.Debris.name)),
+    __metadata("design:paramtypes", [mongoose_2.Model,
+        mongoose_2.Model])
 ], GalaxyService);
 //# sourceMappingURL=galaxy.service.js.map

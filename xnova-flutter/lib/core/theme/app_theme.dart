@@ -18,17 +18,17 @@ class AppTheme {
         onSurface: AppColors.textPrimary,
         onError: Colors.white,
       ),
-      textTheme: GoogleFonts.notoSansKrTextTheme(
+      textTheme: GoogleFonts.exo2TextTheme(
         const TextTheme(
-          displayLarge: TextStyle(color: AppColors.textPrimary),
-          displayMedium: TextStyle(color: AppColors.textPrimary),
-          displaySmall: TextStyle(color: AppColors.textPrimary),
-          headlineLarge: TextStyle(color: AppColors.textPrimary),
-          headlineMedium: TextStyle(color: AppColors.textPrimary),
-          headlineSmall: TextStyle(color: AppColors.textPrimary),
-          titleLarge: TextStyle(color: AppColors.textPrimary),
-          titleMedium: TextStyle(color: AppColors.textPrimary),
-          titleSmall: TextStyle(color: AppColors.textPrimary),
+          displayLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+          displayMedium: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+          displaySmall: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+          headlineLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+          headlineMedium: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+          headlineSmall: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+          titleLarge: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+          titleMedium: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+          titleSmall: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
           bodyLarge: TextStyle(color: AppColors.textPrimary),
           bodyMedium: TextStyle(color: AppColors.textPrimary),
           bodySmall: TextStyle(color: AppColors.textSecondary),
@@ -36,6 +36,11 @@ class AppTheme {
           labelMedium: TextStyle(color: AppColors.textSecondary),
           labelSmall: TextStyle(color: AppColors.textSecondary),
         ),
+      ).copyWith(
+        // 제목과 숫자에 Orbitron 적용
+        displayLarge: GoogleFonts.orbitron(textStyle: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+        titleLarge: GoogleFonts.orbitron(textStyle: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+        headlineSmall: GoogleFonts.orbitron(textStyle: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.ogameDarkBlue,

@@ -1,0 +1,874 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../providers/providers.dart';
+import '../../../../data/models/models.dart';
+import '../../../../core/constants/game_constants.dart';
+
+class MessagesTab extends ConsumerStatefulWidget {
+  const MessagesTab({super.key});
+
+  @override
+  ConsumerState<MessagesTab> createState() => _MessagesTabState();
+}
+
+class _MessagesTabState extends ConsumerState<MessagesTab> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(messageProvider.notifier).loadMessages();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final messageState = ref.watch(messageProvider);
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      body: RefreshIndicator(
+        onRefresh: () => ref.read(messageProvider.notifier).loadMessages(),
+        color: AppColors.accent,
+        backgroundColor: AppColors.surface,
+        child: messageState.isLoading && messageState.messages.isEmpty
+            ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
+            : messageState.messages.isEmpty
+                ? const Center(
+                    child: Text(
+                      '메시지가 없습니다.',
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(12),
+                    itemCount: messageState.messages.length,
+                    itemBuilder: (context, index) {
+                      final message = messageState.messages[index];
+                      return _MessageCard(message: message);
+                    },
+                  ),
+      ),
+    );
+  }
+}
+
+class _MessageCard extends ConsumerWidget {
+  final Message message;
+
+  const _MessageCard({required this.message});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: message.isRead ? AppColors.panelBackground : AppColors.panelHeader,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: message.isRead ? AppColors.panelBorder : AppColors.accent.withOpacity(0.3),
+          width: message.isRead ? 1 : 1.5,
+        ),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () {
+          if (!message.isRead) {
+            ref.read(messageProvider.notifier).markAsRead(message.id);
+          }
+          _showMessageDetail(context, message);
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      _getTypeIcon(message.type),
+                      const SizedBox(width: 8),
+                      Text(
+                        message.senderName,
+                        style: TextStyle(
+                          color: AppColors.accent,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Text(
+                    DateFormat('MM-dd HH:mm').format(message.createdAt),
+                    style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message.title,
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: message.isRead ? FontWeight.normal : FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+              const SizedBox(height: 4),
+              if (message.type == 'battle' && message.metadata != null)
+                _buildBattleSummary(message.metadata!)
+              else
+                Text(
+                  _stripHtml(message.content),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _stripHtml(String html) {
+    return html.replaceAll(RegExp(r'<[^>]*>'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  Widget _buildBattleSummary(Map<String, dynamic> metadata) {
+    final resultType = metadata['resultType'] as String? ?? '알 수 없음';
+    final isAttacker = metadata['isAttacker'] as bool? ?? true;
+    
+    return Text(
+      '${isAttacker ? "공격" : "방어"} $resultType',
+      style: TextStyle(
+        color: resultType == '승리' ? AppColors.positive : (resultType == '패배' ? AppColors.negative : AppColors.textMuted),
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+  }
+
+  Widget _getTypeIcon(String type) {
+    switch (type) {
+      case 'battle':
+        return Icon(Icons.military_tech, size: 14, color: AppColors.negative);
+      case 'system':
+        return Icon(Icons.settings, size: 14, color: AppColors.resourceCrystal);
+      default:
+        return Icon(Icons.person, size: 14, color: AppColors.accent);
+    }
+  }
+
+  void _showMessageDetail(BuildContext context, Message message) {
+    if (message.type == 'battle' && message.metadata != null) {
+      _showBattleReportDialog(context, message);
+    } else {
+      _showNormalMessageDialog(context, message);
+    }
+  }
+
+  void _showNormalMessageDialog(BuildContext context, Message message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.panelBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        title: Text(message.title, style: const TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.9,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '보낸이: ${message.senderName}',
+                  style: TextStyle(color: AppColors.accent, fontSize: 11),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _stripHtml(message.content),
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('닫기', style: TextStyle(color: AppColors.textMuted)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showBattleReportDialog(BuildContext context, Message message) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: AppColors.panelBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+            maxWidth: MediaQuery.of(context).size.width * 0.95,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 헤더
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            message.title,
+                            style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '보낸이: ${message.senderName}',
+                            style: TextStyle(color: AppColors.textMuted, fontSize: 10),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: AppColors.textMuted, size: 20),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              // 전투 보고서 내용
+              Flexible(
+                child: SingleChildScrollView(
+                  child: _BattleReportDetail(metadata: message.metadata!),
+                ),
+              ),
+              // 닫기 버튼
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('닫기'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BattleReportDetail extends StatelessWidget {
+  final Map<String, dynamic> metadata;
+
+  const _BattleReportDetail({required this.metadata});
+
+  @override
+  Widget build(BuildContext context) {
+    final battleResult = metadata['battleResult'] as Map<String, dynamic>?;
+    if (battleResult == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Text('전투 데이터가 없습니다.', style: TextStyle(color: AppColors.textMuted)),
+        ),
+      );
+    }
+
+    final attackerWon = battleResult['result'] == 'awon';
+    final defenderWon = battleResult['result'] == 'dwon';
+    
+    final attackerLosses = battleResult['attackerLosses'] as Map<String, dynamic>? ?? {};
+    final defenderLosses = battleResult['defenderLosses'] as Map<String, dynamic>? ?? {};
+    final loot = battleResult['loot'] as Map<String, dynamic>? ?? {};
+    final debris = {
+      'metal': battleResult['dm'] ?? 0,
+      'crystal': battleResult['dk'] ?? 0,
+    };
+    final moonChance = battleResult['moonChance'] ?? 0;
+    final restoredDefenses = battleResult['restoredDefenses'] as Map<String, dynamic>? ?? {};
+
+    final before = battleResult['before'] as Map<String, dynamic>? ?? {};
+    final beforeAttackers = (before['attackers'] as List<dynamic>?) ?? [];
+    final beforeDefenders = (before['defenders'] as List<dynamic>?) ?? [];
+    final rounds = (battleResult['rounds'] as List<dynamic>?) ?? [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 전투 전 - 공격측
+        _buildPreBattleSide('전투 전 - 공격측', beforeAttackers, true),
+        
+        // 전투 전 - 방어측
+        _buildPreBattleSide('전투 전 - 방어측', beforeDefenders, false),
+        
+        // 라운드별 전투
+        ...rounds.asMap().entries.map((entry) {
+          final roundIdx = entry.key;
+          final round = entry.value as Map<String, dynamic>;
+          final prevRound = roundIdx > 0 ? rounds[roundIdx - 1] as Map<String, dynamic> : null;
+          return _buildRoundSection(roundIdx + 1, round, prevRound, beforeAttackers, beforeDefenders);
+        }),
+        
+        // 전투 결과
+        _buildBattleResultSection(
+          attackerWon: attackerWon,
+          defenderWon: defenderWon,
+          attackerLosses: attackerLosses,
+          defenderLosses: defenderLosses,
+          loot: loot,
+          debris: debris,
+          moonChance: moonChance,
+          restoredDefenses: restoredDefenses,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPreBattleSide(String title, List<dynamic> participants, bool isAttacker) {
+    if (participants.isEmpty) return const SizedBox.shrink();
+    
+    return Container(
+      margin: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.panelBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppColors.panelHeader,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+            ),
+            child: Text(title, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 12)),
+          ),
+          ...participants.map((p) {
+            final participant = p as Map<String, dynamic>;
+            return _buildParticipantSlot(participant, isAttacker, true);
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildParticipantSlot(Map<String, dynamic> participant, bool isAttacker, bool showTech) {
+    final name = participant['name'] ?? '알 수 없음';
+    final coordinate = participant['coordinate'] ?? '?:?:?';
+    final weap = participant['weap'] ?? 0;
+    final shld = participant['shld'] ?? 0;
+    final armr = participant['armr'] ?? 0;
+    final fleet = (participant['fleet'] as Map<String, dynamic>?) ?? {};
+    final defense = (participant['defense'] as Map<String, dynamic>?) ?? {};
+
+    final allUnits = {...fleet, ...defense};
+    final activeUnits = allUnits.entries.where((e) => (e.value as num) > 0).toList();
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.panelBorder.withOpacity(0.5))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Column(
+              children: [
+                Text(
+                  '${isAttacker ? "공격자" : "방어자"} $name [$coordinate]',
+                  style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 11),
+                ),
+                if (showTech)
+                  Text(
+                    '무기: ${weap * 10}%  방어막: ${shld * 10}%  장갑: ${armr * 10}%',
+                    style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          if (activeUnits.isNotEmpty)
+            _buildUnitTable(activeUnits, weap, shld, armr)
+          else
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(8),
+                child: Text('파괴됨', style: TextStyle(color: AppColors.negative, fontWeight: FontWeight.bold)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUnitTable(List<MapEntry<String, dynamic>> units, int weaponTech, int shieldTech, int armorTech) {
+    final weaponBonus = 1 + weaponTech * 0.1;
+    final shieldBonus = 1 + shieldTech * 0.1;
+    final armorBonus = 1 + armorTech * 0.1;
+    
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Table(
+        defaultColumnWidth: const IntrinsicColumnWidth(),
+        border: TableBorder.all(color: AppColors.panelBorder, width: 1),
+        children: [
+          TableRow(
+            decoration: BoxDecoration(color: AppColors.panelHeader),
+            children: [
+              _tableCell('유형', isHeader: true),
+              ...units.map((e) => _tableCell(GameConstants.getName(e.key), isHeader: true)),
+            ],
+          ),
+          TableRow(
+            children: [
+              _tableCell('수량', isHeader: true),
+              ...units.map((e) => _tableCell(_formatNumberFull(_toInt(e.value)))),
+            ],
+          ),
+          TableRow(
+            children: [
+              _tableCell('공격력', isHeader: true),
+              ...units.map((e) {
+                final baseAttack = GameConstants.getBaseAttack(e.key);
+                final attack = (baseAttack * weaponBonus).round();
+                return _tableCell(_formatNumberFull(attack));
+              }),
+            ],
+          ),
+          TableRow(
+            children: [
+              _tableCell('방어막', isHeader: true),
+              ...units.map((e) {
+                final baseShield = GameConstants.getBaseShield(e.key);
+                final shield = (baseShield * shieldBonus).round();
+                return _tableCell(_formatNumberFull(shield));
+              }),
+            ],
+          ),
+          TableRow(
+            children: [
+              _tableCell('장갑', isHeader: true),
+              ...units.map((e) {
+                final baseHull = GameConstants.getBaseHull(e.key);
+                final armor = (baseHull * armorBonus / 10).round();
+                return _tableCell(_formatNumberFull(armor));
+              }),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tableCell(String text, {bool isHeader = false}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: isHeader ? FontWeight.bold : FontWeight.normal,
+          color: isHeader ? AppColors.textPrimary : AppColors.textSecondary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoundSection(int roundNum, Map<String, dynamic> round, Map<String, dynamic>? prevRound, List<dynamic> initialAttackers, List<dynamic> initialDefenders) {
+    final ashoot = _toInt(round['ashoot']);
+    final apower = _toInt(round['apower']);
+    final dabsorb = _toInt(round['dabsorb']);
+    final dshoot = _toInt(round['dshoot']);
+    final dpower = _toInt(round['dpower']);
+    final aabsorb = _toInt(round['aabsorb']);
+    final attackers = (round['attackers'] as List<dynamic>?) ?? [];
+    final defenders = (round['defenders'] as List<dynamic>?) ?? [];
+
+    // 이전 라운드 대비 변화량 계산
+    Map<String, int> attackerChanges = {};
+    Map<String, int> defenderChanges = {};
+    
+    // 이전 상태 (이전 라운드 또는 초기 상태)
+    final prevAttackers = prevRound != null 
+        ? (prevRound['attackers'] as List<dynamic>?) ?? []
+        : initialAttackers;
+    final prevDefenders = prevRound != null 
+        ? (prevRound['defenders'] as List<dynamic>?) ?? []
+        : initialDefenders;
+    
+    // 이전 공격측 유닛 맵
+    Map<String, int> prevAttackerUnits = {};
+    for (final p in prevAttackers) {
+      final participant = p as Map<String, dynamic>;
+      final fleet = (participant['fleet'] as Map<String, dynamic>?) ?? {};
+      fleet.forEach((key, value) {
+        prevAttackerUnits[key] = (prevAttackerUnits[key] ?? 0) + _toInt(value);
+      });
+    }
+    
+    // 이전 방어측 유닛 맵
+    Map<String, int> prevDefenderUnits = {};
+    for (final p in prevDefenders) {
+      final participant = p as Map<String, dynamic>;
+      final fleet = (participant['fleet'] as Map<String, dynamic>?) ?? {};
+      final defense = (participant['defense'] as Map<String, dynamic>?) ?? {};
+      fleet.forEach((key, value) {
+        prevDefenderUnits[key] = (prevDefenderUnits[key] ?? 0) + _toInt(value);
+      });
+      defense.forEach((key, value) {
+        prevDefenderUnits[key] = (prevDefenderUnits[key] ?? 0) + _toInt(value);
+      });
+    }
+    
+    // 현재 공격측 유닛 맵
+    Map<String, int> currAttackerUnits = {};
+    for (final p in attackers) {
+      final participant = p as Map<String, dynamic>;
+      final fleet = (participant['fleet'] as Map<String, dynamic>?) ?? {};
+      fleet.forEach((key, value) {
+        currAttackerUnits[key] = (currAttackerUnits[key] ?? 0) + _toInt(value);
+      });
+    }
+    
+    // 현재 방어측 유닛 맵
+    Map<String, int> currDefenderUnits = {};
+    for (final p in defenders) {
+      final participant = p as Map<String, dynamic>;
+      final fleet = (participant['fleet'] as Map<String, dynamic>?) ?? {};
+      final defense = (participant['defense'] as Map<String, dynamic>?) ?? {};
+      fleet.forEach((key, value) {
+        currDefenderUnits[key] = (currDefenderUnits[key] ?? 0) + _toInt(value);
+      });
+      defense.forEach((key, value) {
+        currDefenderUnits[key] = (currDefenderUnits[key] ?? 0) + _toInt(value);
+      });
+    }
+    
+    // 변화량 계산
+    for (final entry in prevAttackerUnits.entries) {
+      final current = currAttackerUnits[entry.key] ?? 0;
+      final diff = entry.value - current;
+      if (diff > 0) attackerChanges[entry.key] = diff;
+    }
+    
+    for (final entry in prevDefenderUnits.entries) {
+      final current = currDefenderUnits[entry.key] ?? 0;
+      final diff = entry.value - current;
+      if (diff > 0) defenderChanges[entry.key] = diff;
+    }
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.panelBorder),
+            ),
+            child: Column(
+              children: [
+                Text('라운드 $roundNum', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.panelHeader,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '공격 함대가 ${_formatNumberFull(ashoot)}번 발사하여 총 화력 ${_formatNumberFull(apower)}으로\n'
+                    '방어측을 공격합니다. 방어측의 방어막이 ${_formatNumberFull(dabsorb)}의 피해를 흡수합니다.',
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 10, height: 1.5),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.panelHeader,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    '방어 함대가 ${_formatNumberFull(dshoot)}번 발사하여 총 화력 ${_formatNumberFull(dpower)}으로\n'
+                    '공격측을 공격합니다. 공격측의 방어막이 ${_formatNumberFull(aabsorb)}의 피해를 흡수합니다.',
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 10, height: 1.5),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          _buildRoundAfterSide('라운드 $roundNum 후 - 공격측:', attackers, true, attackerChanges),
+          _buildRoundAfterSide('라운드 $roundNum 후 - 방어측:', defenders, false, defenderChanges),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoundAfterSide(String title, List<dynamic> participants, bool isAttacker, Map<String, int> changes) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.panelBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+            decoration: BoxDecoration(
+              color: AppColors.panelHeader,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+            ),
+            child: Text(title, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 11)),
+          ),
+          if (participants.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(
+                child: Text('파괴됨', style: TextStyle(color: AppColors.negative, fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+            )
+          else
+            ...participants.map((p) {
+              final participant = p as Map<String, dynamic>;
+              final name = participant['name'] ?? '알 수 없음';
+              final coordinate = participant['coordinate'] ?? '?:?:?';
+              final fleet = (participant['fleet'] as Map<String, dynamic>?) ?? {};
+              final defense = (participant['defense'] as Map<String, dynamic>?) ?? {};
+              final allUnits = {...fleet, ...defense};
+              final activeUnits = allUnits.entries.where((e) => (e.value as num) > 0).toList();
+
+              return Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${isAttacker ? "공격자" : "방어자"} $name [$coordinate]',
+                      style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                    ),
+                    const SizedBox(height: 8),
+                    if (activeUnits.isEmpty)
+                      const Text('파괴됨', style: TextStyle(color: AppColors.negative, fontSize: 10))
+                    else
+                      _buildRoundUnitTable(activeUnits, changes),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRoundUnitTable(List<MapEntry<String, dynamic>> units, Map<String, int> changes) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Table(
+        defaultColumnWidth: const IntrinsicColumnWidth(),
+        border: TableBorder.all(color: AppColors.panelBorder, width: 1),
+        children: [
+          TableRow(
+            decoration: BoxDecoration(color: AppColors.panelHeader),
+            children: [
+              _tableCell('유형', isHeader: true),
+              ...units.map((e) => _tableCell(GameConstants.getName(e.key), isHeader: true)),
+            ],
+          ),
+          TableRow(
+            children: [
+              _tableCell('수량', isHeader: true),
+              ...units.map((e) {
+                final change = changes[e.key] ?? 0;
+                if (change > 0) {
+                  return _tableCellWithChange(_formatNumberFull(_toInt(e.value)), change);
+                }
+                return _tableCell(_formatNumberFull(_toInt(e.value)));
+              }),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tableCellWithChange(String text, int change) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      child: Column(
+        children: [
+          Text(text, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
+          Text(
+            '(▼${_formatNumberFull(change)})',
+            style: const TextStyle(fontSize: 9, color: AppColors.negative),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBattleResultSection({
+    required bool attackerWon,
+    required bool defenderWon,
+    required Map<String, dynamic> attackerLosses,
+    required Map<String, dynamic> defenderLosses,
+    required Map<String, dynamic> loot,
+    required Map<String, dynamic> debris,
+    required int moonChance,
+    required Map<String, dynamic> restoredDefenses,
+  }) {
+    final resultText = attackerWon 
+        ? '공격자가 전투에서 승리했습니다!' 
+        : (defenderWon ? '방어자가 전투에서 승리했습니다!' : '전투가 무승부로 끝났습니다.');
+
+    final attackerTotal = _toInt(attackerLosses['metal']) + _toInt(attackerLosses['crystal']) + _toInt(attackerLosses['deuterium']);
+    final defenderTotal = _toInt(defenderLosses['metal']) + _toInt(defenderLosses['crystal']) + _toInt(defenderLosses['deuterium']);
+
+    return Container(
+      margin: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.panelBorder),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.panelHeader,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+            ),
+            child: const Text(
+              '전투 결과',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            child: Text(
+              resultText,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (attackerWon) ...[
+                  const Text('약탈한 자원:', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 11)),
+                  const SizedBox(height: 6),
+                  _buildResourceRow('메탈', _toInt(loot['metal'])),
+                  _buildResourceRow('크리스탈', _toInt(loot['crystal'])),
+                  _buildResourceRow('중수소', _toInt(loot['deuterium'])),
+                  const Divider(color: AppColors.panelBorder, height: 20),
+                ],
+                const Text('손실 통계', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 11)),
+                const SizedBox(height: 6),
+                Text('공격자 총 손실: ${_formatNumberFull(attackerTotal)} 유닛', style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                Text('방어자 총 손실: ${_formatNumberFull(defenderTotal)} 유닛', style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                const SizedBox(height: 12),
+                const Text('잔해 필드', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 11)),
+                const SizedBox(height: 4),
+                Text(
+                  '메탈 ${_formatNumberFull(_toInt(debris['metal']))} | 크리스탈 ${_formatNumberFull(_toInt(debris['crystal']))}',
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                ),
+                const SizedBox(height: 8),
+                Text('달 생성 확률: $moonChance%', style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                if (restoredDefenses.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Text('방어시설 복구', style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 11)),
+                  const SizedBox(height: 4),
+                  Text(
+                    restoredDefenses.entries
+                        .where((e) => (e.value as num) > 0)
+                        .map((e) => '${e.value} ${GameConstants.getName(e.key)}')
+                        .join(', ') + ' 복구됨',
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResourceRow(String label, int value) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, top: 2),
+      child: Text('$label: ${_formatNumberFull(value)}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 10)),
+    );
+  }
+
+  int _toInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  String _formatNumberFull(int num) {
+    if (num == 0) return '0';
+    final str = num.toString();
+    final buffer = StringBuffer();
+    int count = 0;
+    for (int i = str.length - 1; i >= 0; i--) {
+      buffer.write(str[i]);
+      count++;
+      if (count % 3 == 0 && i > 0) {
+        buffer.write(',');
+      }
+    }
+    return buffer.toString().split('').reversed.join();
+  }
+}

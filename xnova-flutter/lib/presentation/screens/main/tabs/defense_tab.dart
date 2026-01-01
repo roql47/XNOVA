@@ -21,19 +21,17 @@ class _DefenseTabState extends ConsumerState<DefenseTab> {
 
     return RefreshIndicator(
       onRefresh: () => ref.read(gameProvider.notifier).loadDefense(),
-      color: AppColors.ogameGreen,
-      backgroundColor: AppColors.panelBackground,
+      color: AppColors.accent,
+      backgroundColor: AppColors.surface,
       child: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          // 건설 진행 중
           if (gameState.defenseProgress != null)
             _DefenseProgressCard(
               progress: gameState.defenseProgress!,
               onComplete: () => ref.read(gameProvider.notifier).completeDefense(),
             ),
           
-          // 방어시설 목록
           ...gameState.defense.map((defense) => _DefenseCard(
             defense: defense,
             resources: gameState.resources,
@@ -68,40 +66,42 @@ class _DefenseProgressCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.successGreen.withOpacity(0.1),
+          color: AppColors.accent.withOpacity(0.08),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.successGreen.withOpacity(0.3)),
+          border: Border.all(color: AppColors.accent.withOpacity(0.2)),
         ),
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                const Icon(Icons.shield, color: AppColors.successGreen, size: 20),
+                Icon(Icons.shield, color: AppColors.accent, size: 16),
                 const SizedBox(width: 8),
                 const Text(
                   '방어시설 건설 중',
                   style: TextStyle(
-                    color: AppColors.successGreen,
-                    fontWeight: FontWeight.bold,
+                    color: AppColors.accent,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
               '${progress.name} x${progress.quantity ?? 1}',
               style: const TextStyle(
                 color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Row(
               children: [
-                const Icon(Icons.timer, size: 16, color: AppColors.warningOrange),
-                const SizedBox(width: 8),
+                Icon(Icons.schedule, size: 14, color: AppColors.textMuted),
+                const SizedBox(width: 6),
                 if (progress.finishDateTime != null)
                   ProgressTimer(
                     finishTime: progress.finishDateTime!,
@@ -144,6 +144,37 @@ class _DefenseCard extends StatelessWidget {
     return defense.count >= defense.maxCount!;
   }
 
+  String? _getDefenseImagePath(String type) {
+    const defenseImages = {
+      'rocketLauncher': 'assets/images/rocket_launcher.webp',
+      'lightLaser': 'assets/images/light_laser.webp',
+      'heavyLaser': 'assets/images/heavy_laser.webp',
+      'gaussCannon': 'assets/images/gauss_cannon.webp',
+      'ionCannon': 'assets/images/ion_cannon.webp',
+      'plasmaTurret': 'assets/images/plasma_turret.webp',
+      'smallShieldDome': 'assets/images/small_shield_dome.webp',
+      'largeShieldDome': 'assets/images/large_shield_dome.webp',
+      'antiBallisticMissile': 'assets/images/anti-ballistic_missile.webp',
+      'interplanetaryMissile': 'assets/images/interplanetary_missile.jpg',
+    };
+    return defenseImages[type];
+  }
+
+  String _formatBuildTime(double seconds) {
+    if (seconds <= 0) return '즉시';
+    final totalSeconds = seconds.toInt();
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final secs = totalSeconds % 60;
+    if (hours > 0) {
+      return '${hours}시간 ${minutes}분 ${secs}초';
+    } else if (minutes > 0) {
+      return '${minutes}분 ${secs}초';
+    } else {
+      return '${secs}초';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDisabled = !defense.requirementsMet || isMaxed;
@@ -157,14 +188,13 @@ class _DefenseCard extends StatelessWidget {
             color: AppColors.panelBackground,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isDisabled ? AppColors.textDisabled : AppColors.panelBorder,
+              color: isDisabled ? AppColors.textMuted : AppColors.panelBorder,
             ),
           ),
           child: Column(
             children: [
-              // 헤더
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: const BoxDecoration(
                   color: AppColors.panelHeader,
                   borderRadius: BorderRadius.only(
@@ -179,14 +209,15 @@ class _DefenseCard extends StatelessWidget {
                         defense.name,
                         style: const TextStyle(
                           color: AppColors.textPrimary,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
                         ),
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppColors.successGreen.withOpacity(0.2),
+                        color: AppColors.accent.withOpacity(0.12),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -194,49 +225,101 @@ class _DefenseCard extends StatelessWidget {
                             ? '${defense.count}/${defense.maxCount}'
                             : '보유: ${defense.count}',
                         style: const TextStyle(
-                          color: AppColors.successGreen,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                          color: AppColors.accent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
                   ],
                 ),
               ),
-              // 컨텐츠
               Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 스탯
-                    Wrap(
-                      spacing: 16,
-                      runSpacing: 4,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _StatChip(icon: Icons.gps_fixed, label: '공격', value: defense.stats.attack),
-                        _StatChip(icon: Icons.shield, label: '방어', value: defense.stats.shield),
-                        _StatChip(icon: Icons.favorite, label: '내구', value: defense.stats.hull),
+                        // 방어시설 이미지
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: _getDefenseImagePath(defense.type) != null
+                              ? Image.asset(
+                                  _getDefenseImagePath(defense.type)!,
+                                  width: 100,
+                                  height: 100,
+                                  cacheWidth: 200,
+                                  cacheHeight: 200,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      Container(
+                                        width: 100,
+                                        height: 100,
+                                        color: AppColors.surface,
+                                        child: const Icon(Icons.shield, size: 40, color: AppColors.textMuted),
+                                      ),
+                                )
+                              : Container(
+                                  width: 100,
+                                  height: 100,
+                                  color: AppColors.surface,
+                                  child: const Icon(Icons.shield, size: 40, color: AppColors.textMuted),
+                                ),
+                        ),
+                        const SizedBox(width: 14),
+                        // 스탯
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 4,
+                                children: [
+                                  _StatChip(icon: Icons.gps_fixed, value: defense.stats.attack),
+                                  _StatChip(icon: Icons.shield, value: defense.stats.shield),
+                                  _StatChip(icon: Icons.favorite, value: defense.stats.hull),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              // 건조 시간
+                              Row(
+                                children: [
+                                  Icon(Icons.schedule, size: 14, color: AppColors.textMuted),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '건조: ${_formatBuildTime(defense.buildTime)}',
+                                    style: const TextStyle(
+                                      color: AppColors.textMuted,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    // 요구사항 미충족 시
+                    const SizedBox(height: 10),
                     if (!defense.requirementsMet && defense.missingRequirements.isNotEmpty) ...[
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: AppColors.errorRed.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
+                          color: AppColors.negative.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.lock, size: 14, color: AppColors.errorRed),
+                            Icon(Icons.lock, size: 14, color: AppColors.negative),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 defense.missingRequirements.join(', '),
                                 style: const TextStyle(
-                                  color: AppColors.errorRed,
+                                  color: AppColors.negative,
                                   fontSize: 11,
                                 ),
                               ),
@@ -244,30 +327,30 @@ class _DefenseCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                     ],
                     if (isMaxed) ...[
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: AppColors.warningOrange.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
+                          color: AppColors.warning.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        child: const Row(
+                        child: Row(
                           children: [
-                            Icon(Icons.check_circle, size: 14, color: AppColors.warningOrange),
-                            SizedBox(width: 8),
-                            Text(
+                            Icon(Icons.check_circle, size: 14, color: AppColors.warning),
+                            const SizedBox(width: 8),
+                            const Text(
                               '최대 보유 수량에 도달했습니다',
                               style: TextStyle(
-                                color: AppColors.warningOrange,
+                                color: AppColors.warning,
                                 fontSize: 11,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 10),
                     ],
                     Row(
                       children: [
@@ -278,11 +361,11 @@ class _DefenseCard extends StatelessWidget {
                               Text(
                                 '건설 비용 (x$quantity)',
                                 style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 11,
+                                  color: AppColors.textMuted,
+                                  fontSize: 10,
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 6),
                               CostDisplay(
                                 metal: defense.cost.metal * quantity,
                                 crystal: defense.cost.crystal * quantity,
@@ -294,41 +377,35 @@ class _DefenseCard extends StatelessWidget {
                             ],
                           ),
                         ),
-                        // 수량 조절
                         Row(
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.remove, size: 18),
+                              icon: const Icon(Icons.remove, size: 16),
                               onPressed: quantity > 1 
                                   ? () => onQuantityChanged(quantity - 1)
                                   : null,
-                              color: AppColors.textSecondary,
+                              color: AppColors.textMuted,
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 32,
-                                minHeight: 32,
-                              ),
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                             ),
                             Container(
-                              width: 40,
+                              width: 36,
                               alignment: Alignment.center,
                               child: Text(
                                 '$quantity',
                                 style: const TextStyle(
                                   color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.bold,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
                                 ),
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.add, size: 18),
+                              icon: const Icon(Icons.add, size: 16),
                               onPressed: () => onQuantityChanged(quantity + 1),
-                              color: AppColors.textSecondary,
+                              color: AppColors.textMuted,
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 32,
-                                minHeight: 32,
-                              ),
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                             ),
                           ],
                         ),
@@ -355,12 +432,10 @@ class _DefenseCard extends StatelessWidget {
 
 class _StatChip extends StatelessWidget {
   final IconData icon;
-  final String label;
   final int value;
 
   const _StatChip({
     required this.icon,
-    required this.label,
     required this.value,
   });
 
@@ -369,17 +444,16 @@ class _StatChip extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, size: 12, color: AppColors.textSecondary),
-        const SizedBox(width: 2),
+        Icon(icon, size: 11, color: AppColors.textMuted),
+        const SizedBox(width: 3),
         Text(
           '$value',
           style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 11,
+            color: AppColors.textMuted,
+            fontSize: 10,
           ),
         ),
       ],
     );
   }
 }
-

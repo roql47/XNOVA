@@ -15,13 +15,17 @@ const research_service_1 = require("./services/research.service");
 const fleet_service_1 = require("./services/fleet.service");
 const defense_service_1 = require("./services/defense.service");
 const battle_service_1 = require("./services/battle.service");
+const battle_report_service_1 = require("./services/battle-report.service");
+const battle_simulator_service_1 = require("./services/battle-simulator.service");
 const user_module_1 = require("../user/user.module");
+const message_module_1 = require("../message/message.module");
+const galaxy_module_1 = require("../galaxy/galaxy.module");
 let GameModule = class GameModule {
 };
 exports.GameModule = GameModule;
 exports.GameModule = GameModule = __decorate([
     (0, common_1.Module)({
-        imports: [user_module_1.UserModule],
+        imports: [user_module_1.UserModule, message_module_1.MessageModule, galaxy_module_1.GalaxyModule],
         controllers: [game_controller_1.GameController],
         providers: [
             resources_service_1.ResourcesService,
@@ -30,6 +34,8 @@ exports.GameModule = GameModule = __decorate([
             fleet_service_1.FleetService,
             defense_service_1.DefenseService,
             battle_service_1.BattleService,
+            battle_report_service_1.BattleReportService,
+            battle_simulator_service_1.BattleSimulatorService,
         ],
         exports: [
             resources_service_1.ResourcesService,
@@ -38,6 +44,8 @@ exports.GameModule = GameModule = __decorate([
             fleet_service_1.FleetService,
             defense_service_1.DefenseService,
             battle_service_1.BattleService,
+            battle_report_service_1.BattleReportService,
+            battle_simulator_service_1.BattleSimulatorService,
         ],
     })
 ], GameModule);

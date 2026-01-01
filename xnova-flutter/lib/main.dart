@@ -5,6 +5,7 @@ import 'core/theme/app_theme.dart';
 import 'providers/providers.dart';
 import 'presentation/screens/auth/login_screen.dart';
 import 'presentation/screens/auth/register_screen.dart';
+import 'presentation/screens/auth/nickname_setup_screen.dart';
 import 'presentation/screens/main/main_screen.dart';
 
 void main() {
@@ -40,8 +41,10 @@ class AuthWrapper extends ConsumerStatefulWidget {
   ConsumerState<AuthWrapper> createState() => _AuthWrapperState();
 }
 
+enum AuthScreen { login, register, nicknameSetup }
+
 class _AuthWrapperState extends ConsumerState<AuthWrapper> {
-  bool _isLogin = true;
+  AuthScreen _currentScreen = AuthScreen.login;
   bool _isChecking = true;
 
   @override
@@ -70,21 +73,44 @@ class _AuthWrapperState extends ConsumerState<AuthWrapper> {
     if (authState.isAuthenticated) {
       return MainScreen(
         onLogout: () {
-          setState(() => _isLogin = true);
+          setState(() => _currentScreen = AuthScreen.login);
         },
       );
     }
 
-    if (_isLogin) {
-      return LoginScreen(
-        onRegisterTap: () => setState(() => _isLogin = false),
-        onLoginSuccess: () {},
+    // 구글 로그인 후 닉네임 설정이 필요한 경우
+    if (authState.needsNickname || _currentScreen == AuthScreen.nicknameSetup) {
+      return NicknameSetupScreen(
+        onComplete: () {
+          setState(() => _currentScreen = AuthScreen.login);
+        },
+        onCancel: () {
+          setState(() => _currentScreen = AuthScreen.login);
+        },
       );
-    } else {
-      return RegisterScreen(
-        onLoginTap: () => setState(() => _isLogin = true),
-        onRegisterSuccess: () {},
-      );
+    }
+
+    switch (_currentScreen) {
+      case AuthScreen.login:
+        return LoginScreen(
+          onRegisterTap: () => setState(() => _currentScreen = AuthScreen.register),
+          onLoginSuccess: () {},
+          onNicknameRequired: () => setState(() => _currentScreen = AuthScreen.nicknameSetup),
+        );
+      case AuthScreen.register:
+        return RegisterScreen(
+          onLoginTap: () => setState(() => _currentScreen = AuthScreen.login),
+          onRegisterSuccess: () {},
+        );
+      case AuthScreen.nicknameSetup:
+        return NicknameSetupScreen(
+          onComplete: () {
+            setState(() => _currentScreen = AuthScreen.login);
+          },
+          onCancel: () {
+            setState(() => _currentScreen = AuthScreen.login);
+          },
+        );
     }
   }
 }

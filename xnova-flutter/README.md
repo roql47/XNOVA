@@ -1,16 +1,89 @@
-# xnova_game
+# XNOVA - 우주 전략 게임 (Flutter)
 
-A new Flutter project.
+크로스플랫폼 모바일 게임 앱 - Android & iOS 지원
 
-## Getting Started
+## 🚀 시작하기
 
-This project is a starting point for a Flutter application.
+### 요구사항
+- Flutter SDK 3.x 이상
+- Dart 3.x 이상
+- Android Studio / Xcode (플랫폼별)
 
-A few resources to get you started if this is your first Flutter project:
+### 설치 및 실행
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+```bash
+# 의존성 설치
+flutter pub get
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+# 개발 모드 실행
+flutter run
+
+# Android APK 빌드
+flutter build apk --release
+
+# iOS 빌드 (Mac에서만 가능)
+flutter build ios --release
+```
+
+## 📁 프로젝트 구조
+
+```
+lib/
+├── core/
+│   ├── constants/          # API URL, 상수
+│   └── theme/              # 테마, 색상
+├── data/
+│   ├── models/             # 데이터 모델 클래스
+│   └── services/           # API 서비스, 토큰 관리
+├── presentation/
+│   ├── screens/
+│   │   ├── auth/           # 로그인, 회원가입
+│   │   └── main/           # 메인 화면
+│   │       └── tabs/       # 각 탭 화면들
+│   └── widgets/            # 공통 위젯
+├── providers/              # Riverpod 상태 관리
+└── main.dart               # 앱 진입점
+```
+
+## 🎮 주요 기능
+
+- 🔐 **인증**: 로그인, 회원가입
+- 🏗️ **건물**: 자원 생산 건물 및 시설 업그레이드
+- 🔬 **연구**: 기술 연구
+- 🚀 **조선소**: 함선 건조
+- 🛡️ **방어**: 방어시설 건설
+- ⚔️ **함대**: 함대 이동 및 공격
+- 🌌 **은하계**: 은하 지도 탐색
+
+## ⚙️ 서버 설정
+
+`lib/core/constants/api_constants.dart` 파일에서 서버 URL을 설정하세요:
+
+```dart
+// 개발 환경 (에뮬레이터)
+static const String devBaseUrl = 'http://10.0.2.2:3000/api/';
+
+// 프로덕션 환경
+static const String prodBaseUrl = 'https://your-server.com/api/';
+```
+
+## 🛠️ 기술 스택
+
+- **프레임워크**: Flutter
+- **상태 관리**: Riverpod
+- **HTTP 클라이언트**: Dio
+- **라우팅**: Go Router
+- **로컬 저장소**: Flutter Secure Storage
+- **실시간 통신**: Socket.IO Client
+
+## 📱 플랫폼 지원
+
+| 플랫폼 | 지원 |
+|--------|------|
+| Android | ✅ |
+| iOS | ✅ |
+| Web | ⚠️ (추가 작업 필요) |
+
+## 📄 라이선스
+
+Private - All Rights Reserved

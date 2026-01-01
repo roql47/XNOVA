@@ -6,10 +6,14 @@ import { ResearchService } from './services/research.service';
 import { FleetService } from './services/fleet.service';
 import { DefenseService } from './services/defense.service';
 import { BattleService } from './services/battle.service';
+import { BattleReportService } from './services/battle-report.service';
+import { BattleSimulatorService } from './services/battle-simulator.service';
 import { UserModule } from '../user/user.module';
+import { MessageModule } from '../message/message.module';
+import { GalaxyModule } from '../galaxy/galaxy.module';
 
 @Module({
-  imports: [UserModule],
+  imports: [UserModule, MessageModule, GalaxyModule],
   controllers: [GameController],
   providers: [
     ResourcesService,
@@ -18,6 +22,8 @@ import { UserModule } from '../user/user.module';
     FleetService,
     DefenseService,
     BattleService,
+    BattleReportService,
+    BattleSimulatorService,
   ],
   exports: [
     ResourcesService,
@@ -26,6 +32,8 @@ import { UserModule } from '../user/user.module';
     FleetService,
     DefenseService,
     BattleService,
+    BattleReportService,
+    BattleSimulatorService,
   ],
 })
 export class GameModule {}

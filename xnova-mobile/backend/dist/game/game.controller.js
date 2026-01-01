@@ -21,6 +21,7 @@ const research_service_1 = require("./services/research.service");
 const fleet_service_1 = require("./services/fleet.service");
 const defense_service_1 = require("./services/defense.service");
 const battle_service_1 = require("./services/battle.service");
+const battle_simulator_service_1 = require("./services/battle-simulator.service");
 let GameController = class GameController {
     resourcesService;
     buildingsService;
@@ -28,13 +29,15 @@ let GameController = class GameController {
     fleetService;
     defenseService;
     battleService;
-    constructor(resourcesService, buildingsService, researchService, fleetService, defenseService, battleService) {
+    battleSimulatorService;
+    constructor(resourcesService, buildingsService, researchService, fleetService, defenseService, battleService, battleSimulatorService) {
         this.resourcesService = resourcesService;
         this.buildingsService = buildingsService;
         this.researchService = researchService;
         this.fleetService = fleetService;
         this.defenseService = defenseService;
         this.battleService = battleService;
+        this.battleSimulatorService = battleSimulatorService;
     }
     async getResources(req) {
         return this.resourcesService.getResources(req.user.userId);
@@ -84,17 +87,50 @@ let GameController = class GameController {
     async attack(req, body) {
         return this.battleService.startAttack(req.user.userId, body.targetCoord, body.fleet);
     }
+    async recycle(req, body) {
+        return this.battleService.startRecycle(req.user.userId, body.targetCoord, body.fleet);
+    }
     async getAttackStatus(req) {
         return this.battleService.getAttackStatus(req.user.userId);
     }
     async processBattle(req) {
         const attackResult = await this.battleService.processAttackArrival(req.user.userId);
+        const recycleResult = await this.battleService.processRecycleArrival(req.user.userId);
+        const incomingResults = await this.battleService.processIncomingAttacks(req.user.userId);
         const returnResult = await this.battleService.processFleetReturn(req.user.userId);
         return {
             attackProcessed: attackResult !== null,
             attackResult,
+            recycleProcessed: recycleResult !== null,
+            recycleResult,
+            incomingProcessed: incomingResults.length > 0,
+            incomingResults,
             returnProcessed: returnResult !== null,
             returnResult,
+        };
+    }
+    async simulate(body) {
+        return this.battleSimulatorService.simulate(body);
+    }
+    async simulateSimple(body) {
+        return this.battleSimulatorService.simulateSimple(body.attackerFleet, body.attackerTech, body.defenderFleet, body.defenderDefense, body.defenderTech, body.config);
+    }
+    async simulateMultiple(body) {
+        return this.battleSimulatorService.simulateMultiple(body.request, body.iterations || 100);
+    }
+    async parseSourceData(body) {
+        return this.battleSimulatorService.parseBattleSourceData(body.sourceData);
+    }
+    async generateSourceData(body) {
+        const config = {
+            rapidFire: true,
+            fleetInDebris: 30,
+            defenseInDebris: 0,
+            debug: false,
+            ...body.config,
+        };
+        return {
+            sourceData: this.battleSimulatorService.generateBattleSourceData(body.attackers, body.defenders, config),
         };
     }
 };
@@ -217,6 +253,14 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], GameController.prototype, "attack", null);
 __decorate([
+    (0, common_1.Post)('battle/recycle'),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "recycle", null);
+__decorate([
     (0, common_1.Get)('battle/status'),
     __param(0, (0, common_1.Request)()),
     __metadata("design:type", Function),
@@ -230,6 +274,41 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], GameController.prototype, "processBattle", null);
+__decorate([
+    (0, common_1.Post)('simulator/simulate'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "simulate", null);
+__decorate([
+    (0, common_1.Post)('simulator/simple'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "simulateSimple", null);
+__decorate([
+    (0, common_1.Post)('simulator/multiple'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "simulateMultiple", null);
+__decorate([
+    (0, common_1.Post)('simulator/parse'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "parseSourceData", null);
+__decorate([
+    (0, common_1.Post)('simulator/generate-source'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "generateSourceData", null);
 exports.GameController = GameController = __decorate([
     (0, common_1.Controller)('game'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
@@ -238,6 +317,7 @@ exports.GameController = GameController = __decorate([
         research_service_1.ResearchService,
         fleet_service_1.FleetService,
         defense_service_1.DefenseService,
-        battle_service_1.BattleService])
+        battle_service_1.BattleService,
+        battle_simulator_service_1.BattleSimulatorService])
 ], GameController);
 //# sourceMappingURL=game.controller.js.map

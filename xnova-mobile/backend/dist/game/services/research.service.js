@@ -38,7 +38,7 @@ let ResearchService = class ResearchService {
     }
     getResearchTime(metal, crystal, labLevel) {
         const hours = (metal + crystal) / (20000 * (1 + labLevel));
-        return hours * 3600;
+        return hours * 3600 * 10;
     }
     checkRequirements(user, researchType) {
         const researchData = game_data_1.RESEARCH_DATA[researchType];

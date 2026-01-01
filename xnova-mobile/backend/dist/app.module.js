@@ -11,8 +11,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppModule = void 0;
 const common_1 = require("@nestjs/common");
+const core_1 = require("@nestjs/core");
 const config_1 = require("@nestjs/config");
 const mongoose_1 = require("@nestjs/mongoose");
+const throttler_1 = require("@nestjs/throttler");
 const configuration_1 = __importDefault(require("./config/configuration"));
 const auth_module_1 = require("./auth/auth.module");
 const user_module_1 = require("./user/user.module");
@@ -20,6 +22,7 @@ const game_module_1 = require("./game/game.module");
 const galaxy_module_1 = require("./galaxy/galaxy.module");
 const ranking_module_1 = require("./ranking/ranking.module");
 const socket_module_1 = require("./socket/socket.module");
+const message_module_1 = require("./message/message.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -30,6 +33,23 @@ exports.AppModule = AppModule = __decorate([
                 isGlobal: true,
                 load: [configuration_1.default],
             }),
+            throttler_1.ThrottlerModule.forRoot([
+                {
+                    name: 'short',
+                    ttl: 1000,
+                    limit: 3,
+                },
+                {
+                    name: 'medium',
+                    ttl: 10000,
+                    limit: 20,
+                },
+                {
+                    name: 'long',
+                    ttl: 60000,
+                    limit: 100,
+                },
+            ]),
             mongoose_1.MongooseModule.forRootAsync({
                 imports: [config_1.ConfigModule],
                 useFactory: async (configService) => ({
@@ -43,6 +63,13 @@ exports.AppModule = AppModule = __decorate([
             galaxy_module_1.GalaxyModule,
             ranking_module_1.RankingModule,
             socket_module_1.SocketModule,
+            message_module_1.MessageModule,
+        ],
+        providers: [
+            {
+                provide: core_1.APP_GUARD,
+                useClass: throttler_1.ThrottlerGuard,
+            },
         ],
     })
 ], AppModule);

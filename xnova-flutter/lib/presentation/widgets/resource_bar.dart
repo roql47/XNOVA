@@ -27,35 +27,34 @@ class ResourceBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: AppColors.panelBackground,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      color: AppColors.surface,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _ResourceItem(
-            icon: Icons.hardware,
-            color: AppColors.metalColor,
+            label: 'M',
+            color: AppColors.resourceMetal,
             value: _formatNumber(resources.metal),
-            production: '+${_formatNumber(production.metal)}/h',
+            production: '+${_formatNumber(production.metal)}',
           ),
+          const SizedBox(width: 16),
           _ResourceItem(
-            icon: Icons.diamond,
-            color: AppColors.crystalColor,
+            label: 'C',
+            color: AppColors.resourceCrystal,
             value: _formatNumber(resources.crystal),
-            production: '+${_formatNumber(production.crystal)}/h',
+            production: '+${_formatNumber(production.crystal)}',
           ),
+          const SizedBox(width: 16),
           _ResourceItem(
-            icon: Icons.water_drop,
-            color: AppColors.deuteriumColor,
+            label: 'D',
+            color: AppColors.resourceDeuterium,
             value: _formatNumber(resources.deuterium),
-            production: '+${_formatNumber(production.deuterium)}/h',
+            production: '+${_formatNumber(production.deuterium)}',
           ),
-          _ResourceItem(
-            icon: Icons.bolt,
-            color: energyRatio < 100 ? AppColors.errorRed : AppColors.energyColor,
+          const Spacer(),
+          _EnergyItem(
             value: _formatNumber(resources.energy),
-            production: '$energyRatio%',
-            isEnergy: true,
+            ratio: energyRatio,
           ),
         ],
       ),
@@ -64,51 +63,114 @@ class ResourceBar extends StatelessWidget {
 }
 
 class _ResourceItem extends StatelessWidget {
-  final IconData icon;
+  final String label;
   final Color color;
   final String value;
   final String production;
-  final bool isEnergy;
 
   const _ResourceItem({
-    required this.icon,
+    required this.label,
     required this.color,
     required this.value,
     required this.production,
-    this.isEnergy = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
+        Container(
+          width: 18,
+          height: 18,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 4),
             Text(
               value,
-              style: TextStyle(
-                color: color,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              production,
+              style: const TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 9,
               ),
             ),
           ],
-        ),
-        Text(
-          production,
-          style: TextStyle(
-            color: isEnergy 
-                ? (color == AppColors.errorRed ? AppColors.errorRed : AppColors.successGreen)
-                : AppColors.textSecondary,
-            fontSize: 10,
-          ),
         ),
       ],
     );
   }
 }
 
+class _EnergyItem extends StatelessWidget {
+  final String value;
+  final int ratio;
+
+  const _EnergyItem({
+    required this.value,
+    required this.ratio,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isLow = ratio < 100;
+    final color = isLow ? AppColors.negative : AppColors.resourceEnergy;
+    
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.bolt,
+          size: 14,
+          color: color,
+        ),
+        const SizedBox(width: 4),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              '$ratio%',
+              style: TextStyle(
+                color: isLow ? AppColors.negative : AppColors.textMuted,
+                fontSize: 9,
+                fontWeight: isLow ? FontWeight.w600 : FontWeight.normal,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
