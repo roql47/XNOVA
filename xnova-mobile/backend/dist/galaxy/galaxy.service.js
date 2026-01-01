@@ -286,8 +286,11 @@ let GalaxyService = class GalaxyService {
     filterNonZero(obj) {
         if (!obj)
             return {};
+        const plainObj = obj.toObject ? obj.toObject() : obj;
         const result = {};
-        for (const [key, value] of Object.entries(obj)) {
+        for (const [key, value] of Object.entries(plainObj)) {
+            if (key.startsWith('_') || key === '__v')
+                continue;
             if (typeof value === 'number' && value > 0) {
                 result[key] = value;
             }

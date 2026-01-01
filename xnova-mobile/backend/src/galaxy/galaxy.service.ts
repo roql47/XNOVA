@@ -385,11 +385,15 @@ export class GalaxyService {
     return report;
   }
 
-  // 0이 아닌 값만 필터링
+  // 0이 아닌 값만 필터링 (Mongoose 문서 지원)
   private filterNonZero(obj: any): Record<string, number> {
     if (!obj) return {};
+    // Mongoose 문서를 일반 객체로 변환
+    const plainObj = obj.toObject ? obj.toObject() : obj;
     const result: Record<string, number> = {};
-    for (const [key, value] of Object.entries(obj)) {
+    for (const [key, value] of Object.entries(plainObj)) {
+      // _id, __v 등 메타 필드 제외
+      if (key.startsWith('_') || key === '__v') continue;
       if (typeof value === 'number' && value > 0) {
         result[key] = value;
       }
