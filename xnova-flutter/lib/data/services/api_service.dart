@@ -188,6 +188,15 @@ class ApiService {
     return response.data;
   }
 
+  // ===== 정찰 =====
+  Future<SpyResponse> spyOnPlanet(String targetCoord, int probeCount) async {
+    final response = await _dio.post('galaxy/spy', data: {
+      'targetCoord': targetCoord,
+      'probeCount': probeCount,
+    });
+    return SpyResponse.fromJson(response.data);
+  }
+
   // ===== 랭킹 =====
   Future<RankingResponse> getRanking({String type = 'total', int limit = 100}) async {
     final response = await _dio.get('ranking', queryParameters: {

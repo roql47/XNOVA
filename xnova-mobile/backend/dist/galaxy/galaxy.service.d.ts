@@ -1,6 +1,7 @@
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../user/schemas/user.schema';
 import { Debris, DebrisDocument } from './schemas/debris.schema';
+import { MessageService } from '../message/message.service';
 export interface PlanetInfo {
     position: number;
     coordinate: string;
@@ -14,10 +15,27 @@ export interface PlanetInfo {
     };
     hasMoon: boolean;
 }
+export interface SpyReport {
+    targetCoord: string;
+    targetName: string;
+    resources?: {
+        metal: number;
+        crystal: number;
+        deuterium: number;
+        energy: number;
+    };
+    fleet?: Record<string, number>;
+    defense?: Record<string, number>;
+    buildings?: Record<string, number>;
+    research?: Record<string, number>;
+    probesLost: number;
+    probesSurvived: number;
+}
 export declare class GalaxyService {
     private userModel;
     private debrisModel;
-    constructor(userModel: Model<UserDocument>, debrisModel: Model<DebrisDocument>);
+    private messageService;
+    constructor(userModel: Model<UserDocument>, debrisModel: Model<DebrisDocument>, messageService: MessageService);
     getGalaxyMap(galaxy: number, system: number, currentUserId: string): Promise<PlanetInfo[]>;
     updateDebris(coordinate: string, metal: number, crystal: number): Promise<void>;
     getDebris(coordinate: string): Promise<(import("mongoose").Document<unknown, {}, DebrisDocument, {}, import("mongoose").DefaultSchemaOptions> & Debris & import("mongoose").Document<import("mongoose").Types.ObjectId, any, any, Record<string, any>, {}> & Required<{
@@ -40,4 +58,19 @@ export declare class GalaxyService {
         __v: number;
     }) | null>;
     getActiveSystems(galaxy: number): Promise<number[]>;
+    spyOnPlanet(attackerId: string, targetCoord: string, probeCount: number): Promise<{
+        success: boolean;
+        error: string;
+        report?: undefined;
+        message?: undefined;
+    } | {
+        success: boolean;
+        report: SpyReport;
+        message: string;
+        error?: undefined;
+    }>;
+    private getTotalFleetCount;
+    private generateSpyReport;
+    private filterNonZero;
+    private formatSpyReportContent;
 }

@@ -944,3 +944,71 @@ class Message {
   );
 }
 
+// ===== 정찰 관련 =====
+class SpyReport {
+  final String targetCoord;
+  final String targetName;
+  final Map<String, int>? resources;
+  final Map<String, int>? fleet;
+  final Map<String, int>? defense;
+  final Map<String, int>? buildings;
+  final Map<String, int>? research;
+  final int probesLost;
+  final int probesSurvived;
+
+  SpyReport({
+    required this.targetCoord,
+    required this.targetName,
+    this.resources,
+    this.fleet,
+    this.defense,
+    this.buildings,
+    this.research,
+    required this.probesLost,
+    required this.probesSurvived,
+  });
+
+  factory SpyReport.fromJson(Map<String, dynamic> json) => SpyReport(
+    targetCoord: json['targetCoord'] ?? '',
+    targetName: json['targetName'] ?? '',
+    resources: json['resources'] != null 
+        ? Map<String, int>.from(json['resources'].map((k, v) => MapEntry(k, (v as num).toInt())))
+        : null,
+    fleet: json['fleet'] != null 
+        ? Map<String, int>.from(json['fleet'].map((k, v) => MapEntry(k, (v as num).toInt())))
+        : null,
+    defense: json['defense'] != null 
+        ? Map<String, int>.from(json['defense'].map((k, v) => MapEntry(k, (v as num).toInt())))
+        : null,
+    buildings: json['buildings'] != null 
+        ? Map<String, int>.from(json['buildings'].map((k, v) => MapEntry(k, (v as num).toInt())))
+        : null,
+    research: json['research'] != null 
+        ? Map<String, int>.from(json['research'].map((k, v) => MapEntry(k, (v as num).toInt())))
+        : null,
+    probesLost: (json['probesLost'] ?? 0).toInt(),
+    probesSurvived: (json['probesSurvived'] ?? 0).toInt(),
+  );
+}
+
+class SpyResponse {
+  final bool success;
+  final String? error;
+  final String? message;
+  final SpyReport? report;
+
+  SpyResponse({
+    required this.success,
+    this.error,
+    this.message,
+    this.report,
+  });
+
+  factory SpyResponse.fromJson(Map<String, dynamic> json) => SpyResponse(
+    success: json['success'] ?? false,
+    error: json['error'],
+    message: json['message'],
+    report: json['report'] != null ? SpyReport.fromJson(json['report']) : null,
+  );
+}
+

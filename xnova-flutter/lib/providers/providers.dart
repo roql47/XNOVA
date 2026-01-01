@@ -693,6 +693,17 @@ class GameNotifier extends StateNotifier<GameState> {
     }
   }
 
+  Future<SpyResponse?> spyOnPlanet(String targetCoord, int probeCount) async {
+    try {
+      final response = await _apiService.spyOnPlanet(targetCoord, probeCount);
+      // 정찰 후 함대 정보 갱신
+      await loadFleet();
+      return response;
+    } catch (e) {
+      return null;
+    }
+  }
+
   Future<void> loadBattleStatus() async {
     try {
       final response = await _apiService.getBattleStatus();

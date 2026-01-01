@@ -162,6 +162,9 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
                   onRecycle: planet.hasDebris
                       ? () => _showRecycleDialog(context, planet)
                       : null,
+                  onSpy: planet.playerName != null && !planet.isOwnPlanet
+                      ? () => _showSpyDialog(context, planet)
+                      : null,
                 );
               },
             ),
@@ -302,6 +305,148 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
       ),
     );
   }
+
+  void _showSpyDialog(BuildContext context, PlanetInfo planet) {
+    final gameState = ref.read(gameProvider);
+    final probes = gameState.fleet.firstWhere(
+      (f) => f.type == 'espionageProbe',
+      orElse: () => FleetInfo(type: 'espionageProbe', name: '무인정찰기', count: 0, cost: Cost(), stats: FleetStats()),
+    );
+    
+    int probeCount = 1;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: AppColors.panelBackground,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          title: Row(
+            children: [
+              Icon(Icons.radar, color: AppColors.resourceCrystal, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '정찰: ${planet.coordinate}',
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${planet.playerName}의 행성을 정찰합니다.',
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Text('보유 정찰기: ', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                  Text('${probes.count}대', style: TextStyle(color: AppColors.accent, fontSize: 12, fontWeight: FontWeight.w600)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Text('출격 수: ', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                  IconButton(
+                    icon: Icon(Icons.remove_circle_outline, color: AppColors.textMuted, size: 20),
+                    onPressed: probeCount > 1 ? () => setDialogState(() => probeCount--) : null,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '$probeCount',
+                      style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.add_circle_outline, color: AppColors.textMuted, size: 20),
+                    onPressed: probeCount < probes.count ? () => setDialogState(() => probeCount++) : null,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('💡 팁', style: TextStyle(color: AppColors.accent, fontSize: 11, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    Text(
+                      '• 더 많은 정찰기 = 더 자세한 정보\n'
+                      '• 적 함대가 많으면 정찰기 파괴 위험↑\n'
+                      '• 정탐기술이 높으면 더 적은 정찰기로 OK',
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 10, height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('취소', style: TextStyle(color: AppColors.textMuted)),
+            ),
+            ElevatedButton(
+              onPressed: probes.count >= probeCount ? () async {
+                Navigator.pop(context);
+                _executeSpy(planet, probeCount);
+              } : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.resourceCrystal,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+              ),
+              child: const Text('정찰 시작'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _executeSpy(PlanetInfo planet, int probeCount) async {
+    final result = await ref.read(gameProvider.notifier).spyOnPlanet(planet.coordinate, probeCount);
+    
+    if (result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('정찰 요청에 실패했습니다.')),
+      );
+      return;
+    }
+
+    if (!result.success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.error ?? '정찰에 실패했습니다.')),
+      );
+      return;
+    }
+
+    // 성공 메시지
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result.message ?? '정찰 완료! 메시지함에서 보고서를 확인하세요.'),
+        backgroundColor: AppColors.positive,
+      ),
+    );
+  }
 }
 
 class _PlanetRow extends StatelessWidget {
@@ -309,12 +454,14 @@ class _PlanetRow extends StatelessWidget {
   final PlanetInfo planet;
   final VoidCallback? onAttack;
   final VoidCallback? onRecycle;
+  final VoidCallback? onSpy;
 
   const _PlanetRow({
     required this.position,
     required this.planet,
     this.onAttack,
     this.onRecycle,
+    this.onSpy,
   });
 
   @override
@@ -413,7 +560,20 @@ class _PlanetRow extends StatelessWidget {
                       color: AppColors.accent,
                     ),
                   ),
-                if (!isEmpty && !isOwn)
+                if (!isEmpty && !isOwn) ...[
+                  // 정찰 아이콘
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: InkWell(
+                      onTap: onSpy,
+                      child: Icon(
+                        Icons.radar,
+                        size: 16,
+                        color: AppColors.resourceCrystal,
+                      ),
+                    ),
+                  ),
+                  // 공격 아이콘
                   Padding(
                     padding: const EdgeInsets.only(left: 4),
                     child: InkWell(
@@ -425,6 +585,7 @@ class _PlanetRow extends StatelessWidget {
                       ),
                     ),
                   ),
+                ],
               ],
             ),
           ],

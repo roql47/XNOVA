@@ -16,6 +16,10 @@ exports.GalaxyController = void 0;
 const common_1 = require("@nestjs/common");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const galaxy_service_1 = require("./galaxy.service");
+class SpyRequestDto {
+    targetCoord;
+    probeCount;
+}
 let GalaxyController = class GalaxyController {
     galaxyService;
     constructor(galaxyService) {
@@ -55,6 +59,13 @@ let GalaxyController = class GalaxyController {
             totalActive: systems.length,
         };
     }
+    async spyOnPlanet(body, req) {
+        const { targetCoord, probeCount } = body;
+        if (!targetCoord || !probeCount || probeCount < 1) {
+            return { success: false, error: '잘못된 요청입니다.' };
+        }
+        return this.galaxyService.spyOnPlanet(req.user.userId, targetCoord, probeCount);
+    }
 };
 exports.GalaxyController = GalaxyController;
 __decorate([
@@ -81,6 +92,14 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], GalaxyController.prototype, "getActiveSystems", null);
+__decorate([
+    (0, common_1.Post)('spy'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [SpyRequestDto, Object]),
+    __metadata("design:returntype", Promise)
+], GalaxyController.prototype, "spyOnPlanet", null);
 exports.GalaxyController = GalaxyController = __decorate([
     (0, common_1.Controller)('galaxy'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),

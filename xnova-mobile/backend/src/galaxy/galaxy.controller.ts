@@ -1,6 +1,11 @@
-import { Controller, Get, Param, UseGuards, Request, Query } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, UseGuards, Request, Query } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { GalaxyService } from './galaxy.service';
+
+class SpyRequestDto {
+  targetCoord: string;
+  probeCount: number;
+}
 
 @Controller('galaxy')
 @UseGuards(JwtAuthGuard)
@@ -60,6 +65,18 @@ export class GalaxyController {
       activeSystems: systems,
       totalActive: systems.length,
     };
+  }
+
+  // 정찰 요청
+  @Post('spy')
+  async spyOnPlanet(@Body() body: SpyRequestDto, @Request() req) {
+    const { targetCoord, probeCount } = body;
+
+    if (!targetCoord || !probeCount || probeCount < 1) {
+      return { success: false, error: '잘못된 요청입니다.' };
+    }
+
+    return this.galaxyService.spyOnPlanet(req.user.userId, targetCoord, probeCount);
   }
 }
 

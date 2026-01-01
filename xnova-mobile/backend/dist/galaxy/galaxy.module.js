@@ -12,6 +12,7 @@ const mongoose_1 = require("@nestjs/mongoose");
 const galaxy_service_1 = require("./galaxy.service");
 const galaxy_controller_1 = require("./galaxy.controller");
 const user_module_1 = require("../user/user.module");
+const message_module_1 = require("../message/message.module");
 const debris_schema_1 = require("./schemas/debris.schema");
 let GalaxyModule = class GalaxyModule {
 };
@@ -20,6 +21,7 @@ exports.GalaxyModule = GalaxyModule = __decorate([
     (0, common_1.Module)({
         imports: [
             user_module_1.UserModule,
+            message_module_1.MessageModule,
             mongoose_1.MongooseModule.forFeature([{ name: debris_schema_1.Debris.name, schema: debris_schema_1.DebrisSchema }]),
         ],
         controllers: [galaxy_controller_1.GalaxyController],

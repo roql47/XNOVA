@@ -1,4 +1,8 @@
 import { GalaxyService } from './galaxy.service';
+declare class SpyRequestDto {
+    targetCoord: string;
+    probeCount: number;
+}
 export declare class GalaxyController {
     private galaxyService;
     constructor(galaxyService: GalaxyService);
@@ -32,4 +36,14 @@ export declare class GalaxyController {
         totalActive: number;
         error?: undefined;
     }>;
+    spyOnPlanet(body: SpyRequestDto, req: any): Promise<{
+        success: boolean;
+        report: import("./galaxy.service").SpyReport;
+        message: string;
+        error?: undefined;
+    } | {
+        success: boolean;
+        error: string;
+    }>;
 }
+export {};

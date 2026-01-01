@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../providers/providers.dart';
 import '../../widgets/resource_bar.dart';
+import '../../widgets/guide_tutorial_overlay.dart';
+import '../../widgets/guide_steps_data.dart';
 import 'tabs/overview_tab.dart';
 import 'tabs/buildings_tab.dart';
 import 'tabs/research_tab.dart';
@@ -57,6 +59,15 @@ class MainScreen extends ConsumerStatefulWidget {
 
 class _MainScreenState extends ConsumerState<MainScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  
+  // 가이드 튜토리얼용 GlobalKey들
+  final GlobalKey _resourceBarKey = GlobalKey();
+  final GlobalKey _menuButtonKey = GlobalKey();
+  final GlobalKey _refreshButtonKey = GlobalKey();
+  final GlobalKey _tabContentKey = GlobalKey(); // 탭 컨텐츠 영역
+  
+  // 가이드 표시 상태
+  bool _showGuide = false;
 
   @override
   void initState() {
@@ -77,22 +88,80 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       key: _scaffoldKey,
       backgroundColor: AppColors.background,
       drawer: _buildDrawer(authState, gameState, navState),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(gameState),
-            ResourceBar(
-              resources: gameState.resources,
-              production: gameState.production,
-              energyRatio: gameState.energyRatio,
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                _buildTopBar(gameState),
+                ResourceBar(
+                  key: _resourceBarKey,
+                  resources: gameState.resources,
+                  production: gameState.production,
+                  energyRatio: gameState.energyRatio,
+                ),
+                Expanded(
+                  child: Container(
+                    key: _tabContentKey,
+                    child: _buildTabContent(navState.selectedTab),
+                  ),
+                ),
+              ],
             ),
-            Expanded(
-              child: _buildTabContent(navState.selectedTab),
+          ),
+          // 가이드 오버레이
+          if (_showGuide)
+            GuideTutorialOverlay(
+              steps: GuideStepsData(
+                resourceBarKey: _resourceBarKey,
+                menuButtonKey: _menuButtonKey,
+                refreshButtonKey: _refreshButtonKey,
+                tabContentKey: _tabContentKey,
+              ).getSteps(),
+              onComplete: () {
+                setState(() {
+                  _showGuide = false;
+                });
+              },
+              onSkip: () {
+                setState(() {
+                  _showGuide = false;
+                });
+              },
+              onStepChanged: (tabName) {
+                if (tabName != null) {
+                  final tab = _getTabFromName(tabName);
+                  if (tab != null) {
+                    ref.read(navigationProvider.notifier).setTab(tab);
+                  }
+                }
+              },
             ),
-          ],
-        ),
+        ],
       ),
     );
+  }
+  
+  void _startGuide() {
+    Navigator.pop(context); // Drawer 닫기
+    setState(() {
+      _showGuide = true;
+    });
+  }
+  
+  MainTab? _getTabFromName(String tabName) {
+    switch (tabName) {
+      case 'overview': return MainTab.overview;
+      case 'buildings': return MainTab.buildings;
+      case 'research': return MainTab.research;
+      case 'shipyard': return MainTab.shipyard;
+      case 'defense': return MainTab.defense;
+      case 'fleet': return MainTab.fleet;
+      case 'galaxy': return MainTab.galaxy;
+      case 'messages': return MainTab.messages;
+      case 'techtree': return MainTab.techtree;
+      default: return null;
+    }
   }
 
   Widget _buildTopBar(GameState gameState) {
@@ -102,6 +171,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
       child: Row(
         children: [
           IconButton(
+            key: _menuButtonKey,
             icon: const Icon(Icons.menu, color: AppColors.textSecondary, size: 22),
             onPressed: () => _scaffoldKey.currentState?.openDrawer(),
           ),
@@ -130,6 +200,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
             ),
           ),
           IconButton(
+            key: _refreshButtonKey,
             icon: const Icon(Icons.refresh, color: AppColors.textMuted, size: 20),
             onPressed: () => ref.read(gameProvider.notifier).loadAllData(),
           ),
@@ -213,17 +284,47 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                 top: BorderSide(color: AppColors.panelBorder, width: 1),
               ),
             ),
-            child: ListTile(
-              leading: const Icon(Icons.logout, color: AppColors.negative, size: 20),
-              title: const Text(
-                '로그아웃',
-                style: TextStyle(color: AppColors.negative, fontSize: 13),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                ref.read(authProvider.notifier).logout();
-                widget.onLogout();
-              },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 도움말 버튼
+                ListTile(
+                  leading: const Icon(Icons.help_outline_rounded, color: AppColors.accent, size: 20),
+                  title: const Text(
+                    '도움말',
+                    style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                  ),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      '가이드',
+                      style: TextStyle(
+                        color: AppColors.accent,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  onTap: _startGuide,
+                ),
+                // 로그아웃 버튼
+                ListTile(
+                  leading: const Icon(Icons.logout, color: AppColors.negative, size: 20),
+                  title: const Text(
+                    '로그아웃',
+                    style: TextStyle(color: AppColors.negative, fontSize: 13),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    ref.read(authProvider.notifier).logout();
+                    widget.onLogout();
+                  },
+                ),
+              ],
             ),
           ),
           SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
