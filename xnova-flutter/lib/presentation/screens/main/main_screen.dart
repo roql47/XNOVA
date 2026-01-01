@@ -400,65 +400,39 @@ class _DrawerMenuItem extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Icon(
-                      tab.icon,
-                      size: 18,
-                      color: isSelected ? AppColors.accent : AppColors.textMuted,
-                    ),
-                    if (badgeCount > 0)
-                      Positioned(
-                        right: -6,
-                        top: -4,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: AppColors.negative,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
-                          child: Text(
-                            badgeCount > 99 ? '99+' : '$badgeCount',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                  ],
+                Icon(
+                  tab.icon,
+                  size: 18,
+                  color: isSelected ? AppColors.accent : AppColors.textMuted,
                 ),
                 const SizedBox(width: 14),
-                Expanded(
-                  child: Text(
-                    tab.label,
-                    style: TextStyle(
-                      color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
-                      fontSize: 13,
-                      fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
-                    ),
+                Text(
+                  tab.label,
+                  style: TextStyle(
+                    color: isSelected ? AppColors.textPrimary : AppColors.textSecondary,
+                    fontSize: 13,
+                    fontWeight: isSelected ? FontWeight.w500 : FontWeight.normal,
                   ),
                 ),
-                if (badgeCount > 0)
+                // 안 읽은 메시지 배지 (메시지 텍스트 오른쪽)
+                if (badgeCount > 0) ...[
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: AppColors.accent.withOpacity(0.2),
+                      color: AppColors.negative,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      '$badgeCount',
-                      style: TextStyle(
-                        color: AppColors.accent,
+                      badgeCount > 99 ? '99+' : '$badgeCount',
+                      style: const TextStyle(
+                        color: Colors.white,
                         fontSize: 10,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
+                ],
               ],
             ),
           ),
