@@ -14,6 +14,9 @@ class MessagesTab extends ConsumerStatefulWidget {
 }
 
 class _MessagesTabState extends ConsumerState<MessagesTab> {
+  bool _isSelectionMode = false;
+  final Set<String> _selectedIds = {};
+
   @override
   void initState() {
     super.initState();
@@ -22,33 +25,233 @@ class _MessagesTabState extends ConsumerState<MessagesTab> {
     });
   }
 
+  void _toggleSelectionMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedIds.clear();
+      }
+    });
+  }
+
+  void _toggleMessageSelection(String messageId) {
+    setState(() {
+      if (_selectedIds.contains(messageId)) {
+        _selectedIds.remove(messageId);
+      } else {
+        _selectedIds.add(messageId);
+      }
+    });
+  }
+
+  void _selectAll(List<Message> messages) {
+    setState(() {
+      if (_selectedIds.length == messages.length) {
+        _selectedIds.clear();
+      } else {
+        _selectedIds.clear();
+        _selectedIds.addAll(messages.map((m) => m.id));
+      }
+    });
+  }
+
+  Future<void> _deleteSelected() async {
+    if (_selectedIds.isEmpty) return;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.panelBackground,
+        title: const Text('메시지 삭제', style: TextStyle(color: AppColors.textPrimary)),
+        content: Text('${_selectedIds.length}개의 메시지를 삭제하시겠습니까?', 
+          style: const TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('삭제', style: TextStyle(color: AppColors.negative)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      for (final id in _selectedIds) {
+        await ref.read(messageProvider.notifier).deleteMessage(id);
+      }
+      setState(() {
+        _selectedIds.clear();
+        _isSelectionMode = false;
+      });
+    }
+  }
+
+  Future<void> _deleteAll() async {
+    final messageState = ref.read(messageProvider);
+    if (messageState.messages.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.panelBackground,
+        title: const Text('전체 삭제', style: TextStyle(color: AppColors.textPrimary)),
+        content: Text('모든 메시지(${messageState.messages.length}개)를 삭제하시겠습니까?', 
+          style: const TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('전체 삭제', style: TextStyle(color: AppColors.negative)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      for (final message in messageState.messages) {
+        await ref.read(messageProvider.notifier).deleteMessage(message.id);
+      }
+      setState(() {
+        _selectedIds.clear();
+        _isSelectionMode = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final messageState = ref.watch(messageProvider);
+    final unreadCount = messageState.messages.where((m) => !m.isRead).length;
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: RefreshIndicator(
-        onRefresh: () => ref.read(messageProvider.notifier).loadMessages(),
-        color: AppColors.accent,
-        backgroundColor: AppColors.surface,
-        child: messageState.isLoading && messageState.messages.isEmpty
-            ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
-            : messageState.messages.isEmpty
-                ? const Center(
-                    child: Text(
-                      '메시지가 없습니다.',
-                      style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+      body: Column(
+        children: [
+          // 상단 툴바
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              border: Border(bottom: BorderSide(color: AppColors.panelBorder)),
+            ),
+            child: Row(
+              children: [
+                // 안 읽은 메시지 표시
+                if (unreadCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.mail, size: 14, color: AppColors.accent),
+                        const SizedBox(width: 4),
+                        Text(
+                          '안 읽음 $unreadCount',
+                          style: TextStyle(color: AppColors.accent, fontSize: 11, fontWeight: FontWeight.w600),
+                        ),
+                      ],
                     ),
                   )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: messageState.messages.length,
-                    itemBuilder: (context, index) {
-                      final message = messageState.messages[index];
-                      return _MessageCard(message: message);
-                    },
+                else
+                  Text(
+                    '메시지 ${messageState.messages.length}개',
+                    style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
                   ),
+                const Spacer(),
+                // 선택 모드 버튼
+                if (_isSelectionMode) ...[
+                  TextButton.icon(
+                    onPressed: () => _selectAll(messageState.messages),
+                    icon: Icon(
+                      _selectedIds.length == messageState.messages.length 
+                        ? Icons.deselect : Icons.select_all,
+                      size: 16,
+                    ),
+                    label: Text(_selectedIds.length == messageState.messages.length ? '선택해제' : '전체선택'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.textSecondary,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _selectedIds.isNotEmpty ? _deleteSelected : null,
+                    icon: const Icon(Icons.delete, size: 16),
+                    label: Text('삭제(${_selectedIds.length})'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: _selectedIds.isNotEmpty ? AppColors.negative : AppColors.textMuted,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: _toggleSelectionMode,
+                    icon: const Icon(Icons.close, size: 18),
+                    color: AppColors.textMuted,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ] else ...[
+                  IconButton(
+                    onPressed: _toggleSelectionMode,
+                    icon: const Icon(Icons.checklist, size: 18),
+                    color: AppColors.textSecondary,
+                    tooltip: '선택 모드',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    onPressed: messageState.messages.isNotEmpty ? _deleteAll : null,
+                    icon: const Icon(Icons.delete_sweep, size: 18),
+                    color: messageState.messages.isNotEmpty ? AppColors.negative : AppColors.textMuted,
+                    tooltip: '전체 삭제',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          // 메시지 목록
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () => ref.read(messageProvider.notifier).loadMessages(),
+              color: AppColors.accent,
+              backgroundColor: AppColors.surface,
+              child: messageState.isLoading && messageState.messages.isEmpty
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
+                  : messageState.messages.isEmpty
+                      ? const Center(
+                          child: Text(
+                            '메시지가 없습니다.',
+                            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: messageState.messages.length,
+                          itemBuilder: (context, index) {
+                            final message = messageState.messages[index];
+                            return _MessageCard(
+                              message: message,
+                              isSelectionMode: _isSelectionMode,
+                              isSelected: _selectedIds.contains(message.id),
+                              onSelectionChanged: () => _toggleMessageSelection(message.id),
+                            );
+                          },
+                        ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -56,76 +259,125 @@ class _MessagesTabState extends ConsumerState<MessagesTab> {
 
 class _MessageCard extends ConsumerWidget {
   final Message message;
+  final bool isSelectionMode;
+  final bool isSelected;
+  final VoidCallback? onSelectionChanged;
 
-  const _MessageCard({required this.message});
+  const _MessageCard({
+    required this.message,
+    this.isSelectionMode = false,
+    this.isSelected = false,
+    this.onSelectionChanged,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
-        color: message.isRead ? AppColors.panelBackground : AppColors.panelHeader,
+        color: isSelected 
+          ? AppColors.accent.withOpacity(0.1)
+          : (message.isRead ? AppColors.panelBackground : AppColors.panelHeader),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: message.isRead ? AppColors.panelBorder : AppColors.accent.withOpacity(0.3),
-          width: message.isRead ? 1 : 1.5,
+          color: isSelected 
+            ? AppColors.accent
+            : (message.isRead ? AppColors.panelBorder : AppColors.accent.withOpacity(0.3)),
+          width: isSelected ? 2 : (message.isRead ? 1 : 1.5),
         ),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
         onTap: () {
-          if (!message.isRead) {
-            ref.read(messageProvider.notifier).markAsRead(message.id);
+          if (isSelectionMode) {
+            onSelectionChanged?.call();
+          } else {
+            if (!message.isRead) {
+              ref.read(messageProvider.notifier).markAsRead(message.id);
+            }
+            _showMessageDetail(context, message);
           }
-          _showMessageDetail(context, message);
+        },
+        onLongPress: () {
+          if (!isSelectionMode) {
+            onSelectionChanged?.call();
+          }
         },
         child: Padding(
           padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      _getTypeIcon(message.type),
-                      const SizedBox(width: 8),
-                      Text(
-                        message.senderName,
-                        style: TextStyle(
-                          color: AppColors.accent,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
+              // 선택 모드일 때 체크박스
+              if (isSelectionMode) ...[
+                Icon(
+                  isSelected ? Icons.check_circle : Icons.circle_outlined,
+                  color: isSelected ? AppColors.accent : AppColors.textMuted,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+              ],
+              // 안 읽음 표시
+              if (!message.isRead && !isSelectionMode) ...[
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              // 메시지 내용
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            _getTypeIcon(message.type),
+                            const SizedBox(width: 8),
+                            Text(
+                              message.senderName,
+                              style: TextStyle(
+                                color: AppColors.accent,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
                         ),
+                        Text(
+                          DateFormat('MM-dd HH:mm').format(message.createdAt),
+                          style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      message.title,
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: message.isRead ? FontWeight.normal : FontWeight.w600,
+                        fontSize: 13,
                       ),
-                    ],
-                  ),
-                  Text(
-                    DateFormat('MM-dd HH:mm').format(message.createdAt),
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                message.title,
-                style: TextStyle(
-                  color: AppColors.textPrimary,
-                  fontWeight: message.isRead ? FontWeight.normal : FontWeight.w600,
-                  fontSize: 13,
+                    ),
+                    const SizedBox(height: 4),
+                    if (message.type == 'battle' && message.metadata != null)
+                      _buildBattleSummary(message.metadata!)
+                    else
+                      Text(
+                        _stripHtml(message.content),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                      ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
-              if (message.type == 'battle' && message.metadata != null)
-                _buildBattleSummary(message.metadata!)
-              else
-                Text(
-                  _stripHtml(message.content),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
-                ),
             ],
           ),
         ),

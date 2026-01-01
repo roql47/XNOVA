@@ -262,20 +262,28 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           ),
           const SizedBox(height: 8),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              children: MainTab.values
-                  .where((tab) => tab != MainTab.simulator)  // 시뮬레이터 탭 숨김
-                  .map((tab) {
-                return _DrawerMenuItem(
-                  tab: tab,
-                  isSelected: navState.selectedTab == tab,
-                  onTap: () {
-                    ref.read(navigationProvider.notifier).setTab(tab);
-                    Navigator.pop(context);
-                  },
+            child: Builder(
+              builder: (context) {
+                final messageState = ref.watch(messageProvider);
+                final unreadCount = messageState.messages.where((m) => !m.isRead).length;
+                
+                return ListView(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  children: MainTab.values
+                      .where((tab) => tab != MainTab.simulator)  // 시뮬레이터 탭 숨김
+                      .map((tab) {
+                    return _DrawerMenuItem(
+                      tab: tab,
+                      isSelected: navState.selectedTab == tab,
+                      badgeCount: tab == MainTab.messages ? unreadCount : 0,
+                      onTap: () {
+                        ref.read(navigationProvider.notifier).setTab(tab);
+                        Navigator.pop(context);
+                      },
+                    );
+                  }).toList(),
                 );
-              }).toList(),
+              },
             ),
           ),
           Container(
@@ -363,11 +371,13 @@ class _DrawerMenuItem extends StatelessWidget {
   final MainTab tab;
   final bool isSelected;
   final VoidCallback onTap;
+  final int badgeCount;
 
   const _DrawerMenuItem({
     required this.tab,
     required this.isSelected,
     required this.onTap,
+    this.badgeCount = 0,
   });
 
   @override
@@ -390,10 +400,37 @@ class _DrawerMenuItem extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(
-                  tab.icon,
-                  size: 18,
-                  color: isSelected ? AppColors.accent : AppColors.textMuted,
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(
+                      tab.icon,
+                      size: 18,
+                      color: isSelected ? AppColors.accent : AppColors.textMuted,
+                    ),
+                    if (badgeCount > 0)
+                      Positioned(
+                        right: -6,
+                        top: -4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: AppColors.negative,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
+                          child: Text(
+                            badgeCount > 99 ? '99+' : '$badgeCount',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -406,6 +443,22 @@ class _DrawerMenuItem extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (badgeCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$badgeCount',
+                      style: TextStyle(
+                        color: AppColors.accent,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
