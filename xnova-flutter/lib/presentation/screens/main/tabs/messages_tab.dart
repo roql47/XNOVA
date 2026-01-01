@@ -653,9 +653,13 @@ class _SpyReportDetail extends StatelessWidget {
   }
 
   List<Widget> _buildBuildingsOrResearchItems(Map<String, dynamic> data) {
-    final entries = data.entries.where((e) => _toInt(e.value) > 0).toList();
+    // _empty 플래그 체크 (모든 레벨이 0인 경우)
+    if (data.containsKey('_empty')) {
+      return [const Text('모두 Lv.0', style: TextStyle(color: AppColors.textMuted, fontSize: 11))];
+    }
+    final entries = data.entries.where((e) => !e.key.startsWith('_') && _toInt(e.value) > 0).toList();
     if (entries.isEmpty) {
-      return [const Text('정보 없음', style: TextStyle(color: AppColors.textMuted, fontSize: 11))];
+      return [const Text('모두 Lv.0', style: TextStyle(color: AppColors.textMuted, fontSize: 11))];
     }
     return entries.map((e) {
       final name = GameConstants.getName(e.key);

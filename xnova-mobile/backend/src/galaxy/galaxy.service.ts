@@ -367,15 +367,19 @@ export class GalaxyService {
 
     // ST 5~6: 자원 + 함대 + 방어시설 + 건물
     if (stScore >= 5) {
-      report.buildings = {
+      const buildings = {
         ...this.filterNonZero(target.mines),
         ...this.filterNonZero(target.facilities),
       };
+      // 빈 객체라도 섹션 표시 (모든 건물이 0레벨인 경우)
+      report.buildings = Object.keys(buildings).length > 0 ? buildings : { _empty: 0 };
     }
 
     // ST ≥ 7: 모든 정보 + 연구
     if (stScore >= 7) {
-      report.research = this.filterNonZero(target.researchLevels);
+      const research = this.filterNonZero(target.researchLevels);
+      // 빈 객체라도 섹션 표시 (모든 연구가 0레벨인 경우)
+      report.research = Object.keys(research).length > 0 ? research : { _empty: 0 };
     }
 
     return report;

@@ -271,13 +271,15 @@ let GalaxyService = class GalaxyService {
             report.defense = this.filterNonZero(target.defense);
         }
         if (stScore >= 5) {
-            report.buildings = {
+            const buildings = {
                 ...this.filterNonZero(target.mines),
                 ...this.filterNonZero(target.facilities),
             };
+            report.buildings = Object.keys(buildings).length > 0 ? buildings : { _empty: 0 };
         }
         if (stScore >= 7) {
-            report.research = this.filterNonZero(target.researchLevels);
+            const research = this.filterNonZero(target.researchLevels);
+            report.research = Object.keys(research).length > 0 ? research : { _empty: 0 };
         }
         return report;
     }
