@@ -254,10 +254,10 @@ let GalaxyService = class GalaxyService {
         content += `정찰 위성: ${report.probesSurvived}대 귀환, ${report.probesLost}대 손실\n\n`;
         if (report.resources) {
             content += `【 자원 현황 】\n`;
-            content += `메탈: ${report.resources.metal.toLocaleString()}\n`;
-            content += `크리스탈: ${report.resources.crystal.toLocaleString()}\n`;
-            content += `듀테륨: ${report.resources.deuterium.toLocaleString()}\n`;
-            content += `에너지: ${report.resources.energy.toLocaleString()}\n\n`;
+            content += `메탈: ${Math.floor(report.resources.metal).toLocaleString()}\n`;
+            content += `크리스탈: ${Math.floor(report.resources.crystal).toLocaleString()}\n`;
+            content += `듀테륨: ${Math.floor(report.resources.deuterium).toLocaleString()}\n`;
+            content += `에너지: ${Math.floor(report.resources.energy).toLocaleString()}\n\n`;
         }
         if (report.fleet) {
             content += `【 함대 】\n`;
@@ -287,17 +287,27 @@ let GalaxyService = class GalaxyService {
         }
         if (report.buildings) {
             content += `【 건물 】\n`;
-            for (const [key, value] of Object.entries(report.buildings)) {
-                const name = game_data_1.NAME_MAPPING[key] || key;
-                content += `${name}: Lv.${value}\n`;
+            if (Object.keys(report.buildings).length === 0) {
+                content += `건물 정보 없음\n`;
+            }
+            else {
+                for (const [key, value] of Object.entries(report.buildings)) {
+                    const name = game_data_1.NAME_MAPPING[key] || key;
+                    content += `${name}: Lv.${value}\n`;
+                }
             }
             content += `\n`;
         }
         if (report.research) {
             content += `【 연구 】\n`;
-            for (const [key, value] of Object.entries(report.research)) {
-                const name = game_data_1.NAME_MAPPING[key] || key;
-                content += `${name}: Lv.${value}\n`;
+            if (Object.keys(report.research).length === 0) {
+                content += `연구 정보 없음\n`;
+            }
+            else {
+                for (const [key, value] of Object.entries(report.research)) {
+                    const name = game_data_1.NAME_MAPPING[key] || key;
+                    content += `${name}: Lv.${value}\n`;
+                }
             }
         }
         return content;

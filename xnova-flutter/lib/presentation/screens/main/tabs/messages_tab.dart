@@ -138,6 +138,34 @@ class _MessageCard extends ConsumerWidget {
   }
 
   Widget _buildBattleSummary(Map<String, dynamic> metadata) {
+    // 정찰 보고서인 경우
+    final metaType = metadata['type'] as String?;
+    if (metaType == 'spy') {
+      final report = metadata['report'] as Map<String, dynamic>?;
+      final targetName = report?['targetName'] ?? '알 수 없음';
+      return Text(
+        '정찰 대상: $targetName',
+        style: TextStyle(
+          color: AppColors.infoBlue,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+    }
+    
+    // 정찰 알림인 경우
+    if (metaType == 'spy_alert') {
+      final attackerCoord = metadata['attackerCoord'] ?? '?:?:?';
+      return Text(
+        '정찰 발원지: $attackerCoord',
+        style: TextStyle(
+          color: AppColors.warning,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      );
+    }
+    
     final resultType = metadata['resultType'] as String? ?? '알 수 없음';
     final isAttacker = metadata['isAttacker'] as bool? ?? true;
     
@@ -164,10 +192,91 @@ class _MessageCard extends ConsumerWidget {
 
   void _showMessageDetail(BuildContext context, Message message) {
     if (message.type == 'battle' && message.metadata != null) {
-      _showBattleReportDialog(context, message);
+      final metaType = message.metadata!['type'] as String?;
+      if (metaType == 'spy' || metaType == 'spy_alert') {
+        _showSpyReportDialog(context, message);
+      } else {
+        _showBattleReportDialog(context, message);
+      }
     } else {
       _showNormalMessageDialog(context, message);
     }
+  }
+
+  void _showSpyReportDialog(BuildContext context, Message message) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: AppColors.panelBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+            maxWidth: MediaQuery.of(context).size.width * 0.95,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 헤더
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.radar, color: AppColors.infoBlue, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            message.title,
+                            style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '보낸이: ${message.senderName}',
+                            style: TextStyle(color: AppColors.textMuted, fontSize: 10),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: AppColors.textMuted, size: 20),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              // 정찰 보고서 내용
+              Flexible(
+                child: SingleChildScrollView(
+                  child: _SpyReportDetail(metadata: message.metadata!),
+                ),
+              ),
+              // 닫기 버튼
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.infoBlue,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Text('닫기'),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _showNormalMessageDialog(BuildContext context, Message message) {
@@ -279,6 +388,299 @@ class _MessageCard extends ConsumerWidget {
         ),
       ),
     );
+  }
+}
+
+class _SpyReportDetail extends StatelessWidget {
+  final Map<String, dynamic> metadata;
+
+  const _SpyReportDetail({required this.metadata});
+
+  @override
+  Widget build(BuildContext context) {
+    final metaType = metadata['type'] as String?;
+    
+    // 정찰 알림 (피정찰자에게)
+    if (metaType == 'spy_alert') {
+      final attackerCoord = metadata['attackerCoord'] ?? '?:?:?';
+      return Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.warning.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '정찰 감지!',
+                          style: TextStyle(color: AppColors.warning, fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '좌표 $attackerCoord에서 정찰 위성이 발견되었습니다.',
+                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                '⚠️ 누군가 당신의 행성을 정찰했습니다.\n공격이 임박했을 수 있으니 방어 준비를 하세요!',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 11, height: 1.5),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // 정찰 보고서 (정찰자에게)
+    final report = metadata['report'] as Map<String, dynamic>?;
+    if (report == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(20),
+          child: Text('정찰 데이터가 없습니다.', style: TextStyle(color: AppColors.textMuted)),
+        ),
+      );
+    }
+
+    final targetName = report['targetName'] ?? '알 수 없음';
+    final targetCoord = report['targetCoord'] ?? '?:?:?';
+    final probesLost = report['probesLost'] ?? 0;
+    final probesSurvived = report['probesSurvived'] ?? 0;
+    final resources = report['resources'] as Map<String, dynamic>?;
+    final fleet = report['fleet'] as Map<String, dynamic>?;
+    final defense = report['defense'] as Map<String, dynamic>?;
+    final buildings = report['buildings'] as Map<String, dynamic>?;
+    final research = report['research'] as Map<String, dynamic>?;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 대상 정보
+        Container(
+          margin: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.panelBorder),
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.location_on, color: AppColors.accent, size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$targetName [$targetCoord]',
+                    style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '정찰 위성: $probesSurvived대 귀환, $probesLost대 손실',
+                style: TextStyle(
+                  color: probesLost > 0 ? AppColors.negative : AppColors.positive,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        // 자원 현황
+        if (resources != null)
+          _buildSpySection(
+            '자원 현황',
+            Icons.inventory_2,
+            AppColors.resourceMetal,
+            [
+              _buildResourceItem('메탈', _toInt(resources['metal']), AppColors.resourceMetal),
+              _buildResourceItem('크리스탈', _toInt(resources['crystal']), AppColors.resourceCrystal),
+              _buildResourceItem('듀테륨', _toInt(resources['deuterium']), AppColors.resourceDeuterium),
+              _buildResourceItem('에너지', _toInt(resources['energy']), AppColors.resourceEnergy),
+            ],
+          ),
+        
+        // 함대
+        if (fleet != null)
+          _buildSpySection(
+            '함대',
+            Icons.rocket_launch,
+            AppColors.accent,
+            _buildFleetOrDefenseItems(fleet, true),
+          ),
+        
+        // 방어시설
+        if (defense != null)
+          _buildSpySection(
+            '방어시설',
+            Icons.shield,
+            AppColors.positive,
+            _buildFleetOrDefenseItems(defense, false),
+          ),
+        
+        // 건물
+        if (buildings != null)
+          _buildSpySection(
+            '건물',
+            Icons.apartment,
+            AppColors.warning,
+            _buildBuildingsOrResearchItems(buildings),
+          ),
+        
+        // 연구
+        if (research != null)
+          _buildSpySection(
+            '연구',
+            Icons.science,
+            AppColors.resourceCrystal,
+            _buildBuildingsOrResearchItems(research),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildSpySection(String title, IconData icon, Color color, List<Widget> children) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.panelBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(7)),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: color, size: 16),
+                const SizedBox(width: 8),
+                Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: children.isEmpty
+                ? Text('정보 없음', style: TextStyle(color: AppColors.textMuted, fontSize: 11))
+                : Column(children: children),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResourceItem(String name, int value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(name, style: TextStyle(color: color, fontSize: 11)),
+          Text(_formatNumber(value), style: const TextStyle(color: AppColors.textPrimary, fontSize: 11, fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildFleetOrDefenseItems(Map<String, dynamic> data, bool isFleet) {
+    final entries = data.entries.where((e) => _toInt(e.value) > 0).toList();
+    if (entries.isEmpty) {
+      return [Text(isFleet ? '함대 없음' : '방어시설 없음', style: TextStyle(color: AppColors.textMuted, fontSize: 11))];
+    }
+    return entries.map((e) {
+      final name = GameConstants.getName(e.key);
+      final count = _toInt(e.value);
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(name, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+            Text(_formatNumber(count), style: const TextStyle(color: AppColors.textPrimary, fontSize: 11, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      );
+    }).toList();
+  }
+
+  List<Widget> _buildBuildingsOrResearchItems(Map<String, dynamic> data) {
+    final entries = data.entries.where((e) => _toInt(e.value) > 0).toList();
+    if (entries.isEmpty) {
+      return [const Text('정보 없음', style: TextStyle(color: AppColors.textMuted, fontSize: 11))];
+    }
+    return entries.map((e) {
+      final name = GameConstants.getName(e.key);
+      final level = _toInt(e.value);
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(name, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+            Text('Lv.$level', style: const TextStyle(color: AppColors.accent, fontSize: 11, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      );
+    }).toList();
+  }
+
+  int _toInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
+  }
+
+  String _formatNumber(int num) {
+    if (num == 0) return '0';
+    final str = num.toString();
+    final buffer = StringBuffer();
+    int count = 0;
+    for (int i = str.length - 1; i >= 0; i--) {
+      buffer.write(str[i]);
+      count++;
+      if (count % 3 == 0 && i > 0) {
+        buffer.write(',');
+      }
+    }
+    return buffer.toString().split('').reversed.join();
   }
 }
 
