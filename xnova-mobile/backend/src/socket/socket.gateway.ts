@@ -11,6 +11,7 @@ import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { ChatService } from '../chat/chat.service';
+import { UserService } from '../user/user.service';
 
 interface ConnectedUser {
   odId: string;
@@ -35,6 +36,7 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private jwtService: JwtService,
     private configService: ConfigService,
     private chatService: ChatService,
+    private userService: UserService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -51,7 +53,10 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
 
       const userId = payload.sub;
-      const playerName = payload.playerName || 'Unknown';
+      
+      // DB에서 사용자 정보 조회
+      const user = await this.userService.findById(userId);
+      const playerName = user?.playerName || 'Unknown';
       
       // 사용자를 자신의 room에 조인
       client.join(`user:${userId}`);
@@ -62,10 +67,10 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
         playerName,
       });
 
-      console.log(`User connected: ${userId} (socket: ${client.id})`);
+      console.log(`User connected: ${playerName} (${userId}, socket: ${client.id})`);
       
       // 연결 성공 알림
-      client.emit('connected', { message: '연결되었습니다.' });
+      client.emit('connected', { message: '연결되었습니다.', playerName });
     } catch (error) {
       console.log('Socket authentication failed:', error.message);
       client.disconnect();

@@ -18,17 +18,20 @@ const socket_io_1 = require("socket.io");
 const jwt_1 = require("@nestjs/jwt");
 const config_1 = require("@nestjs/config");
 const chat_service_1 = require("../chat/chat.service");
+const user_service_1 = require("../user/user.service");
 let SocketGateway = class SocketGateway {
     jwtService;
     configService;
     chatService;
+    userService;
     server;
     connectedUsers = new Map();
     chatUsers = new Set();
-    constructor(jwtService, configService, chatService) {
+    constructor(jwtService, configService, chatService, userService) {
         this.jwtService = jwtService;
         this.configService = configService;
         this.chatService = chatService;
+        this.userService = userService;
     }
     async handleConnection(client) {
         try {
@@ -41,15 +44,16 @@ let SocketGateway = class SocketGateway {
                 secret: this.configService.get('jwt.secret'),
             });
             const userId = payload.sub;
-            const playerName = payload.playerName || 'Unknown';
+            const user = await this.userService.findById(userId);
+            const playerName = user?.playerName || 'Unknown';
             client.join(`user:${userId}`);
             this.connectedUsers.set(client.id, {
                 odId: client.id,
                 userId,
                 playerName,
             });
-            console.log(`User connected: ${userId} (socket: ${client.id})`);
-            client.emit('connected', { message: '연결되었습니다.' });
+            console.log(`User connected: ${playerName} (${userId}, socket: ${client.id})`);
+            client.emit('connected', { message: '연결되었습니다.', playerName });
         }
         catch (error) {
             console.log('Socket authentication failed:', error.message);
@@ -246,6 +250,7 @@ exports.SocketGateway = SocketGateway = __decorate([
     }),
     __metadata("design:paramtypes", [jwt_1.JwtService,
         config_1.ConfigService,
-        chat_service_1.ChatService])
+        chat_service_1.ChatService,
+        user_service_1.UserService])
 ], SocketGateway);
 //# sourceMappingURL=socket.gateway.js.map

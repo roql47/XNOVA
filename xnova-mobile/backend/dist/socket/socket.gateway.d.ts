@@ -3,14 +3,16 @@ import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { ChatService } from '../chat/chat.service';
+import { UserService } from '../user/user.service';
 export declare class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private jwtService;
     private configService;
     private chatService;
+    private userService;
     server: Server;
     private connectedUsers;
     private chatUsers;
-    constructor(jwtService: JwtService, configService: ConfigService, chatService: ChatService);
+    constructor(jwtService: JwtService, configService: ConfigService, chatService: ChatService, userService: UserService);
     handleConnection(client: Socket): Promise<void>;
     handleDisconnect(client: Socket): void;
     handleJoinChat(client: Socket): Promise<void>;
