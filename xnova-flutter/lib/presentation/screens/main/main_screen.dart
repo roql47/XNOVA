@@ -367,6 +367,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
               children: [
                 // 도움말 버튼
                 ListTile(
+                  dense: true,
+                  visualDensity: const VisualDensity(vertical: -2),
                   leading: const Icon(Icons.help_outline_rounded, color: AppColors.accent, size: 20),
                   title: const Text(
                     '도움말',
@@ -391,6 +393,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                 ),
                 // 설정 버튼
                 ListTile(
+                  dense: true,
+                  visualDensity: const VisualDensity(vertical: -2),
                   leading: const Icon(Icons.settings_rounded, color: AppColors.textSecondary, size: 20),
                   title: const Text(
                     '설정',
@@ -405,6 +409,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                 ),
                 // 로그아웃 버튼
                 ListTile(
+                  dense: true,
+                  visualDensity: const VisualDensity(vertical: -2),
                   leading: const Icon(Icons.logout, color: AppColors.negative, size: 20),
                   title: const Text(
                     '로그아웃',
