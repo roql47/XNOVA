@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../data/services/token_service.dart';
 import '../data/services/api_service.dart';
+import '../data/services/socket_service.dart';
 import '../data/models/models.dart';
 
 // ===== 서비스 Provider =====
@@ -928,5 +929,108 @@ class MessageNotifier extends StateNotifier<MessageState> {
 final messageProvider = StateNotifierProvider<MessageNotifier, MessageState>((ref) {
   final apiService = ref.watch(apiServiceProvider);
   return MessageNotifier(apiService);
+});
+
+// ===== 소켓 서비스 Provider =====
+final socketServiceProvider = Provider<SocketService>((ref) {
+  final tokenService = ref.watch(tokenServiceProvider);
+  return SocketService(tokenService: tokenService);
+});
+
+// ===== 채팅 상태 =====
+class ChatState {
+  final List<ChatMessage> messages;
+  final bool isConnected;
+  final bool isLoading;
+  final int userCount;
+  final String? error;
+
+  ChatState({
+    this.messages = const [],
+    this.isConnected = false,
+    this.isLoading = false,
+    this.userCount = 0,
+    this.error,
+  });
+
+  ChatState copyWith({
+    List<ChatMessage>? messages,
+    bool? isConnected,
+    bool? isLoading,
+    int? userCount,
+    String? error,
+  }) {
+    return ChatState(
+      messages: messages ?? this.messages,
+      isConnected: isConnected ?? this.isConnected,
+      isLoading: isLoading ?? this.isLoading,
+      userCount: userCount ?? this.userCount,
+      error: error,
+    );
+  }
+}
+
+class ChatNotifier extends StateNotifier<ChatState> {
+  final SocketService _socketService;
+  final String? _currentUserId;
+
+  ChatNotifier(this._socketService, this._currentUserId) : super(ChatState()) {
+    _setupListeners();
+  }
+
+  void _setupListeners() {
+    _socketService.connectionStream.listen((connected) {
+      state = state.copyWith(isConnected: connected);
+    });
+
+    _socketService.chatHistoryStream.listen((messages) {
+      state = state.copyWith(messages: messages, isLoading: false);
+    });
+
+    _socketService.chatMessageStream.listen((message) {
+      // 새 메시지 추가
+      final updatedMessages = [...state.messages, message];
+      // 최근 50개만 유지
+      if (updatedMessages.length > 50) {
+        updatedMessages.removeAt(0);
+      }
+      state = state.copyWith(messages: updatedMessages);
+    });
+
+    _socketService.userCountStream.listen((count) {
+      state = state.copyWith(userCount: count);
+    });
+  }
+
+  Future<void> connect() async {
+    state = state.copyWith(isLoading: true);
+    await _socketService.connect();
+  }
+
+  void joinChat() {
+    _socketService.joinChat();
+  }
+
+  void leaveChat() {
+    _socketService.leaveChat();
+  }
+
+  void sendMessage(String message) {
+    if (message.trim().isNotEmpty) {
+      _socketService.sendChatMessage(message);
+    }
+  }
+
+  void disconnect() {
+    _socketService.disconnect();
+  }
+
+  String? get currentUserId => _currentUserId;
+}
+
+final chatProvider = StateNotifierProvider<ChatNotifier, ChatState>((ref) {
+  final socketService = ref.watch(socketServiceProvider);
+  final authState = ref.watch(authProvider);
+  return ChatNotifier(socketService, authState.user?.id);
 });
 

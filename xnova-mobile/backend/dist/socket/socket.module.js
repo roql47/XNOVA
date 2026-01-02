@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const jwt_1 = require("@nestjs/jwt");
 const config_1 = require("@nestjs/config");
 const socket_gateway_1 = require("./socket.gateway");
+const chat_module_1 = require("../chat/chat.module");
 let SocketModule = class SocketModule {
 };
 exports.SocketModule = SocketModule;
@@ -24,6 +25,7 @@ exports.SocketModule = SocketModule = __decorate([
                 }),
                 inject: [config_1.ConfigService],
             }),
+            chat_module_1.ChatModule,
         ],
         providers: [socket_gateway_1.SocketGateway],
         exports: [socket_gateway_1.SocketGateway],

@@ -17,14 +17,18 @@ const websockets_1 = require("@nestjs/websockets");
 const socket_io_1 = require("socket.io");
 const jwt_1 = require("@nestjs/jwt");
 const config_1 = require("@nestjs/config");
+const chat_service_1 = require("../chat/chat.service");
 let SocketGateway = class SocketGateway {
     jwtService;
     configService;
+    chatService;
     server;
     connectedUsers = new Map();
-    constructor(jwtService, configService) {
+    chatUsers = new Set();
+    constructor(jwtService, configService, chatService) {
         this.jwtService = jwtService;
         this.configService = configService;
+        this.chatService = chatService;
     }
     async handleConnection(client) {
         try {
@@ -37,10 +41,12 @@ let SocketGateway = class SocketGateway {
                 secret: this.configService.get('jwt.secret'),
             });
             const userId = payload.sub;
+            const playerName = payload.playerName || 'Unknown';
             client.join(`user:${userId}`);
             this.connectedUsers.set(client.id, {
                 odId: client.id,
                 userId,
+                playerName,
             });
             console.log(`User connected: ${userId} (socket: ${client.id})`);
             client.emit('connected', { message: '연결되었습니다.' });
@@ -55,7 +61,61 @@ let SocketGateway = class SocketGateway {
         if (user) {
             console.log(`User disconnected: ${user.userId} (socket: ${client.id})`);
             this.connectedUsers.delete(client.id);
+            this.chatUsers.delete(client.id);
+            this.broadcastChatUserCount();
         }
+    }
+    async handleJoinChat(client) {
+        const user = this.connectedUsers.get(client.id);
+        if (!user) {
+            client.emit('error', { message: '인증이 필요합니다.' });
+            return;
+        }
+        client.join('global_chat');
+        this.chatUsers.add(client.id);
+        console.log(`User ${user.playerName} joined global chat`);
+        const recentMessages = await this.chatService.getRecentMessages(50);
+        client.emit('chat_history', recentMessages);
+        this.broadcastChatUserCount();
+        client.emit('chat_joined', {
+            message: '채팅방에 입장했습니다.',
+            userCount: this.chatUsers.size,
+        });
+    }
+    handleLeaveChat(client) {
+        const user = this.connectedUsers.get(client.id);
+        if (user) {
+            client.leave('global_chat');
+            this.chatUsers.delete(client.id);
+            console.log(`User ${user.playerName} left global chat`);
+            this.broadcastChatUserCount();
+        }
+    }
+    async handleSendChat(client, data) {
+        const user = this.connectedUsers.get(client.id);
+        if (!user) {
+            client.emit('error', { message: '인증이 필요합니다.' });
+            return;
+        }
+        if (!data.message || data.message.trim().length === 0) {
+            return;
+        }
+        const message = data.message.trim().substring(0, 200);
+        const savedMessage = await this.chatService.saveMessage(user.userId, user.playerName || 'Unknown', message);
+        this.server.to('global_chat').emit('new_chat_message', {
+            senderId: user.userId,
+            senderName: user.playerName,
+            message: message,
+            timestamp: savedMessage.timestamp,
+        });
+        this.chatService.cleanupOldMessages().catch(err => {
+            console.error('Failed to cleanup old messages:', err);
+        });
+    }
+    broadcastChatUserCount() {
+        this.server.to('global_chat').emit('chat_user_count', {
+            count: this.chatUsers.size,
+        });
     }
     sendToUser(userId, event, data) {
         this.server.to(`user:${userId}`).emit(event, data);
@@ -142,6 +202,28 @@ __decorate([
     __metadata("design:type", socket_io_1.Server)
 ], SocketGateway.prototype, "server", void 0);
 __decorate([
+    (0, websockets_1.SubscribeMessage)('join_chat'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket]),
+    __metadata("design:returntype", Promise)
+], SocketGateway.prototype, "handleJoinChat", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('leave_chat'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket]),
+    __metadata("design:returntype", void 0)
+], SocketGateway.prototype, "handleLeaveChat", null);
+__decorate([
+    (0, websockets_1.SubscribeMessage)('send_chat'),
+    __param(0, (0, websockets_1.ConnectedSocket)()),
+    __param(1, (0, websockets_1.MessageBody)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [socket_io_1.Socket, Object]),
+    __metadata("design:returntype", Promise)
+], SocketGateway.prototype, "handleSendChat", null);
+__decorate([
     (0, websockets_1.SubscribeMessage)('ping'),
     __param(0, (0, websockets_1.ConnectedSocket)()),
     __metadata("design:type", Function),
@@ -163,6 +245,7 @@ exports.SocketGateway = SocketGateway = __decorate([
         namespace: '/game',
     }),
     __metadata("design:paramtypes", [jwt_1.JwtService,
-        config_1.ConfigService])
+        config_1.ConfigService,
+        chat_service_1.ChatService])
 ], SocketGateway);
 //# sourceMappingURL=socket.gateway.js.map

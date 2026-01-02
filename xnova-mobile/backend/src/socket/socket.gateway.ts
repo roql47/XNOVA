@@ -10,10 +10,12 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { ChatService } from '../chat/chat.service';
 
 interface ConnectedUser {
   odId: string;
   userId: string;
+  playerName?: string;
 }
 
 @WebSocketGateway({
@@ -27,10 +29,12 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   private connectedUsers: Map<string, ConnectedUser> = new Map();
+  private chatUsers: Set<string> = new Set(); // 채팅방에 있는 소켓 ID
 
   constructor(
     private jwtService: JwtService,
     private configService: ConfigService,
+    private chatService: ChatService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -47,6 +51,7 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
 
       const userId = payload.sub;
+      const playerName = payload.playerName || 'Unknown';
       
       // 사용자를 자신의 room에 조인
       client.join(`user:${userId}`);
@@ -54,6 +59,7 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.connectedUsers.set(client.id, {
         odId: client.id,
         userId,
+        playerName,
       });
 
       console.log(`User connected: ${userId} (socket: ${client.id})`);
@@ -71,8 +77,106 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (user) {
       console.log(`User disconnected: ${user.userId} (socket: ${client.id})`);
       this.connectedUsers.delete(client.id);
+      this.chatUsers.delete(client.id);
+      
+      // 채팅 유저 수 업데이트 브로드캐스트
+      this.broadcastChatUserCount();
     }
   }
+
+  // ===== 채팅 관련 =====
+
+  // 채팅방 입장
+  @SubscribeMessage('join_chat')
+  async handleJoinChat(@ConnectedSocket() client: Socket) {
+    const user = this.connectedUsers.get(client.id);
+    if (!user) {
+      client.emit('error', { message: '인증이 필요합니다.' });
+      return;
+    }
+
+    // 전체 채팅방에 조인
+    client.join('global_chat');
+    this.chatUsers.add(client.id);
+
+    console.log(`User ${user.playerName} joined global chat`);
+
+    // 최근 50개 메시지 전송
+    const recentMessages = await this.chatService.getRecentMessages(50);
+    client.emit('chat_history', recentMessages);
+
+    // 채팅 유저 수 브로드캐스트
+    this.broadcastChatUserCount();
+
+    // 입장 알림
+    client.emit('chat_joined', { 
+      message: '채팅방에 입장했습니다.',
+      userCount: this.chatUsers.size,
+    });
+  }
+
+  // 채팅방 퇴장
+  @SubscribeMessage('leave_chat')
+  handleLeaveChat(@ConnectedSocket() client: Socket) {
+    const user = this.connectedUsers.get(client.id);
+    if (user) {
+      client.leave('global_chat');
+      this.chatUsers.delete(client.id);
+      console.log(`User ${user.playerName} left global chat`);
+      
+      // 채팅 유저 수 브로드캐스트
+      this.broadcastChatUserCount();
+    }
+  }
+
+  // 메시지 전송
+  @SubscribeMessage('send_chat')
+  async handleSendChat(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { message: string },
+  ) {
+    const user = this.connectedUsers.get(client.id);
+    if (!user) {
+      client.emit('error', { message: '인증이 필요합니다.' });
+      return;
+    }
+
+    if (!data.message || data.message.trim().length === 0) {
+      return;
+    }
+
+    // 메시지 길이 제한 (200자)
+    const message = data.message.trim().substring(0, 200);
+
+    // 메시지 저장
+    const savedMessage = await this.chatService.saveMessage(
+      user.userId,
+      user.playerName || 'Unknown',
+      message,
+    );
+
+    // 전체 채팅방에 브로드캐스트
+    this.server.to('global_chat').emit('new_chat_message', {
+      senderId: user.userId,
+      senderName: user.playerName,
+      message: message,
+      timestamp: savedMessage.timestamp,
+    });
+
+    // 오래된 메시지 정리 (비동기로 처리)
+    this.chatService.cleanupOldMessages().catch(err => {
+      console.error('Failed to cleanup old messages:', err);
+    });
+  }
+
+  // 채팅 유저 수 브로드캐스트
+  private broadcastChatUserCount() {
+    this.server.to('global_chat').emit('chat_user_count', {
+      count: this.chatUsers.size,
+    });
+  }
+
+  // ===== 기존 기능들 =====
 
   // 특정 사용자에게 알림 전송
   sendToUser(userId: string, event: string, data: any) {
@@ -174,4 +278,3 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 }
-

@@ -18,6 +18,7 @@ import 'tabs/messages_tab.dart';
 import 'tabs/ranking_tab.dart';
 import 'tabs/techtree_tab.dart';
 import 'tabs/simulator_tab.dart';
+import '../chat/chat_screen.dart';
 
 extension MainTabExtension on MainTab {
   IconData get icon {
@@ -62,13 +63,13 @@ class MainScreen extends ConsumerStatefulWidget {
   ConsumerState<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends ConsumerState<MainScreen> {
+class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObserver {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   
   // 가이드 튜토리얼용 GlobalKey들
   final GlobalKey _resourceBarKey = GlobalKey();
   final GlobalKey _menuButtonKey = GlobalKey();
-  final GlobalKey _refreshButtonKey = GlobalKey();
+  final GlobalKey _chatButtonKey = GlobalKey();
   final GlobalKey _tabContentKey = GlobalKey(); // 탭 컨텐츠 영역
   
   // 가이드 표시 상태
@@ -77,12 +78,21 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   // 설정 화면 표시 상태
   bool _showSettings = false;
   
+  // 채팅 화면 표시 상태
+  bool _showChat = false;
+  
   // 자동 완료 체크 타이머
   Timer? _autoCompleteTimer;
+  
+  // 마지막 백그라운드 진입 시간
+  DateTime? _lastPausedTime;
 
   @override
   void initState() {
     super.initState();
+    // 앱 Lifecycle 관찰자 등록
+    WidgetsBinding.instance.addObserver(this);
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(gameProvider.notifier).loadAllData();
       ref.read(gameProvider.notifier).loadProfile();
@@ -95,8 +105,65 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   
   @override
   void dispose() {
+    // 앱 Lifecycle 관찰자 해제
+    WidgetsBinding.instance.removeObserver(this);
     _autoCompleteTimer?.cancel();
     super.dispose();
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+        // 앱이 백그라운드로 갈 때 시간 기록
+        _lastPausedTime = DateTime.now();
+        _autoCompleteTimer?.cancel();
+        break;
+        
+      case AppLifecycleState.resumed:
+        // 앱이 포그라운드로 돌아왔을 때
+        _onAppResumed();
+        break;
+        
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        // 앱이 완전히 종료될 때
+        _autoCompleteTimer?.cancel();
+        break;
+    }
+  }
+  
+  /// 앱이 포그라운드로 돌아왔을 때 실행
+  Future<void> _onAppResumed() async {
+    // 백그라운드에서 일정 시간(1분) 이상 있었으면 전체 재연결
+    final shouldFullReconnect = _lastPausedTime != null &&
+        DateTime.now().difference(_lastPausedTime!).inMinutes >= 1;
+    
+    if (shouldFullReconnect) {
+      debugPrint('[MainScreen] 백그라운드에서 복귀 - 전체 데이터 재로드');
+      
+      // 인증 상태 먼저 확인
+      await ref.read(authProvider.notifier).checkAuth();
+      
+      // 인증이 유효하면 게임 데이터 재로드
+      final authState = ref.read(authProvider);
+      if (authState.isAuthenticated) {
+        await ref.read(gameProvider.notifier).loadAllData();
+        await ref.read(gameProvider.notifier).loadProfile();
+        await ref.read(messageProvider.notifier).loadMessages();
+      }
+    } else {
+      debugPrint('[MainScreen] 백그라운드에서 복귀 - 리소스만 새로고침');
+      // 짧은 백그라운드 시간이면 리소스만 업데이트
+      await ref.read(gameProvider.notifier).loadResources();
+    }
+    
+    // 자동 완료 타이머 재시작
+    _startAutoCompleteTimer();
+    _lastPausedTime = null;
   }
   
   void _startAutoCompleteTimer() {
@@ -147,6 +214,17 @@ class _MainScreenState extends ConsumerState<MainScreen> {
           });
           ref.read(authProvider.notifier).logout();
           widget.onLogout();
+        },
+      );
+    }
+
+    // 채팅 화면 표시
+    if (_showChat) {
+      return ChatScreen(
+        onClose: () {
+          setState(() {
+            _showChat = false;
+          });
         },
       );
     }
@@ -270,9 +348,13 @@ class _MainScreenState extends ConsumerState<MainScreen> {
             ),
           ),
           IconButton(
-            key: _refreshButtonKey,
-            icon: const Icon(Icons.refresh, color: AppColors.textMuted, size: 20),
-            onPressed: () => ref.read(gameProvider.notifier).loadAllData(),
+            key: _chatButtonKey,
+            icon: const Icon(Icons.chat_bubble_outline, color: AppColors.accent, size: 20),
+            onPressed: () {
+              setState(() {
+                _showChat = true;
+              });
+            },
           ),
         ],
       ),
