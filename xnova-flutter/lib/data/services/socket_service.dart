@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import '../../core/constants/api_constants.dart';
 import 'token_service.dart';
 
 class ChatMessage {
@@ -28,8 +29,6 @@ class ChatMessage {
 }
 
 class SocketService {
-  static const String _baseUrl = 'https://xnova.duckdns.org';
-  
   IO.Socket? _socket;
   final TokenService _tokenService;
   
@@ -62,7 +61,7 @@ class SocketService {
     }
 
     _socket = IO.io(
-      '$_baseUrl/game',
+      '${ApiConstants.socketUrl}/game',
       IO.OptionBuilder()
           .setTransports(['websocket'])
           .enableAutoConnect()
