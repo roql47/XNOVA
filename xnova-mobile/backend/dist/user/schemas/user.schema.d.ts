@@ -104,12 +104,18 @@ export declare class ReturnProgress {
     loot: Record<string, number>;
     returnTime: Date;
 }
+export declare class VacationMode {
+    isActive: boolean;
+    startTime: Date | null;
+    minEndTime: Date | null;
+}
 export declare class User {
     email: string;
     password?: string;
     googleId?: string;
     playerName: string;
     coordinate: string;
+    vacationMode: VacationMode;
     resources: Resources;
     mines: Mines;
     facilities: Facilities;
@@ -125,6 +131,7 @@ export declare class User {
     pendingReturn: ReturnProgress | null;
     incomingAttack: AttackProgress | null;
     lastResourceUpdate: Date;
+    lastActivity: Date;
 }
 export declare const UserSchema: import("mongoose").Schema<User, import("mongoose").Model<User, any, any, any, Document<unknown, any, User, any, import("mongoose").DefaultSchemaOptions> & User & {
     _id: import("mongoose").Types.ObjectId;
@@ -176,6 +183,15 @@ export declare const UserSchema: import("mongoose").Schema<User, import("mongoos
         id: string;
     }> | undefined;
     coordinate?: import("mongoose").SchemaDefinitionProperty<string, User, Document<unknown, {}, User, {
+        id: string;
+    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
+        _id: import("mongoose").Types.ObjectId;
+    } & {
+        __v: number;
+    }, "id"> & {
+        id: string;
+    }> | undefined;
+    vacationMode?: import("mongoose").SchemaDefinitionProperty<VacationMode, User, Document<unknown, {}, User, {
         id: string;
     }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
         _id: import("mongoose").Types.ObjectId;
@@ -311,6 +327,15 @@ export declare const UserSchema: import("mongoose").Schema<User, import("mongoos
         id: string;
     }> | undefined;
     lastResourceUpdate?: import("mongoose").SchemaDefinitionProperty<Date, User, Document<unknown, {}, User, {
+        id: string;
+    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
+        _id: import("mongoose").Types.ObjectId;
+    } & {
+        __v: number;
+    }, "id"> & {
+        id: string;
+    }> | undefined;
+    lastActivity?: import("mongoose").SchemaDefinitionProperty<Date, User, Document<unknown, {}, User, {
         id: string;
     }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
         _id: import("mongoose").Types.ObjectId;

@@ -5,6 +5,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../providers/providers.dart';
 import '../../../../data/models/models.dart';
 import '../../../../core/constants/game_constants.dart';
+import '../../../../data/services/api_service.dart';
+import '../../../../data/services/token_service.dart';
 
 class MessagesTab extends ConsumerStatefulWidget {
   const MessagesTab({super.key});
@@ -532,9 +534,14 @@ class _MessageCard extends ConsumerWidget {
   }
 
   void _showNormalMessageDialog(BuildContext context, Message message) {
+    // 플레이어 메시지인 경우 발신자 좌표 추출
+    final senderCoordinate = message.type == 'player' && message.metadata != null
+        ? message.metadata!['senderCoordinate'] as String?
+        : null;
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: AppColors.panelBackground,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         title: Text(message.title, style: const TextStyle(color: AppColors.textPrimary, fontSize: 16)),
@@ -545,9 +552,20 @@ class _MessageCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  '보낸이: ${message.senderName}',
-                  style: TextStyle(color: AppColors.accent, fontSize: 11),
+                Row(
+                  children: [
+                    Text(
+                      '보낸이: ${message.senderName}',
+                      style: TextStyle(color: AppColors.accent, fontSize: 11),
+                    ),
+                    if (senderCoordinate != null) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        '[$senderCoordinate]',
+                        style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                      ),
+                    ],
+                  ],
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -560,12 +578,173 @@ class _MessageCard extends ConsumerWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: Text('닫기', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          // 플레이어 메시지인 경우 답장 버튼 표시
+          if (senderCoordinate != null)
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _showReplyDialog(context, message.senderName, senderCoordinate);
+              },
+              icon: const Icon(Icons.reply, size: 16),
+              label: const Text('답장'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.white,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showReplyDialog(BuildContext context, String receiverName, String receiverCoordinate) {
+    final titleController = TextEditingController(text: 'Re: ');
+    final contentController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.panelBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        title: Row(
+          children: [
+            Icon(Icons.reply, color: AppColors.accent, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '$receiverName에게 답장',
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '좌표: $receiverCoordinate',
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: titleController,
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: '제목',
+                  labelStyle: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: AppColors.panelBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: AppColors.panelBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: AppColors.accent),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                maxLength: 100,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: contentController,
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: '내용',
+                  labelStyle: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: AppColors.panelBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: AppColors.panelBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: AppColors.accent),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                maxLines: 5,
+                maxLength: 2000,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text('취소', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _sendReply(context, receiverName, receiverCoordinate, titleController.text, contentController.text);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            child: const Text('보내기'),
           ),
         ],
       ),
     );
+  }
+
+  void _sendReply(BuildContext context, String receiverName, String receiverCoordinate, String title, String content) async {
+    if (title.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('제목을 입력해주세요.')),
+      );
+      return;
+    }
+    if (content.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('내용을 입력해주세요.')),
+      );
+      return;
+    }
+
+    try {
+      final apiService = ApiService(tokenService: TokenService());
+      final result = await apiService.sendMessage(
+        receiverCoordinate: receiverCoordinate,
+        title: title.trim(),
+        content: content.trim(),
+      );
+
+      if (result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$receiverName에게 답장을 보냈습니다.'),
+            backgroundColor: AppColors.positive,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? '메시지 전송에 실패했습니다.')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('메시지 전송 중 오류가 발생했습니다.')),
+      );
+    }
   }
 
   void _showBattleReportDialog(BuildContext context, Message message) {

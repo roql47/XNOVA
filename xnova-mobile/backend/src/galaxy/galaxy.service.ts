@@ -15,6 +15,7 @@ export interface PlanetInfo {
   hasDebris: boolean;
   debrisAmount?: { metal: number; crystal: number };
   hasMoon: boolean;
+  lastActivity: string | null;  // ISO 날짜 문자열
 }
 
 export interface SpyReport {
@@ -47,6 +48,8 @@ export class GalaxyService {
     const [players, debrisFields] = await Promise.all([
       this.userModel.find({ coordinate: pattern }).exec(),
       this.debrisModel.find({ coordinate: pattern }).exec(),
+      // 현재 사용자 활동 시간 업데이트
+      this.userModel.findByIdAndUpdate(currentUserId, { lastActivity: new Date() }).exec(),
     ]);
 
     // 행성 포인트 1~15 초기화
@@ -66,6 +69,7 @@ export class GalaxyService {
         hasDebris: !!debris && (debris.metal > 0 || debris.crystal > 0),
         debrisAmount: debris ? { metal: debris.metal, crystal: debris.crystal } : undefined,
         hasMoon: false, // TODO: 달 시스템 구현 시 추가
+        lastActivity: player?.lastActivity ? player.lastActivity.toISOString() : null,
       };
 
       planets.push(info);

@@ -149,7 +149,7 @@ let BuildingsService = class BuildingsService {
         const totalCost = (cost.metal || 0) + (cost.crystal || 0);
         const nanoBonus = Math.pow(2, nanoFactoryLevel);
         const facilityBonus = 1 + robotFactoryLevel;
-        return ((totalCost / (25 * facilityBonus * nanoBonus)) * 4) * 10;
+        return ((totalCost / (25 * facilityBonus * nanoBonus)) * 4) * 2;
     }
     async getBuildings(userId) {
         const user = await this.userModel.findById(userId).exec();

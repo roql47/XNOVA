@@ -34,6 +34,7 @@ let GalaxyService = class GalaxyService {
         const [players, debrisFields] = await Promise.all([
             this.userModel.find({ coordinate: pattern }).exec(),
             this.debrisModel.find({ coordinate: pattern }).exec(),
+            this.userModel.findByIdAndUpdate(currentUserId, { lastActivity: new Date() }).exec(),
         ]);
         const planets = [];
         for (let position = 1; position <= 15; position++) {
@@ -49,6 +50,7 @@ let GalaxyService = class GalaxyService {
                 hasDebris: !!debris && (debris.metal > 0 || debris.crystal > 0),
                 debrisAmount: debris ? { metal: debris.metal, crystal: debris.crystal } : undefined,
                 hasMoon: false,
+                lastActivity: player?.lastActivity ? player.lastActivity.toISOString() : null,
             };
             planets.push(info);
         }

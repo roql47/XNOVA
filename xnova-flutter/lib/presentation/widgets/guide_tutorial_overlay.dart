@@ -138,20 +138,29 @@ class _GuideTutorialOverlayState extends State<GuideTutorialOverlay>
   Widget build(BuildContext context) {
     final step = widget.steps[_currentStep];
     final targetRect = _getTargetRect();
+    final screenSize = MediaQuery.of(context).size;
 
-    return Material(
+    return Container(
+      width: screenSize.width,
+      height: screenSize.height,
       color: Colors.transparent,
       child: Stack(
+        fit: StackFit.expand,
         children: [
           // 어두운 오버레이 배경 (하이라이트 영역 제외)
           Positioned.fill(
             child: GestureDetector(
               onTap: () {}, // 배경 터치 무시
-              child: CustomPaint(
-                painter: _OverlayPainter(
-                  highlightRect: targetRect,
-                  overlayColor: Colors.black.withOpacity(0.85),
-                ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return CustomPaint(
+                    size: Size(constraints.maxWidth, constraints.maxHeight),
+                    painter: _OverlayPainter(
+                      highlightRect: targetRect,
+                      overlayColor: const Color(0xD9000000), // Colors.black.withOpacity(0.85)
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -215,22 +224,43 @@ class _GuideTutorialOverlayState extends State<GuideTutorialOverlay>
   }
 
   Widget _buildTooltip(GuideStep step, Rect? targetRect) {
-    return AnimatedBuilder(
-      animation: _animationController,
-      builder: (context, child) {
-        return Opacity(
-          opacity: _fadeAnimation.value,
-          child: Transform.scale(
-            scale: _scaleAnimation.value,
-            child: child,
-          ),
-        );
-      },
-      child: _TooltipContent(
-        step: step,
-        targetRect: targetRect,
-        currentStep: _currentStep,
-        totalSteps: widget.steps.length,
+    final screenSize = MediaQuery.of(context).size;
+    final padding = MediaQuery.of(context).padding;
+
+    // 툴팁 위치 계산
+    double top;
+    if (targetRect != null) {
+      final targetCenter = targetRect.center.dy;
+      final screenCenter = screenSize.height / 2;
+      if (targetCenter < screenCenter) {
+        top = targetRect.bottom + 20;
+      } else {
+        top = padding.top + 60;
+      }
+    } else {
+      top = screenSize.height * 0.25;
+    }
+
+    return Positioned(
+      top: top,
+      left: 24,
+      right: 24,
+      child: AnimatedBuilder(
+        animation: _animationController,
+        builder: (context, child) {
+          return Opacity(
+            opacity: _fadeAnimation.value,
+            child: Transform.scale(
+              scale: _scaleAnimation.value,
+              child: child,
+            ),
+          );
+        },
+        child: _TooltipContent(
+          step: step,
+          currentStep: _currentStep,
+          totalSteps: widget.steps.length,
+        ),
       ),
     );
   }
@@ -424,130 +454,98 @@ class _OverlayPainter extends CustomPainter {
 /// 툴팁 컨텐츠 위젯
 class _TooltipContent extends StatelessWidget {
   final GuideStep step;
-  final Rect? targetRect;
   final int currentStep;
   final int totalSteps;
 
   const _TooltipContent({
     required this.step,
-    this.targetRect,
     required this.currentStep,
     required this.totalSteps,
   });
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final padding = MediaQuery.of(context).padding;
-
-    // 툴팁 위치 계산
-    double top;
-    double left = 24;
-    double right = 24;
-
-    if (targetRect != null) {
-      // 타겟 아래 또는 위에 위치
-      final targetCenter = targetRect!.center.dy;
-      final screenCenter = screenSize.height / 2;
-
-      if (targetCenter < screenCenter) {
-        // 타겟이 상단에 있으면 아래에 표시
-        top = targetRect!.bottom + 20;
-      } else {
-        // 타겟이 하단에 있으면 위에 표시
-        top = padding.top + 60;
-      }
-    } else {
-      // 타겟이 없으면 중앙에 표시
-      top = screenSize.height * 0.25;
-    }
-
-    return Positioned(
-      top: top,
-      left: left,
-      right: right,
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: AppColors.panelBackground,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: AppColors.accent.withOpacity(0.3),
-            width: 1,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.accent.withOpacity(0.1),
-              blurRadius: 30,
-              spreadRadius: 0,
-            ),
-          ],
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: const Color(0xFF141A24), // AppColors.panelBackground
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0x4D00C896), // AppColors.accent.withOpacity(0.3)
+          width: 1,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 스텝 번호와 아이콘
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    '${currentStep + 1} / $totalSteps',
-                    style: TextStyle(
-                      color: AppColors.accent,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1A00C896), // AppColors.accent.withOpacity(0.1)
+            blurRadius: 30,
+            spreadRadius: 0,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 스텝 번호와 아이콘
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0x2600C896), // AppColors.accent.withOpacity(0.15)
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${currentStep + 1} / $totalSteps',
+                  style: const TextStyle(
+                    color: Color(0xFF00C896), // AppColors.accent
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const Spacer(),
-                if (step.icon != null)
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      step.icon,
-                      color: AppColors.accent,
-                      size: 20,
-                    ),
+              ),
+              const Spacer(),
+              if (step.icon != null)
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0x1A00C896), // AppColors.accent.withOpacity(0.1)
+                    borderRadius: BorderRadius.circular(10),
                   ),
-              ],
+                  child: Icon(
+                    step.icon,
+                    color: const Color(0xFF00C896), // AppColors.accent
+                    size: 20,
+                  ),
+                ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // 제목
+          Text(
+            step.title,
+            style: const TextStyle(
+              color: Color(0xFFE8ECF0), // AppColors.textPrimary
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.5,
             ),
+          ),
 
-            const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-            // 제목
-            Text(
-              step.title,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.5,
-              ),
+          // 설명
+          Text(
+            step.description,
+            style: const TextStyle(
+              color: Color(0xFF7A8A9A), // AppColors.textSecondary
+              fontSize: 14,
+              height: 1.6,
             ),
-
-            const SizedBox(height: 12),
-
-            // 설명
-            Text(
-              step.description,
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 14,
-                height: 1.6,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

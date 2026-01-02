@@ -120,6 +120,7 @@ export class ResourcesService {
     user.resources.deuterium += netDeuteriumProduction * hoursElapsed;
     user.resources.energy = energyProduction - energyConsumption;
     user.lastResourceUpdate = now;
+    user.lastActivity = now;  // 활동 시간 업데이트
 
     await user.save();
     return user;

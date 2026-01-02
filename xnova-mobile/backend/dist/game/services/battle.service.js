@@ -583,12 +583,19 @@ let BattleService = class BattleService {
             throw new common_1.BadRequestException('자신의 행성은 공격할 수 없습니다.');
         }
         for (const type in fleet) {
-            if (fleet[type] > 0) {
+            const count = fleet[type];
+            if (!Number.isInteger(count) || count < 0) {
+                throw new common_1.BadRequestException('잘못된 함대 수량입니다.');
+            }
+            if (count > 0) {
+                if (!game_data_1.FLEET_DATA[type]) {
+                    throw new common_1.BadRequestException(`알 수 없는 함대 유형: ${type}`);
+                }
                 if (type === 'solarSatellite') {
                     throw new common_1.BadRequestException('태양광인공위성은 공격에 참여할 수 없습니다.');
                 }
-                if (!attacker.fleet[type] || attacker.fleet[type] < fleet[type]) {
-                    throw new common_1.BadRequestException(`${game_data_1.NAME_MAPPING[type] || type}을(를) ${fleet[type]}대 보유하고 있지 않습니다.`);
+                if (!attacker.fleet[type] || attacker.fleet[type] < count) {
+                    throw new common_1.BadRequestException(`${game_data_1.NAME_MAPPING[type] || type}을(를) ${count}대 보유하고 있지 않습니다.`);
                 }
             }
         }
@@ -677,7 +684,11 @@ let BattleService = class BattleService {
     }
     async startRecycle(attackerId, targetCoord, fleet) {
         for (const type in fleet) {
-            if (fleet[type] > 0 && type !== 'recycler') {
+            const count = fleet[type];
+            if (!Number.isInteger(count) || count < 0) {
+                throw new common_1.BadRequestException('잘못된 함대 수량입니다.');
+            }
+            if (count > 0 && type !== 'recycler') {
                 throw new common_1.BadRequestException('수확 임무에는 수확선만 보낼 수 있습니다.');
             }
         }

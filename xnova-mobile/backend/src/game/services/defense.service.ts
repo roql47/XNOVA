@@ -62,8 +62,8 @@ export class DefenseService {
     const totalCost = (defenseData.cost.metal || 0) + (defenseData.cost.crystal || 0);
     const nanoBonus = Math.pow(2, nanoFactoryLevel);
 
-    // 1대당 건조 시간 (초) - 10배 상향
-    const singleUnitTime = (totalCost / (25 * (1 + robotFactoryLevel) * nanoBonus)) * 4 * 10;
+    // 1대당 건조 시간 (초) - 2배 상향
+    const singleUnitTime = (totalCost / (25 * (1 + robotFactoryLevel) * nanoBonus)) * 2;
     
     return singleUnitTime * quantity;
   }
@@ -105,8 +105,9 @@ export class DefenseService {
 
   // 방어시설 건조 시작
   async startBuild(userId: string, defenseType: string, quantity: number) {
-    if (quantity < 1) {
-      throw new BadRequestException('수량은 1 이상이어야 합니다.');
+    // 수량 검증 (정수, 양수, 합리적인 범위)
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100000) {
+      throw new BadRequestException('수량은 1 ~ 100,000 사이의 정수여야 합니다.');
     }
 
     const user = await this.resourcesService.updateResources(userId);

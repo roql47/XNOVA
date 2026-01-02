@@ -296,6 +296,19 @@ export class ReturnProgress {
   returnTime: Date;
 }
 
+// 휴가 모드 스키마
+@Schema({ _id: false })
+export class VacationMode {
+  @Prop({ default: false })
+  isActive: boolean;
+
+  @Prop({ default: null })
+  startTime: Date | null;
+
+  @Prop({ default: null })
+  minEndTime: Date | null;  // 최소 48시간 후
+}
+
 @Schema({ timestamps: true })
 export class User {
   @Prop({ required: true, unique: true })
@@ -312,6 +325,9 @@ export class User {
 
   @Prop({ required: true, unique: true })
   coordinate: string;
+
+  @Prop({ type: VacationMode, default: () => ({ isActive: false, startTime: null, minEndTime: null }) })
+  vacationMode: VacationMode;
 
   @Prop({ type: Resources, default: () => ({}) })
   resources: Resources;
@@ -357,6 +373,9 @@ export class User {
 
   @Prop({ default: Date.now })
   lastResourceUpdate: Date;
+
+  @Prop({ default: Date.now })
+  lastActivity: Date;  // 최근 활동 시간
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

@@ -860,12 +860,23 @@ export class BattleService {
 
     // 함대 확인
     for (const type in fleet) {
-      if (fleet[type] > 0) {
+      const count = fleet[type];
+      
+      // 음수/비정상 값 검증
+      if (!Number.isInteger(count) || count < 0) {
+        throw new BadRequestException('잘못된 함대 수량입니다.');
+      }
+      
+      if (count > 0) {
+        // 유효한 함대 타입 검증
+        if (!FLEET_DATA[type]) {
+          throw new BadRequestException(`알 수 없는 함대 유형: ${type}`);
+        }
         if (type === 'solarSatellite') {
           throw new BadRequestException('태양광인공위성은 공격에 참여할 수 없습니다.');
         }
-        if (!(attacker.fleet as any)[type] || (attacker.fleet as any)[type] < fleet[type]) {
-          throw new BadRequestException(`${NAME_MAPPING[type] || type}을(를) ${fleet[type]}대 보유하고 있지 않습니다.`);
+        if (!(attacker.fleet as any)[type] || (attacker.fleet as any)[type] < count) {
+          throw new BadRequestException(`${NAME_MAPPING[type] || type}을(를) ${count}대 보유하고 있지 않습니다.`);
         }
       }
     }
@@ -983,9 +994,16 @@ export class BattleService {
     targetCoord: string,
     fleet: Record<string, number>,
   ) {
-    // 수확선만 있는지 확인
+    // 수확선만 있는지 확인 + 음수 검증
     for (const type in fleet) {
-      if (fleet[type] > 0 && type !== 'recycler') {
+      const count = fleet[type];
+      
+      // 음수/비정상 값 검증
+      if (!Number.isInteger(count) || count < 0) {
+        throw new BadRequestException('잘못된 함대 수량입니다.');
+      }
+      
+      if (count > 0 && type !== 'recycler') {
         throw new BadRequestException('수확 임무에는 수확선만 보낼 수 있습니다.');
       }
     }

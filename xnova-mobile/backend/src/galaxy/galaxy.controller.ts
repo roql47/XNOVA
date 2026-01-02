@@ -77,8 +77,14 @@ export class GalaxyController {
   async spyOnPlanet(@Body() body: SpyRequestDto, @Request() req) {
     const { targetCoord, probeCount } = body;
 
-    if (!targetCoord || !probeCount || probeCount < 1) {
+    // 입력 검증 강화
+    if (!targetCoord || !probeCount) {
       return { success: false, error: '잘못된 요청입니다.' };
+    }
+    
+    // 정수, 양수, 합리적인 범위 검증
+    if (!Number.isInteger(probeCount) || probeCount < 1 || probeCount > 100) {
+      return { success: false, error: '정찰 위성 수량은 1 ~ 100 사이여야 합니다.' };
     }
 
     return this.galaxyService.spyOnPlanet(req.user.userId, targetCoord, probeCount);

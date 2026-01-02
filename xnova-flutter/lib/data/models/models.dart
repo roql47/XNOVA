@@ -595,6 +595,7 @@ class PlanetInfo {
   final bool hasDebris;
   final Map<String, dynamic>? debrisAmount;
   final bool hasMoon;
+  final DateTime? lastActivity;  // 최근 활동 시간
 
   PlanetInfo({
     required this.position,
@@ -605,6 +606,7 @@ class PlanetInfo {
     this.hasDebris = false,
     this.debrisAmount,
     this.hasMoon = false,
+    this.lastActivity,
   });
 
   factory PlanetInfo.fromJson(Map<String, dynamic> json) => PlanetInfo(
@@ -616,7 +618,49 @@ class PlanetInfo {
     hasDebris: json['hasDebris'] ?? false,
     debrisAmount: json['debrisAmount'],
     hasMoon: json['hasMoon'] ?? false,
+    lastActivity: json['lastActivity'] != null 
+        ? DateTime.tryParse(json['lastActivity']) 
+        : null,
   );
+
+  /// 활동 상태를 반환합니다.
+  /// - 'online': 10분 이내 활동 (초록색 점)
+  /// - 'recent': 11분~59분 (회색 글씨로 시간 표시)
+  /// - 'hours': 1시간~12시간 (회색 글씨로 시간 표시)
+  /// - 'inactive': 7일 이상 접속 없음 (회색 점)
+  /// - null: 12시간~7일 (표시 없음)
+  String? get activityStatus {
+    if (lastActivity == null) return null;
+    
+    final now = DateTime.now();
+    final diff = now.difference(lastActivity!);
+    
+    if (diff.inMinutes <= 10) {
+      return 'online';
+    } else if (diff.inMinutes <= 59) {
+      return 'recent';
+    } else if (diff.inHours <= 12) {
+      return 'hours';
+    } else if (diff.inDays >= 7) {
+      return 'inactive';
+    }
+    return null;  // 12시간~7일: 표시 없음
+  }
+
+  /// 활동 표시 텍스트 (11min~59min, 1~12h)
+  String? get activityText {
+    if (lastActivity == null) return null;
+    
+    final now = DateTime.now();
+    final diff = now.difference(lastActivity!);
+    
+    if (diff.inMinutes >= 11 && diff.inMinutes <= 59) {
+      return '${diff.inMinutes}m';
+    } else if (diff.inHours >= 1 && diff.inHours <= 12) {
+      return '${diff.inHours}h';
+    }
+    return null;
+  }
 }
 
 class GalaxyResponse {
@@ -769,20 +813,14 @@ class PlayerScore {
   final String playerId;
   final String playerName;
   final String coordinate;
-  final int totalScore;
-  final int constructionScore;
-  final int researchScore;
-  final int fleetScore;
+  final int score;
 
   PlayerScore({
     required this.rank,
     required this.playerId,
     required this.playerName,
     required this.coordinate,
-    this.totalScore = 0,
-    this.constructionScore = 0,
-    this.researchScore = 0,
-    this.fleetScore = 0,
+    this.score = 0,
   });
 
   factory PlayerScore.fromJson(Map<String, dynamic> json) => PlayerScore(
@@ -790,51 +828,79 @@ class PlayerScore {
     playerId: json['playerId'] ?? '',
     playerName: json['playerName'] ?? '',
     coordinate: json['coordinate'] ?? '',
-    totalScore: (json['totalScore'] ?? 0).toInt(),
-    constructionScore: (json['constructionScore'] ?? 0).toInt(),
-    researchScore: (json['researchScore'] ?? 0).toInt(),
-    fleetScore: (json['fleetScore'] ?? 0).toInt(),
+    score: (json['score'] ?? 0).toInt(),
   );
 }
 
 class RankingResponse {
-  final String type;
   final List<PlayerScore> ranking;
   final int totalPlayers;
+  final int page;
+  final int totalPages;
 
   RankingResponse({
-    required this.type,
     required this.ranking,
     this.totalPlayers = 0,
+    this.page = 1,
+    this.totalPages = 1,
   });
 
   factory RankingResponse.fromJson(Map<String, dynamic> json) => RankingResponse(
-    type: json['type'] ?? 'total',
     ranking: (json['ranking'] as List<dynamic>?)
         ?.map((e) => PlayerScore.fromJson(e))
         .toList() ?? [],
     totalPlayers: (json['totalPlayers'] ?? 0).toInt(),
+    page: (json['page'] ?? 1).toInt(),
+    totalPages: (json['totalPages'] ?? 1).toInt(),
+  );
+}
+
+// 내 점수 응답
+class MyScoresResponse {
+  final int buildingScore;
+  final int researchScore;
+  final int fleetScore;
+  final int defenseScore;
+  final int totalScore;
+
+  MyScoresResponse({
+    this.buildingScore = 0,
+    this.researchScore = 0,
+    this.fleetScore = 0,
+    this.defenseScore = 0,
+    this.totalScore = 0,
+  });
+
+  factory MyScoresResponse.fromJson(Map<String, dynamic> json) => MyScoresResponse(
+    buildingScore: (json['buildingScore'] ?? 0).toInt(),
+    researchScore: (json['researchScore'] ?? 0).toInt(),
+    fleetScore: (json['fleetScore'] ?? 0).toInt(),
+    defenseScore: (json['defenseScore'] ?? 0).toInt(),
+    totalScore: (json['totalScore'] ?? 0).toInt(),
   );
 }
 
 class MyRankResponse {
   final RankInfo total;
-  final RankInfo construction;
+  final RankInfo building;
   final RankInfo research;
   final RankInfo fleet;
+  final RankInfo defense;
 
   MyRankResponse({
     required this.total,
-    required this.construction,
+    required this.building,
     required this.research,
     required this.fleet,
+    required this.defense,
   });
 
   factory MyRankResponse.fromJson(Map<String, dynamic> json) => MyRankResponse(
     total: RankInfo.fromJson(json['total'] ?? {}),
-    construction: RankInfo.fromJson(json['construction'] ?? {}),
+    building: RankInfo.fromJson(json['building'] ?? {}),
     research: RankInfo.fromJson(json['research'] ?? {}),
     fleet: RankInfo.fromJson(json['fleet'] ?? {}),
+    defense: RankInfo.fromJson(json['defense'] ?? {}),
   );
 }
 

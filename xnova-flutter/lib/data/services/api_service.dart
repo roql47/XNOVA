@@ -177,6 +177,19 @@ class ApiService {
     await _dio.delete('messages/$id');
   }
 
+  Future<Map<String, dynamic>> sendMessage({
+    required String receiverCoordinate,
+    required String title,
+    required String content,
+  }) async {
+    final response = await _dio.post('messages/send', data: {
+      'receiverCoordinate': receiverCoordinate,
+      'title': title,
+      'content': content,
+    });
+    return response.data;
+  }
+
   // ===== 은하 =====
   Future<GalaxyResponse> getGalaxyMap(int galaxy, int system) async {
     final response = await _dio.get('galaxy/$galaxy/$system');
@@ -219,17 +232,69 @@ class ApiService {
   }
 
   // ===== 랭킹 =====
-  Future<RankingResponse> getRanking({String type = 'total', int limit = 100}) async {
+  Future<RankingResponse> getRanking({String type = 'total', int page = 1, int limit = 100}) async {
     final response = await _dio.get('ranking', queryParameters: {
       'type': type,
+      'page': page,
       'limit': limit,
     });
     return RankingResponse.fromJson(response.data);
   }
 
   Future<MyRankResponse> getMyRank() async {
-    final response = await _dio.get('ranking/me');
+    final response = await _dio.get('ranking/my-rank');
     return MyRankResponse.fromJson(response.data);
+  }
+
+  Future<MyScoresResponse> getMyScores() async {
+    final response = await _dio.get('ranking/my-scores');
+    return MyScoresResponse.fromJson(response.data);
+  }
+
+  // ===== 설정 =====
+  // 행성 이름 변경
+  Future<Map<String, dynamic>> updatePlanetName(String planetName) async {
+    final response = await _dio.put('user/planet-name', data: {'planetName': planetName});
+    return response.data;
+  }
+
+  // 비밀번호 변경
+  Future<Map<String, dynamic>> updatePassword(String currentPassword, String newPassword) async {
+    final response = await _dio.put('user/password', data: {
+      'currentPassword': currentPassword,
+      'newPassword': newPassword,
+    });
+    return response.data;
+  }
+
+  // 휴가 모드 상태 조회
+  Future<Map<String, dynamic>> getVacationStatus() async {
+    final response = await _dio.get('user/vacation');
+    return response.data;
+  }
+
+  // 휴가 모드 활성화
+  Future<Map<String, dynamic>> activateVacation() async {
+    final response = await _dio.post('user/vacation');
+    return response.data;
+  }
+
+  // 휴가 모드 해제
+  Future<Map<String, dynamic>> deactivateVacation() async {
+    final response = await _dio.delete('user/vacation');
+    return response.data;
+  }
+
+  // 계정 초기화
+  Future<Map<String, dynamic>> resetAccount(String password) async {
+    final response = await _dio.post('user/reset', data: {'password': password});
+    return response.data;
+  }
+
+  // 계정 탈퇴
+  Future<Map<String, dynamic>> deleteAccount(String password) async {
+    final response = await _dio.delete('user/account', data: {'password': password});
+    return response.data;
   }
 }
 

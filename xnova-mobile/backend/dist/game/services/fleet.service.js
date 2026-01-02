@@ -53,7 +53,7 @@ let FleetService = class FleetService {
             return 0;
         const totalCost = (fleetData.cost.metal || 0) + (fleetData.cost.crystal || 0);
         const nanoBonus = Math.pow(2, nanoFactoryLevel);
-        const singleShipTime = (totalCost / (25 * (1 + shipyardLevel) * nanoBonus)) * 10;
+        const singleShipTime = (totalCost / (25 * (1 + shipyardLevel) * nanoBonus)) * 2;
         return singleShipTime * quantity;
     }
     async getFleet(userId) {
@@ -86,8 +86,8 @@ let FleetService = class FleetService {
         };
     }
     async startBuild(userId, fleetType, quantity) {
-        if (quantity < 1) {
-            throw new common_1.BadRequestException('수량은 1 이상이어야 합니다.');
+        if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100000) {
+            throw new common_1.BadRequestException('수량은 1 ~ 100,000 사이의 정수여야 합니다.');
         }
         const user = await this.resourcesService.updateResources(userId);
         if (!user) {

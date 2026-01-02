@@ -14,6 +14,7 @@ export interface PlanetInfo {
         crystal: number;
     };
     hasMoon: boolean;
+    lastActivity: string | null;
 }
 export interface SpyReport {
     targetCoord: string;

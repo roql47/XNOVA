@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../providers/providers.dart';
 import '../../../../data/models/models.dart';
+import '../../../../data/services/api_service.dart';
+import '../../../../data/services/token_service.dart';
 
 class GalaxyTab extends ConsumerStatefulWidget {
   const GalaxyTab({super.key});
@@ -187,6 +189,9 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
                       : null,
                   onSpy: planet.playerName != null && !planet.isOwnPlanet
                       ? () => _showSpyDialog(context, planet)
+                      : null,
+                  onMessage: planet.playerName != null && !planet.isOwnPlanet
+                      ? () => _showMessageDialog(context, planet)
                       : null,
                 );
               },
@@ -470,6 +475,153 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
       ),
     );
   }
+
+  void _showMessageDialog(BuildContext context, PlanetInfo planet) {
+    final titleController = TextEditingController();
+    final contentController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.panelBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        title: Row(
+          children: [
+            Icon(Icons.mail_outline, color: AppColors.accent, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '${planet.playerName}에게 메시지',
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '좌표: ${planet.coordinate}',
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: titleController,
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: '제목',
+                  labelStyle: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: AppColors.panelBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: AppColors.panelBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: AppColors.accent),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                maxLength: 100,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: contentController,
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
+                decoration: InputDecoration(
+                  labelText: '내용',
+                  labelStyle: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: AppColors.panelBorder),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: AppColors.panelBorder),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(6),
+                    borderSide: BorderSide(color: AppColors.accent),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                maxLines: 5,
+                maxLength: 2000,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text('취소', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _sendMessage(planet, titleController.text, contentController.text);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            child: const Text('보내기'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _sendMessage(PlanetInfo planet, String title, String content) async {
+    if (title.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('제목을 입력해주세요.')),
+      );
+      return;
+    }
+    if (content.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('내용을 입력해주세요.')),
+      );
+      return;
+    }
+
+    try {
+      final apiService = ApiService(tokenService: TokenService());
+      final result = await apiService.sendMessage(
+        receiverCoordinate: planet.coordinate,
+        title: title.trim(),
+        content: content.trim(),
+      );
+
+      if (result['success'] == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${planet.playerName}에게 메시지를 보냈습니다.'),
+            backgroundColor: AppColors.positive,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result['message'] ?? '메시지 전송에 실패했습니다.')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('메시지 전송 중 오류가 발생했습니다.')),
+      );
+    }
+  }
 }
 
 class _PlanetRow extends StatelessWidget {
@@ -478,6 +630,7 @@ class _PlanetRow extends StatelessWidget {
   final VoidCallback? onAttack;
   final VoidCallback? onRecycle;
   final VoidCallback? onSpy;
+  final VoidCallback? onMessage;
 
   const _PlanetRow({
     required this.position,
@@ -485,7 +638,86 @@ class _PlanetRow extends StatelessWidget {
     this.onAttack,
     this.onRecycle,
     this.onSpy,
+    this.onMessage,
   });
+
+  /// 활동 상태 표시 위젯
+  Widget _buildActivityIndicator(PlanetInfo planet) {
+    final status = planet.activityStatus;
+    final text = planet.activityText;
+
+    // 온라인 (10분 이내): 초록색 점
+    if (status == 'online') {
+      return Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          color: AppColors.positive,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.positive.withOpacity(0.5),
+              blurRadius: 4,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 최근 활동 (11분~59분): 회색 글씨
+    if (status == 'recent' && text != null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+        decoration: BoxDecoration(
+          color: AppColors.textMuted.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 9,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
+    // 1시간~12시간: 회색 글씨
+    if (status == 'hours' && text != null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+        decoration: BoxDecoration(
+          color: AppColors.textMuted.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: AppColors.textMuted.withOpacity(0.7),
+            fontSize: 9,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+    }
+
+    // 7일 이상 접속 없음: 회색 점
+    if (status == 'inactive') {
+      return Container(
+        width: 8,
+        height: 8,
+        decoration: BoxDecoration(
+          color: AppColors.textMuted.withOpacity(0.5),
+          shape: BoxShape.circle,
+        ),
+      );
+    }
+
+    // 12시간~7일: 표시 없음
+    return const SizedBox.shrink();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -535,17 +767,26 @@ class _PlanetRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      isEmpty ? '빈 슬롯' : planet.playerName!,
-                      style: TextStyle(
-                        color: isEmpty 
-                            ? AppColors.textMuted
-                            : isOwn
-                                ? AppColors.accent
-                                : AppColors.textPrimary,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 13,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          isEmpty ? '빈 슬롯' : planet.playerName!,
+                          style: TextStyle(
+                            color: isEmpty 
+                                ? AppColors.textMuted
+                                : isOwn
+                                    ? AppColors.accent
+                                    : AppColors.textPrimary,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 13,
+                          ),
+                        ),
+                        // 활동 상태 표시
+                        if (!isEmpty && !isOwn) ...[
+                          const SizedBox(width: 6),
+                          _buildActivityIndicator(planet),
+                        ],
+                      ],
                     ),
                     Text(
                       planet.coordinate,
@@ -584,6 +825,18 @@ class _PlanetRow extends StatelessWidget {
                     ),
                   ),
                 if (!isEmpty && !isOwn) ...[
+                  // 메시지 아이콘
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: InkWell(
+                      onTap: onMessage,
+                      child: Icon(
+                        Icons.mail_outline,
+                        size: 16,
+                        color: AppColors.accent,
+                      ),
+                    ),
+                  ),
                   // 정찰 아이콘
                   Padding(
                     padding: const EdgeInsets.only(left: 4),

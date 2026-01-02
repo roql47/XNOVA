@@ -9,6 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.GameModule = void 0;
 const common_1 = require("@nestjs/common");
 const game_controller_1 = require("./game.controller");
+const ranking_controller_1 = require("./ranking.controller");
 const resources_service_1 = require("./services/resources.service");
 const buildings_service_1 = require("./services/buildings.service");
 const research_service_1 = require("./services/research.service");
@@ -17,6 +18,7 @@ const defense_service_1 = require("./services/defense.service");
 const battle_service_1 = require("./services/battle.service");
 const battle_report_service_1 = require("./services/battle-report.service");
 const battle_simulator_service_1 = require("./services/battle-simulator.service");
+const ranking_service_1 = require("./services/ranking.service");
 const user_module_1 = require("../user/user.module");
 const message_module_1 = require("../message/message.module");
 const galaxy_module_1 = require("../galaxy/galaxy.module");
@@ -26,7 +28,7 @@ exports.GameModule = GameModule;
 exports.GameModule = GameModule = __decorate([
     (0, common_1.Module)({
         imports: [user_module_1.UserModule, message_module_1.MessageModule, galaxy_module_1.GalaxyModule],
-        controllers: [game_controller_1.GameController],
+        controllers: [game_controller_1.GameController, ranking_controller_1.RankingController],
         providers: [
             resources_service_1.ResourcesService,
             buildings_service_1.BuildingsService,
@@ -36,6 +38,7 @@ exports.GameModule = GameModule = __decorate([
             battle_service_1.BattleService,
             battle_report_service_1.BattleReportService,
             battle_simulator_service_1.BattleSimulatorService,
+            ranking_service_1.RankingService,
         ],
         exports: [
             resources_service_1.ResourcesService,
@@ -46,6 +49,7 @@ exports.GameModule = GameModule = __decorate([
             battle_service_1.BattleService,
             battle_report_service_1.BattleReportService,
             battle_simulator_service_1.BattleSimulatorService,
+            ranking_service_1.RankingService,
         ],
     })
 ], GameModule);

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
@@ -5,6 +6,7 @@ import '../../../providers/providers.dart';
 import '../../widgets/resource_bar.dart';
 import '../../widgets/guide_tutorial_overlay.dart';
 import '../../widgets/guide_steps_data.dart';
+import '../settings/settings_screen.dart';
 import 'tabs/overview_tab.dart';
 import 'tabs/buildings_tab.dart';
 import 'tabs/research_tab.dart';
@@ -13,6 +15,7 @@ import 'tabs/defense_tab.dart';
 import 'tabs/fleet_movement_tab.dart';
 import 'tabs/galaxy_tab.dart';
 import 'tabs/messages_tab.dart';
+import 'tabs/ranking_tab.dart';
 import 'tabs/techtree_tab.dart';
 import 'tabs/simulator_tab.dart';
 
@@ -27,6 +30,7 @@ extension MainTabExtension on MainTab {
       case MainTab.fleet: return Icons.flight_outlined;
       case MainTab.galaxy: return Icons.blur_circular_outlined;
       case MainTab.messages: return Icons.mail_outline;
+      case MainTab.ranking: return Icons.leaderboard_outlined;
       case MainTab.techtree: return Icons.account_tree_outlined;
       case MainTab.simulator: return Icons.analytics_outlined;
     }
@@ -42,6 +46,7 @@ extension MainTabExtension on MainTab {
       case MainTab.fleet: return '함대';
       case MainTab.galaxy: return '은하계';
       case MainTab.messages: return '메시지';
+      case MainTab.ranking: return '랭킹';
       case MainTab.techtree: return '테크트리';
       case MainTab.simulator: return '시뮬레이터';
     }
@@ -68,6 +73,12 @@ class _MainScreenState extends ConsumerState<MainScreen> {
   
   // 가이드 표시 상태
   bool _showGuide = false;
+  
+  // 설정 화면 표시 상태
+  bool _showSettings = false;
+  
+  // 자동 완료 체크 타이머
+  Timer? _autoCompleteTimer;
 
   @override
   void initState() {
@@ -75,7 +86,45 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(gameProvider.notifier).loadAllData();
       ref.read(gameProvider.notifier).loadProfile();
+      ref.read(messageProvider.notifier).loadMessages(); // 메시지 로드
+      
+      // 1초마다 자동 완료 체크 시작
+      _startAutoCompleteTimer();
     });
+  }
+  
+  @override
+  void dispose() {
+    _autoCompleteTimer?.cancel();
+    super.dispose();
+  }
+  
+  void _startAutoCompleteTimer() {
+    _autoCompleteTimer?.cancel();
+    _autoCompleteTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      ref.read(gameProvider.notifier).checkAndAutoComplete();
+    });
+  }
+
+  // 탭 전환 시 데이터 새로고침
+  void _onTabChanged(MainTab tab) {
+    ref.read(navigationProvider.notifier).setTab(tab);
+    
+    // 탭별 데이터 새로고침
+    switch (tab) {
+      case MainTab.messages:
+        ref.read(messageProvider.notifier).loadMessages();
+        break;
+      case MainTab.overview:
+      case MainTab.buildings:
+      case MainTab.research:
+      case MainTab.fleet:
+      case MainTab.defense:
+        ref.read(gameProvider.notifier).loadAllData();
+        break;
+      default:
+        break;
+    }
   }
 
   @override
@@ -83,6 +132,24 @@ class _MainScreenState extends ConsumerState<MainScreen> {
     final gameState = ref.watch(gameProvider);
     final authState = ref.watch(authProvider);
     final navState = ref.watch(navigationProvider);
+
+    // 설정 화면 표시
+    if (_showSettings) {
+      return SettingsScreen(
+        onClose: () {
+          setState(() {
+            _showSettings = false;
+          });
+        },
+        onLogout: () {
+          setState(() {
+            _showSettings = false;
+          });
+          ref.read(authProvider.notifier).logout();
+          widget.onLogout();
+        },
+      );
+    }
 
     return Scaffold(
       key: _scaffoldKey,
@@ -132,7 +199,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                 if (tabName != null) {
                   final tab = _getTabFromName(tabName);
                   if (tab != null) {
-                    ref.read(navigationProvider.notifier).setTab(tab);
+                    _onTabChanged(tab);
                   }
                 }
               },
@@ -176,27 +243,30 @@ class _MainScreenState extends ConsumerState<MainScreen> {
             onPressed: () => _scaffoldKey.currentState?.openDrawer(),
           ),
           Expanded(
-            child: Column(
-              children: [
-                Text(
-                  'XNOVA',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.accent,
-                    letterSpacing: 2,
-                  ),
-                ),
-                if (gameState.coordinate != null)
+            child: GestureDetector(
+              onTap: () => _onTabChanged(MainTab.overview),
+              child: Column(
+                children: [
                   Text(
-                    gameState.coordinate!,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: AppColors.textMuted,
-                      letterSpacing: 1,
+                    'XNOVA',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.accent,
+                      letterSpacing: 2,
                     ),
                   ),
-              ],
+                  if (gameState.coordinate != null)
+                    Text(
+                      gameState.coordinate!,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textMuted,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
           IconButton(
@@ -277,7 +347,7 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                       isSelected: navState.selectedTab == tab,
                       badgeCount: tab == MainTab.messages ? unreadCount : 0,
                       onTap: () {
-                        ref.read(navigationProvider.notifier).setTab(tab);
+                        _onTabChanged(tab);
                         Navigator.pop(context);
                       },
                     );
@@ -319,6 +389,20 @@ class _MainScreenState extends ConsumerState<MainScreen> {
                   ),
                   onTap: _startGuide,
                 ),
+                // 설정 버튼
+                ListTile(
+                  leading: const Icon(Icons.settings_rounded, color: AppColors.textSecondary, size: 20),
+                  title: const Text(
+                    '설정',
+                    style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    setState(() {
+                      _showSettings = true;
+                    });
+                  },
+                ),
                 // 로그아웃 버튼
                 ListTile(
                   leading: const Icon(Icons.logout, color: AppColors.negative, size: 20),
@@ -359,6 +443,8 @@ class _MainScreenState extends ConsumerState<MainScreen> {
         return const GalaxyTab();
       case MainTab.messages:
         return const MessagesTab();
+      case MainTab.ranking:
+        return const RankingTab();
       case MainTab.techtree:
         return const TechtreeTab();
       case MainTab.simulator:

@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserSchema = exports.User = exports.ReturnProgress = exports.AttackProgress = exports.ProgressInfo = exports.Defense = exports.Fleet = exports.ResearchLevels = exports.PlanetInfo = exports.Facilities = exports.Mines = exports.Resources = void 0;
+exports.UserSchema = exports.User = exports.VacationMode = exports.ReturnProgress = exports.AttackProgress = exports.ProgressInfo = exports.Defense = exports.Fleet = exports.ResearchLevels = exports.PlanetInfo = exports.Facilities = exports.Mines = exports.Resources = void 0;
 const mongoose_1 = require("@nestjs/mongoose");
 let Resources = class Resources {
     metal;
@@ -491,12 +491,34 @@ __decorate([
 exports.ReturnProgress = ReturnProgress = __decorate([
     (0, mongoose_1.Schema)({ _id: false })
 ], ReturnProgress);
+let VacationMode = class VacationMode {
+    isActive;
+    startTime;
+    minEndTime;
+};
+exports.VacationMode = VacationMode;
+__decorate([
+    (0, mongoose_1.Prop)({ default: false }),
+    __metadata("design:type", Boolean)
+], VacationMode.prototype, "isActive", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: null }),
+    __metadata("design:type", Object)
+], VacationMode.prototype, "startTime", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: null }),
+    __metadata("design:type", Object)
+], VacationMode.prototype, "minEndTime", void 0);
+exports.VacationMode = VacationMode = __decorate([
+    (0, mongoose_1.Schema)({ _id: false })
+], VacationMode);
 let User = class User {
     email;
     password;
     googleId;
     playerName;
     coordinate;
+    vacationMode;
     resources;
     mines;
     facilities;
@@ -512,6 +534,7 @@ let User = class User {
     pendingReturn;
     incomingAttack;
     lastResourceUpdate;
+    lastActivity;
 };
 exports.User = User;
 __decorate([
@@ -534,6 +557,10 @@ __decorate([
     (0, mongoose_1.Prop)({ required: true, unique: true }),
     __metadata("design:type", String)
 ], User.prototype, "coordinate", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: VacationMode, default: () => ({ isActive: false, startTime: null, minEndTime: null }) }),
+    __metadata("design:type", VacationMode)
+], User.prototype, "vacationMode", void 0);
 __decorate([
     (0, mongoose_1.Prop)({ type: Resources, default: () => ({}) }),
     __metadata("design:type", Resources)
@@ -594,6 +621,10 @@ __decorate([
     (0, mongoose_1.Prop)({ default: Date.now }),
     __metadata("design:type", Date)
 ], User.prototype, "lastResourceUpdate", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: Date.now }),
+    __metadata("design:type", Date)
+], User.prototype, "lastActivity", void 0);
 exports.User = User = __decorate([
     (0, mongoose_1.Schema)({ timestamps: true })
 ], User);

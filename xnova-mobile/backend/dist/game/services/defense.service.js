@@ -53,7 +53,7 @@ let DefenseService = class DefenseService {
             return 0;
         const totalCost = (defenseData.cost.metal || 0) + (defenseData.cost.crystal || 0);
         const nanoBonus = Math.pow(2, nanoFactoryLevel);
-        const singleUnitTime = (totalCost / (25 * (1 + robotFactoryLevel) * nanoBonus)) * 4 * 10;
+        const singleUnitTime = (totalCost / (25 * (1 + robotFactoryLevel) * nanoBonus)) * 2;
         return singleUnitTime * quantity;
     }
     async getDefense(userId) {
@@ -87,8 +87,8 @@ let DefenseService = class DefenseService {
         };
     }
     async startBuild(userId, defenseType, quantity) {
-        if (quantity < 1) {
-            throw new common_1.BadRequestException('수량은 1 이상이어야 합니다.');
+        if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100000) {
+            throw new common_1.BadRequestException('수량은 1 ~ 100,000 사이의 정수여야 합니다.');
         }
         const user = await this.resourcesService.updateResources(userId);
         if (!user) {

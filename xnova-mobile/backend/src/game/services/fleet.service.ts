@@ -61,8 +61,8 @@ export class FleetService {
     const totalCost = (fleetData.cost.metal || 0) + (fleetData.cost.crystal || 0);
     const nanoBonus = Math.pow(2, nanoFactoryLevel);
 
-    // 1대당 건조 시간 (초) - 10배 상향
-    const singleShipTime = (totalCost / (25 * (1 + shipyardLevel) * nanoBonus)) * 10;
+    // 1대당 건조 시간 (초) - 2배 상향
+    const singleShipTime = (totalCost / (25 * (1 + shipyardLevel) * nanoBonus)) * 2;
     
     return singleShipTime * quantity;
   }
@@ -103,8 +103,9 @@ export class FleetService {
 
   // 함대 건조 시작
   async startBuild(userId: string, fleetType: string, quantity: number) {
-    if (quantity < 1) {
-      throw new BadRequestException('수량은 1 이상이어야 합니다.');
+    // 수량 검증 (정수, 양수, 합리적인 범위)
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100000) {
+      throw new BadRequestException('수량은 1 ~ 100,000 사이의 정수여야 합니다.');
     }
 
     const user = await this.resourcesService.updateResources(userId);

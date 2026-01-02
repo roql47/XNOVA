@@ -21,4 +21,30 @@ export declare class UserService {
     findByGoogleId(googleId: string): Promise<UserDocument | null>;
     createGoogleUser(email: string, googleId: string, playerName: string): Promise<UserDocument>;
     linkGoogleAccount(userId: string, googleId: string): Promise<UserDocument | null>;
+    updateLastActivity(userId: string): Promise<void>;
+    updatePlanetName(userId: string, newPlanetName: string): Promise<UserDocument | null>;
+    updatePassword(userId: string, currentPassword: string, newPassword: string): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    canActivateVacation(userId: string): Promise<{
+        canActivate: boolean;
+        reason?: string;
+    }>;
+    activateVacation(userId: string): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    deactivateVacation(userId: string): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    resetAccount(userId: string, password: string): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    deleteAccount(userId: string, password: string): Promise<{
+        success: boolean;
+        message: string;
+    }>;
 }

@@ -272,6 +272,7 @@ enum MainTab {
   fleet,
   galaxy,
   messages,
+  ranking,
   techtree,
   simulator,
 }
@@ -475,6 +476,9 @@ class GameProduction {
 
 class GameNotifier extends StateNotifier<GameState> {
   final ApiService _apiService;
+  
+  // 자동 완료 처리 중 플래그 (중복 호출 방지)
+  bool _isProcessingAutoComplete = false;
 
   GameNotifier(this._apiService) : super(GameState());
 
@@ -767,6 +771,69 @@ class GameNotifier extends StateNotifier<GameState> {
 
   void clearError() {
     state = state.copyWith(error: null);
+  }
+
+  /// 자동 완료 체크 - 건설/연구/함대/방어 진행 중인 작업이 완료되었는지 확인하고 자동 완료 처리
+  Future<void> checkAndAutoComplete() async {
+    if (_isProcessingAutoComplete) return;
+    
+    final now = DateTime.now();
+    bool needsRefresh = false;
+    
+    try {
+      _isProcessingAutoComplete = true;
+      
+      // 건설 완료 체크
+      if (state.constructionProgress != null) {
+        final finishTime = state.constructionProgress!.finishDateTime;
+        if (finishTime != null && now.isAfter(finishTime)) {
+          await _apiService.completeBuilding();
+          needsRefresh = true;
+        }
+      }
+      
+      // 연구 완료 체크
+      if (state.researchProgress != null) {
+        final finishTime = state.researchProgress!.finishDateTime;
+        if (finishTime != null && now.isAfter(finishTime)) {
+          await _apiService.completeResearch();
+          needsRefresh = true;
+        }
+      }
+      
+      // 함대 건조 완료 체크
+      if (state.fleetProgress != null) {
+        final finishTime = state.fleetProgress!.finishDateTime;
+        if (finishTime != null && now.isAfter(finishTime)) {
+          await _apiService.completeFleet();
+          needsRefresh = true;
+        }
+      }
+      
+      // 방어시설 건조 완료 체크
+      if (state.defenseProgress != null) {
+        final finishTime = state.defenseProgress!.finishDateTime;
+        if (finishTime != null && now.isAfter(finishTime)) {
+          await _apiService.completeDefense();
+          needsRefresh = true;
+        }
+      }
+      
+      // 완료된 작업이 있으면 데이터 새로고침
+      if (needsRefresh) {
+        await Future.wait([
+          loadBuildings(),
+          loadResearch(),
+          loadFleet(),
+          loadDefense(),
+          loadResources(),
+        ]);
+      }
+    } catch (e) {
+      // 에러 무시 (다음 체크에서 재시도)
+    } finally {
+      _isProcessingAutoComplete = false;
+    }
   }
 
   Future<void> processBattle() async {

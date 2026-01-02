@@ -251,6 +251,223 @@ let UserService = class UserService {
     async linkGoogleAccount(userId, googleId) {
         return this.userModel.findByIdAndUpdate(userId, { googleId }, { new: true }).exec();
     }
+    async updateLastActivity(userId) {
+        await this.userModel.findByIdAndUpdate(userId, { lastActivity: new Date() }).exec();
+    }
+    async updatePlanetName(userId, newPlanetName) {
+        return this.userModel.findByIdAndUpdate(userId, { 'planetInfo.planetName': newPlanetName }, { new: true }).exec();
+    }
+    async updatePassword(userId, currentPassword, newPassword) {
+        const user = await this.findById(userId);
+        if (!user) {
+            return { success: false, message: '사용자를 찾을 수 없습니다.' };
+        }
+        if (user.googleId && !user.password) {
+            return { success: false, message: 'Google 계정은 비밀번호를 변경할 수 없습니다.' };
+        }
+        const isValid = await this.validatePassword(user, currentPassword);
+        if (!isValid) {
+            return { success: false, message: '현재 비밀번호가 일치하지 않습니다.' };
+        }
+        const hashedPassword = await bcrypt.hash(newPassword, 10);
+        await this.userModel.findByIdAndUpdate(userId, { password: hashedPassword }).exec();
+        return { success: true, message: '비밀번호가 변경되었습니다.' };
+    }
+    async canActivateVacation(userId) {
+        const user = await this.findById(userId);
+        if (!user) {
+            return { canActivate: false, reason: '사용자를 찾을 수 없습니다.' };
+        }
+        if (user.vacationMode?.isActive) {
+            return { canActivate: false, reason: '이미 휴가 모드입니다.' };
+        }
+        if (user.constructionProgress) {
+            return { canActivate: false, reason: '진행 중인 건설이 있습니다.' };
+        }
+        if (user.researchProgress) {
+            return { canActivate: false, reason: '진행 중인 연구가 있습니다.' };
+        }
+        if (user.fleetProgress) {
+            return { canActivate: false, reason: '진행 중인 함대 건조가 있습니다.' };
+        }
+        if (user.defenseProgress) {
+            return { canActivate: false, reason: '진행 중인 방어시설 건설이 있습니다.' };
+        }
+        if (user.pendingAttack) {
+            return { canActivate: false, reason: '진행 중인 공격 미션이 있습니다.' };
+        }
+        if (user.pendingReturn) {
+            return { canActivate: false, reason: '귀환 중인 함대가 있습니다.' };
+        }
+        return { canActivate: true };
+    }
+    async activateVacation(userId) {
+        const canActivate = await this.canActivateVacation(userId);
+        if (!canActivate.canActivate) {
+            return { success: false, message: canActivate.reason || '휴가 모드를 활성화할 수 없습니다.' };
+        }
+        const now = new Date();
+        const minEndTime = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+        await this.userModel.findByIdAndUpdate(userId, {
+            vacationMode: {
+                isActive: true,
+                startTime: now,
+                minEndTime: minEndTime,
+            }
+        }).exec();
+        return { success: true, message: '휴가 모드가 활성화되었습니다. 최소 48시간 후에 해제할 수 있습니다.' };
+    }
+    async deactivateVacation(userId) {
+        const user = await this.findById(userId);
+        if (!user) {
+            return { success: false, message: '사용자를 찾을 수 없습니다.' };
+        }
+        if (!user.vacationMode?.isActive) {
+            return { success: false, message: '휴가 모드가 활성화되어 있지 않습니다.' };
+        }
+        const now = new Date();
+        if (user.vacationMode.minEndTime && now < user.vacationMode.minEndTime) {
+            const remaining = Math.ceil((user.vacationMode.minEndTime.getTime() - now.getTime()) / (60 * 60 * 1000));
+            return { success: false, message: `최소 기간이 지나지 않았습니다. ${remaining}시간 후에 해제할 수 있습니다.` };
+        }
+        await this.userModel.findByIdAndUpdate(userId, {
+            vacationMode: {
+                isActive: false,
+                startTime: null,
+                minEndTime: null,
+            },
+            lastResourceUpdate: now,
+        }).exec();
+        return { success: true, message: '휴가 모드가 해제되었습니다.' };
+    }
+    async resetAccount(userId, password) {
+        const user = await this.findById(userId);
+        if (!user) {
+            return { success: false, message: '사용자를 찾을 수 없습니다.' };
+        }
+        if (user.password) {
+            const isValid = await this.validatePassword(user, password);
+            if (!isValid) {
+                return { success: false, message: '비밀번호가 일치하지 않습니다.' };
+            }
+        }
+        const newCoordinate = await this.generateUniqueCoordinate();
+        const position = parseInt(newCoordinate.split(':')[2], 10) || 7;
+        const planetInfo = this.generatePlanetInfo(position, true);
+        await this.userModel.findByIdAndUpdate(userId, {
+            coordinate: newCoordinate,
+            resources: {
+                metal: 5000,
+                crystal: 2500,
+                deuterium: 1500,
+                energy: 0,
+            },
+            mines: {
+                metalMine: 0,
+                crystalMine: 0,
+                deuteriumMine: 0,
+                solarPlant: 0,
+                fusionReactor: 0,
+            },
+            facilities: {
+                robotFactory: 0,
+                shipyard: 0,
+                researchLab: 0,
+                nanoFactory: 0,
+                terraformer: 0,
+                allianceDepot: 0,
+                missileSilo: 0,
+                metalStorage: 0,
+                crystalStorage: 0,
+                deuteriumTank: 0,
+                lunarBase: 0,
+                sensorPhalanx: 0,
+                jumpGate: 0,
+            },
+            planetInfo: {
+                maxFields: planetInfo.maxFields,
+                usedFields: 0,
+                temperature: planetInfo.temperature,
+                planetType: planetInfo.planetType,
+                isMoon: false,
+                planetName: user.playerName,
+                diameter: planetInfo.diameter,
+            },
+            researchLevels: {
+                energyTech: 0,
+                laserTech: 0,
+                ionTech: 0,
+                hyperspaceTech: 0,
+                plasmaTech: 0,
+                combustionDrive: 0,
+                impulseDrive: 0,
+                hyperspaceDrive: 0,
+                espionageTech: 0,
+                computerTech: 0,
+                astrophysics: 0,
+                intergalacticResearch: 0,
+                gravitonTech: 0,
+                weaponsTech: 0,
+                shieldTech: 0,
+                armorTech: 0,
+            },
+            fleet: {
+                smallCargo: 0,
+                largeCargo: 0,
+                lightFighter: 0,
+                heavyFighter: 0,
+                cruiser: 0,
+                battleship: 0,
+                battlecruiser: 0,
+                bomber: 0,
+                destroyer: 0,
+                deathstar: 0,
+                recycler: 0,
+                espionageProbe: 0,
+                solarSatellite: 0,
+            },
+            defense: {
+                rocketLauncher: 0,
+                lightLaser: 0,
+                heavyLaser: 0,
+                gaussCannon: 0,
+                ionCannon: 0,
+                plasmaTurret: 0,
+                smallShieldDome: 0,
+                largeShieldDome: 0,
+                antiBallisticMissile: 0,
+                interplanetaryMissile: 0,
+            },
+            constructionProgress: null,
+            researchProgress: null,
+            fleetProgress: null,
+            defenseProgress: null,
+            pendingAttack: null,
+            pendingReturn: null,
+            incomingAttack: null,
+            vacationMode: {
+                isActive: false,
+                startTime: null,
+                minEndTime: null,
+            },
+            lastResourceUpdate: new Date(),
+        }).exec();
+        return { success: true, message: '계정이 초기화되었습니다.' };
+    }
+    async deleteAccount(userId, password) {
+        const user = await this.findById(userId);
+        if (!user) {
+            return { success: false, message: '사용자를 찾을 수 없습니다.' };
+        }
+        if (user.password) {
+            const isValid = await this.validatePassword(user, password);
+            if (!isValid) {
+                return { success: false, message: '비밀번호가 일치하지 않습니다.' };
+            }
+        }
+        await this.userModel.findByIdAndDelete(userId).exec();
+        return { success: true, message: '계정이 삭제되었습니다.' };
+    }
 };
 exports.UserService = UserService;
 exports.UserService = UserService = __decorate([
