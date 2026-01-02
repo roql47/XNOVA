@@ -106,7 +106,6 @@ let ResourcesService = class ResourcesService {
         user.resources.deuterium += netDeuteriumProduction * hoursElapsed;
         user.resources.energy = energyProduction - energyConsumption;
         user.lastResourceUpdate = now;
-        user.lastActivity = now;
         await user.save();
         return user;
     }
