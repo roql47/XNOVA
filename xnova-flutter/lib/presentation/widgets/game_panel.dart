@@ -141,11 +141,13 @@ class GameButton extends StatelessWidget {
 class ProgressTimer extends StatefulWidget {
   final DateTime finishTime;
   final VoidCallback? onComplete;
+  final TextStyle? textStyle;
 
   const ProgressTimer({
     super.key,
     required this.finishTime,
     this.onComplete,
+    this.textStyle,
   });
 
   @override
@@ -170,13 +172,14 @@ class _ProgressTimerState extends State<ProgressTimer> {
               widget.onComplete?.call();
             });
           }
-          return const Text(
+          return Text(
             '완료',
-            style: TextStyle(
-              color: AppColors.positive,
-              fontWeight: FontWeight.w500,
-              fontSize: 12,
-            ),
+            style: widget.textStyle?.copyWith(color: AppColors.positive) ?? 
+              const TextStyle(
+                color: AppColors.positive,
+                fontWeight: FontWeight.w500,
+                fontSize: 12,
+              ),
           );
         }
 
@@ -186,7 +189,7 @@ class _ProgressTimerState extends State<ProgressTimer> {
 
         return Text(
           '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}',
-          style: const TextStyle(
+          style: widget.textStyle ?? const TextStyle(
             color: AppColors.accent,
             fontWeight: FontWeight.w600,
             fontSize: 12,

@@ -138,30 +138,30 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
   
   /// 앱이 포그라운드로 돌아왔을 때 실행
   Future<void> _onAppResumed() async {
-    // 백그라운드에서 일정 시간(1분) 이상 있었으면 전체 재연결
-    final shouldFullReconnect = _lastPausedTime != null &&
-        DateTime.now().difference(_lastPausedTime!).inMinutes >= 1;
+    debugPrint('[MainScreen] 백그라운드에서 복귀');
     
-    if (shouldFullReconnect) {
-      debugPrint('[MainScreen] 백그라운드에서 복귀 - 전체 데이터 재로드');
-      
-      // 인증 상태 먼저 확인
-      await ref.read(authProvider.notifier).checkAuth();
-      
-      // 인증이 유효하면 게임 데이터 재로드
-      final authState = ref.read(authProvider);
-      if (authState.isAuthenticated) {
-        await ref.read(gameProvider.notifier).loadAllData();
-        await ref.read(gameProvider.notifier).loadProfile();
-        await ref.read(messageProvider.notifier).loadMessages();
-      }
-    } else {
-      debugPrint('[MainScreen] 백그라운드에서 복귀 - 리소스만 새로고침');
-      // 짧은 백그라운드 시간이면 리소스만 업데이트
-      await ref.read(gameProvider.notifier).loadResources();
+    // 1. 인증 상태 확인
+    await ref.read(authProvider.notifier).checkAuth();
+    final authState = ref.read(authProvider);
+    
+    if (!authState.isAuthenticated) {
+      // 인증 실패 시 로그아웃 처리
+      debugPrint('[MainScreen] 인증 실패 - 로그아웃');
+      widget.onLogout();
+      return;
     }
     
-    // 자동 완료 타이머 재시작
+    // 2. 소켓 재연결 (백그라운드에서 끊어졌을 수 있음)
+    debugPrint('[MainScreen] 소켓 재연결 시도');
+    await ref.read(chatProvider.notifier).reconnect();
+    
+    // 3. 전체 데이터 재로드
+    debugPrint('[MainScreen] 게임 데이터 재로드');
+    await ref.read(gameProvider.notifier).loadAllData();
+    await ref.read(gameProvider.notifier).loadProfile();
+    await ref.read(messageProvider.notifier).loadMessages();
+    
+    // 4. 자동 완료 타이머 재시작
     _startAutoCompleteTimer();
     _lastPausedTime = null;
   }
@@ -310,6 +310,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
   }
 
   Widget _buildTopBar(GameState gameState) {
+    final messageState = ref.watch(messageProvider);
+    final unreadCount = messageState.messages.where((m) => !m.isRead).length;
+    
     return Container(
       color: AppColors.surface,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -346,6 +349,44 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                 ],
               ),
             ),
+          ),
+          // 메시지 아이콘 (읽지 않은 메시지 배지)
+          Stack(
+            children: [
+              IconButton(
+                icon: Icon(
+                  unreadCount > 0 ? Icons.mail : Icons.mail_outline,
+                  color: unreadCount > 0 ? AppColors.accent : AppColors.textMuted,
+                  size: 20,
+                ),
+                onPressed: () => _onTabChanged(MainTab.messages),
+              ),
+              if (unreadCount > 0)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: AppColors.negative,
+                      shape: BoxShape.circle,
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      unreadCount > 9 ? '9+' : '$unreadCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
           ),
           IconButton(
             key: _chatButtonKey,
@@ -422,7 +463,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                 return ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   children: MainTab.values
-                      .where((tab) => tab != MainTab.simulator)  // 시뮬레이터 탭 숨김
+                      .where((tab) => tab != MainTab.simulator && tab != MainTab.messages)  // 시뮬레이터, 메시지 탭 숨김
                       .map((tab) {
                     return _DrawerMenuItem(
                       tab: tab,

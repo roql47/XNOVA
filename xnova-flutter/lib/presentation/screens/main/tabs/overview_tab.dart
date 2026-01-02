@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/constants/game_constants.dart';
+import '../../../../core/constants/game_names.dart';
 import '../../../../providers/providers.dart';
 import '../../../../data/services/api_service.dart';
 import '../../../widgets/game_panel.dart';
@@ -22,45 +23,76 @@ class OverviewTab extends ConsumerWidget {
       child: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          // 건설 진행 상황
-          if (gameState.constructionProgress != null)
-            _ProgressPanel(
-              icon: Icons.apartment,
-              title: '건설 중',
-              name: gameState.constructionProgress!.name,
-              finishTime: gameState.constructionProgress!.finishDateTime,
-              onComplete: () => ref.read(gameProvider.notifier).completeBuilding(),
-              onCancel: () => ref.read(gameProvider.notifier).cancelBuilding(),
+          // 건설/연구 진행 상황 (두 줄 레이아웃)
+          if (gameState.constructionProgress != null || gameState.researchProgress != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  // 건설 진행
+                  if (gameState.constructionProgress != null)
+                    Expanded(
+                      child: _CompactProgressCard(
+                        type: 'building',
+                        name: gameState.constructionProgress!.name,
+                        finishTime: gameState.constructionProgress!.finishDateTime,
+                        onComplete: () => ref.read(gameProvider.notifier).completeBuilding(),
+                      ),
+                    )
+                  else
+                    const Expanded(child: SizedBox()),
+                  const SizedBox(width: 8),
+                  // 연구 진행
+                  if (gameState.researchProgress != null)
+                    Expanded(
+                      child: _CompactProgressCard(
+                        type: 'research',
+                        name: gameState.researchProgress!.name,
+                        finishTime: gameState.researchProgress!.finishDateTime,
+                        onComplete: () => ref.read(gameProvider.notifier).completeResearch(),
+                      ),
+                    )
+                  else
+                    const Expanded(child: SizedBox()),
+                ],
+              ),
             ),
           
-          // 연구 진행 상황
-          if (gameState.researchProgress != null)
-            _ProgressPanel(
-              icon: Icons.science,
-              title: '연구 중',
-              name: gameState.researchProgress!.name,
-              finishTime: gameState.researchProgress!.finishDateTime,
-              onComplete: () => ref.read(gameProvider.notifier).completeResearch(),
-            ),
-          
-          // 함대 건조 진행 상황
-          if (gameState.fleetProgress != null)
-            _ProgressPanel(
-              icon: Icons.rocket_launch,
-              title: '함선 건조 중',
-              name: '${gameState.fleetProgress!.name} x${gameState.fleetProgress!.quantity ?? 1}',
-              finishTime: gameState.fleetProgress!.finishDateTime,
-              onComplete: () => ref.read(gameProvider.notifier).completeFleet(),
-            ),
-          
-          // 방어시설 건설 진행 상황
-          if (gameState.defenseProgress != null)
-            _ProgressPanel(
-              icon: Icons.shield,
-              title: '방어시설 건설 중',
-              name: '${gameState.defenseProgress!.name} x${gameState.defenseProgress!.quantity ?? 1}',
-              finishTime: gameState.defenseProgress!.finishDateTime,
-              onComplete: () => ref.read(gameProvider.notifier).completeDefense(),
+          // 함대/방어시설 건조 진행 상황 (두 줄 레이아웃)
+          if (gameState.fleetProgress != null || gameState.defenseProgress != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  // 함대 건조
+                  if (gameState.fleetProgress != null)
+                    Expanded(
+                      child: _CompactProgressCard(
+                        type: 'fleet',
+                        name: gameState.fleetProgress!.name,
+                        quantity: gameState.fleetProgress!.quantity,
+                        finishTime: gameState.fleetProgress!.finishDateTime,
+                        onComplete: () => ref.read(gameProvider.notifier).completeFleet(),
+                      ),
+                    )
+                  else
+                    const Expanded(child: SizedBox()),
+                  const SizedBox(width: 8),
+                  // 방어시설 건설
+                  if (gameState.defenseProgress != null)
+                    Expanded(
+                      child: _CompactProgressCard(
+                        type: 'defense',
+                        name: gameState.defenseProgress!.name,
+                        quantity: gameState.defenseProgress!.quantity,
+                        finishTime: gameState.defenseProgress!.finishDateTime,
+                        onComplete: () => ref.read(gameProvider.notifier).completeDefense(),
+                      ),
+                    )
+                  else
+                    const Expanded(child: SizedBox()),
+                ],
+              ),
             ),
           
           // 전투 상태
@@ -158,6 +190,179 @@ class _InfoGrid extends StatelessWidget {
         )).toList(),
       ),
     );
+  }
+}
+
+// 홈화면용 컴팩트 진행 카드 (원형 이미지 + 시간)
+class _CompactProgressCard extends StatelessWidget {
+  final String type; // 'building', 'research', 'fleet', 'defense'
+  final String name;
+  final int? quantity;
+  final DateTime? finishTime;
+  final VoidCallback onComplete;
+
+  const _CompactProgressCard({
+    required this.type,
+    required this.name,
+    this.quantity,
+    required this.finishTime,
+    required this.onComplete,
+  });
+
+  Color get _accentColor {
+    switch (type) {
+      case 'building':
+        return AppColors.accent;
+      case 'research':
+        return const Color(0xFF8B5CF6); // Purple
+      case 'fleet':
+        return const Color(0xFF10B981); // Green
+      case 'defense':
+        return const Color(0xFFF59E0B); // Orange
+      default:
+        return AppColors.accent;
+    }
+  }
+
+  String get _label {
+    switch (type) {
+      case 'building':
+        return '건설';
+      case 'research':
+        return '연구';
+      case 'fleet':
+        return '건조';
+      case 'defense':
+        return '방어';
+      default:
+        return '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final koreanName = getKoreanName(name);
+    final imagePath = getImagePath(name);
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: _accentColor.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _accentColor.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          // 원형 이미지
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: _accentColor, width: 2),
+            ),
+            child: ClipOval(
+              child: imagePath != null
+                  ? Image.asset(
+                      imagePath,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: AppColors.surface,
+                        child: Icon(_getIcon(), color: _accentColor, size: 20),
+                      ),
+                    )
+                  : Container(
+                      color: AppColors.surface,
+                      child: Icon(_getIcon(), color: _accentColor, size: 20),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          // 정보
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 라벨 + 수량
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _accentColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(
+                        _label,
+                        style: TextStyle(
+                          color: _accentColor,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if (quantity != null && quantity! > 1) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        'x$quantity',
+                        style: TextStyle(
+                          color: _accentColor,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 3),
+                // 이름
+                Text(
+                  koreanName,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          // 시간 (오른쪽 가운데 정렬)
+          if (finishTime != null)
+            ProgressTimer(
+              finishTime: finishTime!,
+              onComplete: onComplete,
+              textStyle: TextStyle(
+                color: _accentColor,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            )
+          else
+            Text(
+              '...',
+              style: TextStyle(color: _accentColor, fontSize: 11),
+            ),
+        ],
+      ),
+    );
+  }
+
+  IconData _getIcon() {
+    switch (type) {
+      case 'building':
+        return Icons.apartment;
+      case 'research':
+        return Icons.science;
+      case 'fleet':
+        return Icons.rocket_launch;
+      case 'defense':
+        return Icons.shield;
+      default:
+        return Icons.build;
+    }
   }
 }
 

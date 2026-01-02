@@ -31,7 +31,7 @@ import { BlacklistedToken, BlacklistedTokenSchema } from './schemas/blacklisted-
         return {
           secret,
           signOptions: {
-            expiresIn: '15m', // Access Token: 15분
+            expiresIn: '7d', // Access Token: 7일
           },
         };
       },

@@ -30,9 +30,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _initializeChat() async {
     if (!mounted) return;
     final chatNotifier = ref.read(chatProvider.notifier);
-    await chatNotifier.connect();
+    await chatNotifier.connect();  // autoJoinChat=true로 자동 입장
     if (!mounted) return;
-    chatNotifier.joinChat();
     setState(() {
       _isInitialized = true;
     });
@@ -40,7 +39,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
-    ref.read(chatProvider.notifier).leaveChat();
+    // dispose에서는 ref 사용하지 않음 (이미 disposed 상태일 수 있음)
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -273,26 +272,69 @@ class _ChatBubble extends StatelessWidget {
     return '$hour:$minute';
   }
 
+  // 플레이어 ID 기반 색상 생성
+  Color _getAvatarColor(String odId) {
+    final colors = [
+      const Color(0xFF6366F1), // Indigo
+      const Color(0xFF8B5CF6), // Violet
+      const Color(0xFFEC4899), // Pink
+      const Color(0xFFEF4444), // Red
+      const Color(0xFFF97316), // Orange
+      const Color(0xFFF59E0B), // Amber
+      const Color(0xFF10B981), // Emerald
+      const Color(0xFF14B8A6), // Teal
+      const Color(0xFF06B6D4), // Cyan
+      const Color(0xFF3B82F6), // Blue
+    ];
+    final hash = odId.hashCode.abs();
+    return colors[hash % colors.length];
+  }
+
   @override
   Widget build(BuildContext context) {
+    final avatarColor = _getAvatarColor(message.senderId);
+    final initial = message.senderName.isNotEmpty 
+        ? message.senderName[0].toUpperCase() 
+        : '?';
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!isMe) ...[
-            // 발신자 이름 (왼쪽 정렬)
+            // 아바타
+            Container(
+              width: 32,
+              height: 32,
+              margin: const EdgeInsets.only(right: 8, top: 2),
+              decoration: BoxDecoration(
+                color: avatarColor,
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  initial,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            // 발신자 이름 + 메시지
             Flexible(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 4),
+                    padding: const EdgeInsets.only(bottom: 4),
                     child: Text(
                       message.senderName,
                       style: TextStyle(
-                        color: AppColors.accent,
+                        color: avatarColor,
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
                       ),
@@ -308,10 +350,10 @@ class _ChatBubble extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: AppColors.panelBackground,
                             borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(16),
+                              topLeft: Radius.circular(4),
                               topRight: Radius.circular(16),
                               bottomRight: Radius.circular(16),
-                              bottomLeft: Radius.circular(4),
+                              bottomLeft: Radius.circular(16),
                             ),
                             border: Border.all(color: AppColors.panelBorder),
                           ),

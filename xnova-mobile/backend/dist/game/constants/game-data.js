@@ -1,6 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.NAME_MAPPING = exports.RESEARCH_DATA = exports.DEFENSE_DATA = exports.FLEET_DATA = exports.BUILDING_COSTS = void 0;
+exports.NAME_MAPPING = exports.ESPIONAGE_INFO_LEVELS = exports.SHIP_ENGINE_DATA = exports.RESEARCH_EFFECTS = exports.RESEARCH_DATA = exports.DEFENSE_DATA = exports.FLEET_DATA = exports.BUILDING_COSTS = void 0;
+exports.calculateShipSpeed = calculateShipSpeed;
+exports.calculateFleetSlots = calculateFleetSlots;
+exports.calculateCombatStats = calculateCombatStats;
 exports.BUILDING_COSTS = {
     metalMine: {
         base: { metal: 60, crystal: 15 },
@@ -245,6 +248,151 @@ exports.RESEARCH_DATA = {
         requirements: { researchLab: 2 },
     },
 };
+exports.RESEARCH_EFFECTS = {
+    weaponsTech: {
+        type: 'combat',
+        effect: 'attack',
+        bonus: 0.1,
+        description: '모든 유닛 공격력 +10%/레벨',
+        formula: '공격력 = 기본공격력 × (1 + 0.1 × 레벨)',
+    },
+    shieldTech: {
+        type: 'combat',
+        effect: 'shield',
+        bonus: 0.1,
+        description: '모든 유닛 실드 +10%/레벨',
+        formula: '실드 = 기본실드 × (1 + 0.1 × 레벨)',
+    },
+    armorTech: {
+        type: 'combat',
+        effect: 'armor',
+        bonus: 0.1,
+        description: '모든 유닛 구조력 +10%/레벨',
+        formula: '구조력 = 기본구조력 × (1 + 0.1 × 레벨)',
+    },
+    combustionDrive: {
+        type: 'engine',
+        effect: 'speed',
+        bonus: 0.1,
+        description: '연소 엔진 함선 속도 +10%/레벨',
+        formula: '속도 = 기본속도 × (1 + 0.1 × 레벨)',
+    },
+    impulseDrive: {
+        type: 'engine',
+        effect: 'speed',
+        bonus: 0.2,
+        description: '임펄스 엔진 함선 속도 +20%/레벨',
+        formula: '속도 = 기본속도 × (1 + 0.2 × 레벨)',
+    },
+    hyperspaceDrive: {
+        type: 'engine',
+        effect: 'speed',
+        bonus: 0.3,
+        description: '초공간 엔진 함선 속도 +30%/레벨',
+        formula: '속도 = 기본속도 × (1 + 0.3 × 레벨)',
+    },
+    computerTech: {
+        type: 'utility',
+        effect: 'fleetSlots',
+        bonus: 1,
+        description: '최대 함대 슬롯 +1/레벨',
+        formula: '함대슬롯 = 1 + 레벨',
+    },
+    espionageTech: {
+        type: 'utility',
+        effect: 'espionage',
+        description: '정찰 보고서 정보량 증가, 역정찰 방어력 증가',
+        formula: 'ST = 위성수 ± (레벨차이)²',
+    },
+    energyTech: { type: 'prerequisite', description: '다른 기술의 선행 조건' },
+    laserTech: { type: 'prerequisite', description: '레이저 무기의 선행 조건' },
+    ionTech: { type: 'prerequisite', description: '이온 무기의 선행 조건' },
+    plasmaTech: { type: 'prerequisite', description: '플라즈마 무기의 선행 조건' },
+    hyperspaceTech: { type: 'prerequisite', description: '고급 함선/건물의 선행 조건' },
+    astrophysics: { type: 'utility', description: '탐사 미션 가능' },
+    intergalacticResearch: {
+        type: 'utility',
+        effect: 'researchNetwork',
+        description: '다른 행성의 연구소 레벨 합산',
+        formula: '총 연구소 레벨 = 레벨 개수만큼의 가장 높은 연구소들의 합',
+    },
+    gravitonTech: { type: 'prerequisite', description: '데스스타 건조 가능' },
+};
+exports.SHIP_ENGINE_DATA = {
+    smallCargo: {
+        defaultEngine: 'combustion',
+        baseSpeed: 5000,
+        upgradeCondition: { impulseDrive: 5 },
+        upgradedEngine: 'impulse',
+        upgradedBaseSpeed: 10000,
+    },
+    largeCargo: { defaultEngine: 'combustion', baseSpeed: 7500 },
+    lightFighter: { defaultEngine: 'combustion', baseSpeed: 12500 },
+    recycler: { defaultEngine: 'combustion', baseSpeed: 2000 },
+    espionageProbe: { defaultEngine: 'combustion', baseSpeed: 100000000 },
+    heavyFighter: { defaultEngine: 'impulse', baseSpeed: 10000 },
+    cruiser: { defaultEngine: 'impulse', baseSpeed: 15000 },
+    bomber: {
+        defaultEngine: 'impulse',
+        baseSpeed: 4000,
+        upgradeCondition: { hyperspaceDrive: 8 },
+        upgradedEngine: 'hyperspace',
+        upgradedBaseSpeed: 5000,
+    },
+    battleship: { defaultEngine: 'hyperspace', baseSpeed: 10000 },
+    destroyer: { defaultEngine: 'hyperspace', baseSpeed: 5000 },
+    deathstar: { defaultEngine: 'hyperspace', baseSpeed: 100 },
+    battlecruiser: { defaultEngine: 'hyperspace', baseSpeed: 10000 },
+    solarSatellite: { defaultEngine: 'none', baseSpeed: 0 },
+};
+exports.ESPIONAGE_INFO_LEVELS = {
+    1: ['resources'],
+    2: ['resources', 'fleet'],
+    3: ['resources', 'fleet', 'defense'],
+    5: ['resources', 'fleet', 'defense', 'buildings'],
+    7: ['resources', 'fleet', 'defense', 'buildings', 'research'],
+};
+function calculateShipSpeed(shipType, researchLevels) {
+    const shipData = exports.SHIP_ENGINE_DATA[shipType];
+    if (!shipData)
+        return 0;
+    const combustionLevel = researchLevels.combustionDrive || 0;
+    const impulseLevel = researchLevels.impulseDrive || 0;
+    const hyperspaceLevel = researchLevels.hyperspaceDrive || 0;
+    let engine = shipData.defaultEngine;
+    let baseSpeed = shipData.baseSpeed;
+    if (shipData.upgradeCondition) {
+        const [techType, requiredLevel] = Object.entries(shipData.upgradeCondition)[0];
+        const currentTechLevel = researchLevels[techType] || 0;
+        if (currentTechLevel >= requiredLevel) {
+            engine = shipData.upgradedEngine;
+            baseSpeed = shipData.upgradedBaseSpeed;
+        }
+    }
+    let bonus = 0;
+    switch (engine) {
+        case 'combustion':
+            bonus = combustionLevel * 0.1;
+            break;
+        case 'impulse':
+            bonus = impulseLevel * 0.2;
+            break;
+        case 'hyperspace':
+            bonus = hyperspaceLevel * 0.3;
+            break;
+    }
+    return Math.floor(baseSpeed * (1 + bonus));
+}
+function calculateFleetSlots(computerTechLevel) {
+    return 1 + computerTechLevel;
+}
+function calculateCombatStats(baseAttack, baseShield, baseHull, weaponsTech, shieldTech, armorTech) {
+    return {
+        attack: Math.floor(baseAttack * (1 + 0.1 * weaponsTech)),
+        shield: Math.floor(baseShield * (1 + 0.1 * shieldTech)),
+        hull: Math.floor(baseHull * (1 + 0.1 * armorTech)),
+    };
+}
 exports.NAME_MAPPING = {
     metalMine: '메탈광산',
     crystalMine: '크리스탈광산',

@@ -745,6 +745,179 @@ export declare const RESEARCH_DATA: {
         };
     };
 };
+export declare const RESEARCH_EFFECTS: {
+    weaponsTech: {
+        type: string;
+        effect: string;
+        bonus: number;
+        description: string;
+        formula: string;
+    };
+    shieldTech: {
+        type: string;
+        effect: string;
+        bonus: number;
+        description: string;
+        formula: string;
+    };
+    armorTech: {
+        type: string;
+        effect: string;
+        bonus: number;
+        description: string;
+        formula: string;
+    };
+    combustionDrive: {
+        type: string;
+        effect: string;
+        bonus: number;
+        description: string;
+        formula: string;
+    };
+    impulseDrive: {
+        type: string;
+        effect: string;
+        bonus: number;
+        description: string;
+        formula: string;
+    };
+    hyperspaceDrive: {
+        type: string;
+        effect: string;
+        bonus: number;
+        description: string;
+        formula: string;
+    };
+    computerTech: {
+        type: string;
+        effect: string;
+        bonus: number;
+        description: string;
+        formula: string;
+    };
+    espionageTech: {
+        type: string;
+        effect: string;
+        description: string;
+        formula: string;
+    };
+    energyTech: {
+        type: string;
+        description: string;
+    };
+    laserTech: {
+        type: string;
+        description: string;
+    };
+    ionTech: {
+        type: string;
+        description: string;
+    };
+    plasmaTech: {
+        type: string;
+        description: string;
+    };
+    hyperspaceTech: {
+        type: string;
+        description: string;
+    };
+    astrophysics: {
+        type: string;
+        description: string;
+    };
+    intergalacticResearch: {
+        type: string;
+        effect: string;
+        description: string;
+        formula: string;
+    };
+    gravitonTech: {
+        type: string;
+        description: string;
+    };
+};
+export declare const SHIP_ENGINE_DATA: {
+    smallCargo: {
+        defaultEngine: string;
+        baseSpeed: number;
+        upgradeCondition: {
+            impulseDrive: number;
+        };
+        upgradedEngine: string;
+        upgradedBaseSpeed: number;
+    };
+    largeCargo: {
+        defaultEngine: string;
+        baseSpeed: number;
+    };
+    lightFighter: {
+        defaultEngine: string;
+        baseSpeed: number;
+    };
+    recycler: {
+        defaultEngine: string;
+        baseSpeed: number;
+    };
+    espionageProbe: {
+        defaultEngine: string;
+        baseSpeed: number;
+    };
+    heavyFighter: {
+        defaultEngine: string;
+        baseSpeed: number;
+    };
+    cruiser: {
+        defaultEngine: string;
+        baseSpeed: number;
+    };
+    bomber: {
+        defaultEngine: string;
+        baseSpeed: number;
+        upgradeCondition: {
+            hyperspaceDrive: number;
+        };
+        upgradedEngine: string;
+        upgradedBaseSpeed: number;
+    };
+    battleship: {
+        defaultEngine: string;
+        baseSpeed: number;
+    };
+    destroyer: {
+        defaultEngine: string;
+        baseSpeed: number;
+    };
+    deathstar: {
+        defaultEngine: string;
+        baseSpeed: number;
+    };
+    battlecruiser: {
+        defaultEngine: string;
+        baseSpeed: number;
+    };
+    solarSatellite: {
+        defaultEngine: string;
+        baseSpeed: number;
+    };
+};
+export declare const ESPIONAGE_INFO_LEVELS: {
+    1: string[];
+    2: string[];
+    3: string[];
+    5: string[];
+    7: string[];
+};
+export declare function calculateShipSpeed(shipType: string, researchLevels: {
+    combustionDrive?: number;
+    impulseDrive?: number;
+    hyperspaceDrive?: number;
+}): number;
+export declare function calculateFleetSlots(computerTechLevel: number): number;
+export declare function calculateCombatStats(baseAttack: number, baseShield: number, baseHull: number, weaponsTech: number, shieldTech: number, armorTech: number): {
+    attack: number;
+    shield: number;
+    hull: number;
+};
 export declare const NAME_MAPPING: {
     metalMine: string;
     crystalMine: string;

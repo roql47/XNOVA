@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/constants/game_names.dart';
 import '../../../../providers/providers.dart';
 import '../../../../data/models/models.dart' hide Resources;
 import '../../../widgets/game_panel.dart';
@@ -62,6 +63,9 @@ class _DefenseProgressCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final koreanName = getKoreanName(progress.name);
+    final imagePath = getImagePath(progress.name);
+    
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
@@ -71,43 +75,98 @@ class _DefenseProgressCard extends StatelessWidget {
           border: Border.all(color: AppColors.accent.withOpacity(0.2)),
         ),
         padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Row(
-              children: [
-                Icon(Icons.shield, color: AppColors.accent, size: 16),
-                const SizedBox(width: 8),
-                const Text(
-                  '방어시설 건설 중',
-                  style: TextStyle(
-                    color: AppColors.accent,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '${progress.name} x${progress.quantity ?? 1}',
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w500,
-                fontSize: 13,
+            // 원형 이미지
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.accent, width: 2),
+              ),
+              child: ClipOval(
+                child: imagePath != null
+                    ? Image.asset(
+                        imagePath,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
+                          color: AppColors.surface,
+                          child: const Icon(Icons.shield, color: AppColors.accent, size: 24),
+                        ),
+                      )
+                    : Container(
+                        color: AppColors.surface,
+                        child: const Icon(Icons.shield, color: AppColors.accent, size: 24),
+                      ),
               ),
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Icon(Icons.schedule, size: 14, color: AppColors.textMuted),
-                const SizedBox(width: 6),
-                if (progress.finishDateTime != null)
-                  ProgressTimer(
-                    finishTime: progress.finishDateTime!,
-                    onComplete: onComplete,
+            const SizedBox(width: 12),
+            // 정보
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          '건설 중',
+                          style: TextStyle(
+                            color: AppColors.accent,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.positive.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          'x${progress.quantity ?? 1}',
+                          style: const TextStyle(
+                            color: AppColors.positive,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-              ],
+                  const SizedBox(height: 4),
+                  Text(
+                    koreanName,
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(Icons.schedule, size: 12, color: AppColors.textMuted),
+                      const SizedBox(width: 4),
+                      if (progress.finishDateTime != null)
+                        Expanded(
+                          child: ProgressTimer(
+                            finishTime: progress.finishDateTime!,
+                            onComplete: onComplete,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
         ),

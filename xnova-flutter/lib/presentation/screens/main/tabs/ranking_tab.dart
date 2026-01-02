@@ -364,14 +364,6 @@ class _RankingTabState extends ConsumerState<RankingTab> with SingleTickerProvid
                     ],
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  player.coordinate,
-                  style: const TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 11,
-                  ),
-                ),
               ],
             ),
           ),

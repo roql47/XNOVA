@@ -25,8 +25,8 @@ interface ClientInfo {
 @Injectable()
 export class AuthService {
   private googleClient: OAuth2Client;
-  private readonly REFRESH_TOKEN_EXPIRY_DAYS = 7;
-  private readonly ACCESS_TOKEN_EXPIRY_MINUTES = 15;
+  private readonly REFRESH_TOKEN_EXPIRY_DAYS = 30;
+  private readonly ACCESS_TOKEN_EXPIRY_DAYS = 7; // 7일로 변경
 
   constructor(
     private userService: UserService,
@@ -141,7 +141,7 @@ export class AuthService {
     return {
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
-      expiresIn: this.ACCESS_TOKEN_EXPIRY_MINUTES * 60, // 초 단위
+      expiresIn: this.ACCESS_TOKEN_EXPIRY_DAYS * 24 * 60 * 60, // 초 단위
     };
   }
 
@@ -294,7 +294,7 @@ export class AuthService {
         },
         accessToken,
         refreshToken,
-        expiresIn: this.ACCESS_TOKEN_EXPIRY_MINUTES * 60,
+        expiresIn: this.ACCESS_TOKEN_EXPIRY_DAYS * 24 * 60 * 60,
       };
     } catch (error) {
       if (error instanceof ConflictException) {
@@ -336,7 +336,7 @@ export class AuthService {
         },
         accessToken,
         refreshToken,
-        expiresIn: this.ACCESS_TOKEN_EXPIRY_MINUTES * 60,
+        expiresIn: this.ACCESS_TOKEN_EXPIRY_DAYS * 24 * 60 * 60,
       };
     } catch (error) {
       if (error instanceof ConflictException) {
@@ -360,7 +360,7 @@ export class AuthService {
       },
       accessToken,
       refreshToken,
-      expiresIn: this.ACCESS_TOKEN_EXPIRY_MINUTES * 60,
+      expiresIn: this.ACCESS_TOKEN_EXPIRY_DAYS * 24 * 60 * 60,
     };
   }
 

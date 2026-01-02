@@ -63,8 +63,8 @@ let AuthService = class AuthService {
     refreshTokenModel;
     blacklistedTokenModel;
     googleClient;
-    REFRESH_TOKEN_EXPIRY_DAYS = 7;
-    ACCESS_TOKEN_EXPIRY_MINUTES = 15;
+    REFRESH_TOKEN_EXPIRY_DAYS = 30;
+    ACCESS_TOKEN_EXPIRY_DAYS = 7;
     constructor(userService, jwtService, configService, refreshTokenModel, blacklistedTokenModel) {
         this.userService = userService;
         this.jwtService = jwtService;
@@ -141,7 +141,7 @@ let AuthService = class AuthService {
         return {
             accessToken: newAccessToken,
             refreshToken: newRefreshToken,
-            expiresIn: this.ACCESS_TOKEN_EXPIRY_MINUTES * 60,
+            expiresIn: this.ACCESS_TOKEN_EXPIRY_DAYS * 24 * 60 * 60,
         };
     }
     async revokeRefreshToken(refreshToken) {
@@ -240,7 +240,7 @@ let AuthService = class AuthService {
                 },
                 accessToken,
                 refreshToken,
-                expiresIn: this.ACCESS_TOKEN_EXPIRY_MINUTES * 60,
+                expiresIn: this.ACCESS_TOKEN_EXPIRY_DAYS * 24 * 60 * 60,
             };
         }
         catch (error) {
@@ -273,7 +273,7 @@ let AuthService = class AuthService {
                 },
                 accessToken,
                 refreshToken,
-                expiresIn: this.ACCESS_TOKEN_EXPIRY_MINUTES * 60,
+                expiresIn: this.ACCESS_TOKEN_EXPIRY_DAYS * 24 * 60 * 60,
             };
         }
         catch (error) {
@@ -296,7 +296,7 @@ let AuthService = class AuthService {
             },
             accessToken,
             refreshToken,
-            expiresIn: this.ACCESS_TOKEN_EXPIRY_MINUTES * 60,
+            expiresIn: this.ACCESS_TOKEN_EXPIRY_DAYS * 24 * 60 * 60,
         };
     }
     async getProfile(userId) {

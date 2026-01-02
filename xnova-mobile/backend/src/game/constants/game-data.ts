@@ -252,6 +252,198 @@ export const RESEARCH_DATA = {
   },
 };
 
+// ===== 연구 효과 시스템 =====
+
+// 연구 효과 정의
+export const RESEARCH_EFFECTS = {
+  // 전투 기술 - 10%/레벨
+  weaponsTech: {
+    type: 'combat',
+    effect: 'attack',
+    bonus: 0.1, // 10% per level
+    description: '모든 유닛 공격력 +10%/레벨',
+    formula: '공격력 = 기본공격력 × (1 + 0.1 × 레벨)',
+  },
+  shieldTech: {
+    type: 'combat',
+    effect: 'shield',
+    bonus: 0.1,
+    description: '모든 유닛 실드 +10%/레벨',
+    formula: '실드 = 기본실드 × (1 + 0.1 × 레벨)',
+  },
+  armorTech: {
+    type: 'combat',
+    effect: 'armor',
+    bonus: 0.1,
+    description: '모든 유닛 구조력 +10%/레벨',
+    formula: '구조력 = 기본구조력 × (1 + 0.1 × 레벨)',
+  },
+  
+  // 엔진 기술
+  combustionDrive: {
+    type: 'engine',
+    effect: 'speed',
+    bonus: 0.1, // 10% per level
+    description: '연소 엔진 함선 속도 +10%/레벨',
+    formula: '속도 = 기본속도 × (1 + 0.1 × 레벨)',
+  },
+  impulseDrive: {
+    type: 'engine',
+    effect: 'speed',
+    bonus: 0.2, // 20% per level
+    description: '임펄스 엔진 함선 속도 +20%/레벨',
+    formula: '속도 = 기본속도 × (1 + 0.2 × 레벨)',
+  },
+  hyperspaceDrive: {
+    type: 'engine',
+    effect: 'speed',
+    bonus: 0.3, // 30% per level
+    description: '초공간 엔진 함선 속도 +30%/레벨',
+    formula: '속도 = 기본속도 × (1 + 0.3 × 레벨)',
+  },
+  
+  // 컴퓨터 기술
+  computerTech: {
+    type: 'utility',
+    effect: 'fleetSlots',
+    bonus: 1, // +1 slot per level
+    description: '최대 함대 슬롯 +1/레벨',
+    formula: '함대슬롯 = 1 + 레벨',
+  },
+  
+  // 정탐 기술
+  espionageTech: {
+    type: 'utility',
+    effect: 'espionage',
+    description: '정찰 보고서 정보량 증가, 역정찰 방어력 증가',
+    formula: 'ST = 위성수 ± (레벨차이)²',
+  },
+  
+  // 선행 기술 (효과 없음, 요구조건용)
+  energyTech: { type: 'prerequisite', description: '다른 기술의 선행 조건' },
+  laserTech: { type: 'prerequisite', description: '레이저 무기의 선행 조건' },
+  ionTech: { type: 'prerequisite', description: '이온 무기의 선행 조건' },
+  plasmaTech: { type: 'prerequisite', description: '플라즈마 무기의 선행 조건' },
+  hyperspaceTech: { type: 'prerequisite', description: '고급 함선/건물의 선행 조건' },
+  astrophysics: { type: 'utility', description: '탐사 미션 가능' },
+  intergalacticResearch: { 
+    type: 'utility', 
+    effect: 'researchNetwork',
+    description: '다른 행성의 연구소 레벨 합산',
+    formula: '총 연구소 레벨 = 레벨 개수만큼의 가장 높은 연구소들의 합',
+  },
+  gravitonTech: { type: 'prerequisite', description: '데스스타 건조 가능' },
+};
+
+// 함선별 엔진 타입 정의
+export const SHIP_ENGINE_DATA = {
+  // 연소 엔진 함선
+  smallCargo: { 
+    defaultEngine: 'combustion', 
+    baseSpeed: 5000,
+    upgradeCondition: { impulseDrive: 5 },
+    upgradedEngine: 'impulse',
+    upgradedBaseSpeed: 10000,
+  },
+  largeCargo: { defaultEngine: 'combustion', baseSpeed: 7500 },
+  lightFighter: { defaultEngine: 'combustion', baseSpeed: 12500 },
+  recycler: { defaultEngine: 'combustion', baseSpeed: 2000 },
+  espionageProbe: { defaultEngine: 'combustion', baseSpeed: 100000000 },
+  
+  // 임펄스 엔진 함선
+  heavyFighter: { defaultEngine: 'impulse', baseSpeed: 10000 },
+  cruiser: { defaultEngine: 'impulse', baseSpeed: 15000 },
+  bomber: { 
+    defaultEngine: 'impulse', 
+    baseSpeed: 4000,
+    upgradeCondition: { hyperspaceDrive: 8 },
+    upgradedEngine: 'hyperspace',
+    upgradedBaseSpeed: 5000,
+  },
+  
+  // 초공간 엔진 함선
+  battleship: { defaultEngine: 'hyperspace', baseSpeed: 10000 },
+  destroyer: { defaultEngine: 'hyperspace', baseSpeed: 5000 },
+  deathstar: { defaultEngine: 'hyperspace', baseSpeed: 100 },
+  battlecruiser: { defaultEngine: 'hyperspace', baseSpeed: 10000 },
+  
+  // 기타
+  solarSatellite: { defaultEngine: 'none', baseSpeed: 0 },
+};
+
+// 정탐 기술 정보 레벨
+export const ESPIONAGE_INFO_LEVELS = {
+  1: ['resources'],           // 자원만
+  2: ['resources', 'fleet'],  // +함대
+  3: ['resources', 'fleet', 'defense'],        // +방어시설
+  5: ['resources', 'fleet', 'defense', 'buildings'], // +건물
+  7: ['resources', 'fleet', 'defense', 'buildings', 'research'], // +연구
+};
+
+// 함선 속도 계산 함수
+export function calculateShipSpeed(
+  shipType: string,
+  researchLevels: { combustionDrive?: number; impulseDrive?: number; hyperspaceDrive?: number }
+): number {
+  const shipData = SHIP_ENGINE_DATA[shipType];
+  if (!shipData) return 0;
+  
+  const combustionLevel = researchLevels.combustionDrive || 0;
+  const impulseLevel = researchLevels.impulseDrive || 0;
+  const hyperspaceLevel = researchLevels.hyperspaceDrive || 0;
+  
+  // 엔진 업그레이드 확인
+  let engine = shipData.defaultEngine;
+  let baseSpeed = shipData.baseSpeed;
+  
+  if (shipData.upgradeCondition) {
+    const [techType, requiredLevel] = Object.entries(shipData.upgradeCondition)[0] as [string, number];
+    const currentTechLevel = researchLevels[techType] || 0;
+    
+    if (currentTechLevel >= requiredLevel) {
+      engine = shipData.upgradedEngine;
+      baseSpeed = shipData.upgradedBaseSpeed;
+    }
+  }
+  
+  // 엔진 보너스 적용
+  let bonus = 0;
+  switch (engine) {
+    case 'combustion':
+      bonus = combustionLevel * 0.1; // 10% per level
+      break;
+    case 'impulse':
+      bonus = impulseLevel * 0.2; // 20% per level
+      break;
+    case 'hyperspace':
+      bonus = hyperspaceLevel * 0.3; // 30% per level
+      break;
+  }
+  
+  return Math.floor(baseSpeed * (1 + bonus));
+}
+
+// 함대 슬롯 계산 함수
+export function calculateFleetSlots(computerTechLevel: number): number {
+  return 1 + computerTechLevel;
+}
+
+// 전투 스탯 계산 함수
+export function calculateCombatStats(
+  baseAttack: number,
+  baseShield: number,
+  baseHull: number,
+  weaponsTech: number,
+  shieldTech: number,
+  armorTech: number
+): { attack: number; shield: number; hull: number } {
+  return {
+    attack: Math.floor(baseAttack * (1 + 0.1 * weaponsTech)),
+    shield: Math.floor(baseShield * (1 + 0.1 * shieldTech)),
+    hull: Math.floor(baseHull * (1 + 0.1 * armorTech)),
+  };
+}
+
 // 한글 이름 매핑
 export const NAME_MAPPING = {
   // 건물

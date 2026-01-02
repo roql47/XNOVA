@@ -17,7 +17,7 @@ export declare class AuthService {
     private blacklistedTokenModel;
     private googleClient;
     private readonly REFRESH_TOKEN_EXPIRY_DAYS;
-    private readonly ACCESS_TOKEN_EXPIRY_MINUTES;
+    private readonly ACCESS_TOKEN_EXPIRY_DAYS;
     constructor(userService: UserService, jwtService: JwtService, configService: ConfigService, refreshTokenModel: Model<RefreshTokenDocument>, blacklistedTokenModel: Model<BlacklistedTokenDocument>);
     private generateAccessToken;
     private generateRefreshToken;

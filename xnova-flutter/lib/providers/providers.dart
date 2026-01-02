@@ -614,6 +614,16 @@ class GameNotifier extends StateNotifier<GameState> {
     }
   }
 
+  Future<void> cancelResearch() async {
+    try {
+      await _apiService.cancelResearch();
+      await loadResearch();
+      await loadResources();
+    } catch (e) {
+      // ignore
+    }
+  }
+
   Future<void> loadFleet() async {
     try {
       final response = await _apiService.getFleet();
@@ -1004,7 +1014,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   Future<void> connect() async {
     state = state.copyWith(isLoading: true);
-    await _socketService.connect();
+    await _socketService.connect(autoJoinChat: true);  // 자동 채팅방 입장
   }
 
   void joinChat() {
@@ -1023,6 +1033,12 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   void disconnect() {
     _socketService.disconnect();
+  }
+
+  /// 소켓 재연결 - 백그라운드에서 복귀 시 사용
+  Future<void> reconnect() async {
+    state = state.copyWith(isLoading: true);
+    await _socketService.reconnect(autoJoinChat: true);
   }
 
   String? get currentUserId => _currentUserId;
