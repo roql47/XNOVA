@@ -767,27 +767,26 @@ class _PlanetRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          isEmpty ? '빈 슬롯' : planet.playerName!,
-                          style: TextStyle(
-                            color: isEmpty 
-                                ? AppColors.textMuted
-                                : isOwn
-                                    ? AppColors.accent
-                                    : AppColors.textPrimary,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 13,
-                          ),
-                        ),
-                        // 활동 상태 표시
-                        if (!isEmpty && !isOwn) ...[
-                          const SizedBox(width: 6),
-                          _buildActivityIndicator(planet),
-                        ],
-                      ],
+                    // 행성 이름
+                    Text(
+                      isEmpty ? '빈 슬롯' : planet.playerName!,
+                      style: TextStyle(
+                        color: isEmpty 
+                            ? AppColors.textMuted
+                            : isOwn
+                                ? AppColors.accent
+                                : AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 13,
+                      ),
                     ),
+                    // 활동 상태 표시
+                    if (!isEmpty && !isOwn)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: _buildActivityIndicator(planet),
+                      ),
+                    // 좌표
                     Text(
                       planet.coordinate,
                       style: const TextStyle(

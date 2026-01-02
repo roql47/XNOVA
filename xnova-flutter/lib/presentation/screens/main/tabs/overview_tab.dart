@@ -22,9 +22,6 @@ class OverviewTab extends ConsumerWidget {
       child: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          // 내 점수 & 순위
-          const _ScorePanel(),
-          const SizedBox(height: 12),
           // 건설 진행 상황
           if (gameState.constructionProgress != null)
             _ProgressPanel(
@@ -590,10 +587,55 @@ class _FleetReturnPanel extends StatelessWidget {
 }
 
 // 행성 정보 패널 (필드 시스템 포함)
-class _PlanetInfoPanel extends StatelessWidget {
+class _PlanetInfoPanel extends ConsumerStatefulWidget {
   final GameState gameState;
 
   const _PlanetInfoPanel({required this.gameState});
+
+  @override
+  ConsumerState<_PlanetInfoPanel> createState() => _PlanetInfoPanelState();
+}
+
+class _PlanetInfoPanelState extends ConsumerState<_PlanetInfoPanel> {
+  int? _totalScore;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadScore();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PlanetInfoPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // gameState가 변경되면 점수 다시 로드 (건물/연구 등 완료 시)
+    _loadScore();
+  }
+
+  Future<void> _loadScore() async {
+    try {
+      final apiService = ref.read(apiServiceProvider);
+      final scores = await apiService.getMyScores();
+      if (mounted) {
+        setState(() {
+          _totalScore = scores.totalScore;
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  GameState get gameState => widget.gameState;
+
+  String _formatScore(int number) {
+    if (number >= 1000000) {
+      return '${(number / 1000000).toStringAsFixed(1)}M';
+    } else if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(1)}K';
+    }
+    return number.toString();
+  }
 
   String _getPlanetTypeName(String? type) {
     switch (type) {
@@ -805,6 +847,27 @@ class _PlanetInfoPanel extends StatelessWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                // 총합 점수
+                Row(
+                  children: [
+                    const Icon(Icons.star, size: 14, color: AppColors.accent),
+                    const SizedBox(width: 6),
+                    const Text(
+                      '총합 점수',
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    ),
+                    const Spacer(),
+                    Text(
+                      _totalScore != null ? _formatScore(_totalScore!) : '-',
+                      style: const TextStyle(
+                        color: AppColors.accent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -857,253 +920,3 @@ class _PlanetInfoPanel extends StatelessWidget {
   }
 }
 
-// 점수 & 순위 패널
-class _ScorePanel extends ConsumerStatefulWidget {
-  const _ScorePanel();
-
-  @override
-  ConsumerState<_ScorePanel> createState() => _ScorePanelState();
-}
-
-class _ScorePanelState extends ConsumerState<_ScorePanel> {
-  MyScoresResponse? _scores;
-  MyRankResponse? _rank;
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadScores();
-  }
-
-  Future<void> _loadScores() async {
-    try {
-      final apiService = ref.read(apiServiceProvider);
-      final results = await Future.wait([
-        apiService.getMyScores(),
-        apiService.getMyRank(),
-      ]);
-      if (mounted) {
-        setState(() {
-          _scores = results[0] as MyScoresResponse;
-          _rank = results[1] as MyRankResponse;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-
-  String _formatNumber(int number) {
-    if (number >= 1000000) {
-      return '${(number / 1000000).toStringAsFixed(1)}M';
-    } else if (number >= 1000) {
-      return '${(number / 1000).toStringAsFixed(1)}K';
-    }
-    return number.toString();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.panelBackground,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.panelBorder),
-        ),
-        child: const Center(
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: AppColors.accent,
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (_scores == null || _rank == null) {
-      return const SizedBox.shrink();
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.accent.withOpacity(0.1),
-            AppColors.accent.withOpacity(0.05),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.accent.withOpacity(0.3)),
-      ),
-      child: Column(
-        children: [
-          // 헤더
-          Row(
-            children: [
-              const Icon(Icons.leaderboard, size: 18, color: AppColors.accent),
-              const SizedBox(width: 8),
-              const Text(
-                '내 점수',
-                style: TextStyle(
-                  color: AppColors.accent,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: () {
-                  ref.read(navigationProvider.notifier).setTab(MainTab.ranking);
-                },
-                child: Row(
-                  children: const [
-                    Text(
-                      '랭킹 보기',
-                      style: TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 11,
-                      ),
-                    ),
-                    SizedBox(width: 4),
-                    Icon(Icons.chevron_right, size: 16, color: AppColors.textMuted),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          
-          // 총합 점수 (크게)
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '총합 점수',
-                      style: TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 11,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatNumber(_scores!.totalScore),
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.accent,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  children: [
-                    const Text(
-                      '순위',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 10,
-                      ),
-                    ),
-                    Text(
-                      '#${_rank!.total.rank}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          
-          // 세부 점수
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                _buildScoreItem('건물', _scores!.buildingScore, _rank!.building.rank),
-                _buildDivider(),
-                _buildScoreItem('연구', _scores!.researchScore, _rank!.research.rank),
-                _buildDivider(),
-                _buildScoreItem('함대', _scores!.fleetScore, _rank!.fleet.rank),
-                _buildDivider(),
-                _buildScoreItem('방어', _scores!.defenseScore, _rank!.defense.rank),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScoreItem(String label, int score, int rank) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 10,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _formatNumber(score),
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '#$rank',
-            style: const TextStyle(
-              color: AppColors.accent,
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDivider() {
-    return Container(
-      width: 1,
-      height: 40,
-      color: AppColors.panelBorder,
-    );
-  }
-}

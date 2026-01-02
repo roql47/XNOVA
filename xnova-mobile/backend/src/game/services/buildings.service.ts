@@ -193,8 +193,8 @@ export class BuildingsService {
     const nanoBonus = Math.pow(2, nanoFactoryLevel);
     const facilityBonus = 1 + robotFactoryLevel;
 
-    // 건설 시간 (초) - 2배 상향
-    return ((totalCost / (25 * facilityBonus * nanoBonus)) * 4) * 2;
+    // 건설 시간 (초) - 2배 상향, 올림 처리로 일관성 유지
+    return Math.ceil(((totalCost / (25 * facilityBonus * nanoBonus)) * 4) * 2);
   }
 
   // 건물 현황 조회
