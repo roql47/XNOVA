@@ -21,12 +21,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeChat();
+    // 위젯 빌드 후에 provider 수정
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeChat();
+    });
   }
 
   Future<void> _initializeChat() async {
+    if (!mounted) return;
     final chatNotifier = ref.read(chatProvider.notifier);
     await chatNotifier.connect();
+    if (!mounted) return;
     chatNotifier.joinChat();
     setState(() {
       _isInitialized = true;
