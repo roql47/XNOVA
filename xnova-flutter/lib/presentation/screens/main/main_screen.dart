@@ -260,7 +260,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
               steps: GuideStepsData(
                 resourceBarKey: _resourceBarKey,
                 menuButtonKey: _menuButtonKey,
-                refreshButtonKey: _refreshButtonKey,
+                chatButtonKey: _chatButtonKey,
                 tabContentKey: _tabContentKey,
               ).getSteps(),
               onComplete: () {

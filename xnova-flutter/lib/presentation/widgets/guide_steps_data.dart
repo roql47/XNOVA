@@ -6,13 +6,13 @@ class GuideStepsData {
   // GlobalKey들을 외부에서 주입받아 사용
   final GlobalKey? resourceBarKey;
   final GlobalKey? menuButtonKey;
-  final GlobalKey? refreshButtonKey;
+  final GlobalKey? chatButtonKey;
   final GlobalKey? tabContentKey;
 
   GuideStepsData({
     this.resourceBarKey,
     this.menuButtonKey,
-    this.refreshButtonKey,
+    this.chatButtonKey,
     this.tabContentKey,
   });
 
@@ -158,13 +158,13 @@ class GuideStepsData {
         targetKey: tabContentKey,
       ),
 
-      // 13. 새로고침 버튼
+      // 13. 채팅 버튼
       GuideStep(
-        title: '새로고침',
-        description: '우측 상단의 새로고침 버튼으로 게임 데이터를 최신 상태로 업데이트할 수 있습니다. '
-            '자원 생산량이나 건설 완료 등의 변경사항을 즉시 반영합니다.',
-        targetKey: refreshButtonKey,
-        icon: Icons.refresh_rounded,
+        title: '전체 채팅',
+        description: '우측 상단의 채팅 버튼으로 다른 플레이어들과 실시간으로 대화할 수 있습니다. '
+            '전략을 공유하거나 동맹을 맺어보세요!',
+        targetKey: chatButtonKey,
+        icon: Icons.chat_bubble_outline_rounded,
         tabToShow: 'overview',
       ),
 
