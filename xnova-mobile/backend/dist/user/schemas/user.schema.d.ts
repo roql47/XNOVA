@@ -106,8 +106,8 @@ export declare class ReturnProgress {
 }
 export declare class VacationMode {
     isActive: boolean;
-    startTime: Date | null;
-    minEndTime: Date | null;
+    startTime: Date;
+    minEndTime: Date;
 }
 export declare class User {
     email: string;

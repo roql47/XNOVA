@@ -76,8 +76,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     _buildSettingItem(
                       icon: Icons.edit_rounded,
                       title: '행성 이름 변경',
-                      subtitle: gameState.planetName ?? '행성',
-                      onTap: () => _showPlanetNameDialog(gameState.planetName ?? ''),
+                      subtitle: gameState.playerName ?? '행성',
+                      onTap: () => _showPlanetNameDialog(gameState.playerName ?? ''),
                     ),
                   ]),
                   

@@ -134,7 +134,7 @@ class _RankingTabState extends ConsumerState<RankingTab> with SingleTickerProvid
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          color: AppColors.cardBackground,
+          color: AppColors.panelBackground,
           child: Text(
             '총 $_totalPlayers명의 플레이어',
             style: const TextStyle(

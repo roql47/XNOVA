@@ -498,16 +498,16 @@ let VacationMode = class VacationMode {
 };
 exports.VacationMode = VacationMode;
 __decorate([
-    (0, mongoose_1.Prop)({ default: false }),
+    (0, mongoose_1.Prop)({ type: Boolean, default: false }),
     __metadata("design:type", Boolean)
 ], VacationMode.prototype, "isActive", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ default: null }),
-    __metadata("design:type", Object)
+    (0, mongoose_1.Prop)({ type: Date, default: null }),
+    __metadata("design:type", Date)
 ], VacationMode.prototype, "startTime", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ default: null }),
-    __metadata("design:type", Object)
+    (0, mongoose_1.Prop)({ type: Date, default: null }),
+    __metadata("design:type", Date)
 ], VacationMode.prototype, "minEndTime", void 0);
 exports.VacationMode = VacationMode = __decorate([
     (0, mongoose_1.Schema)({ _id: false })

@@ -35,8 +35,8 @@ export declare class UserController {
         canActivateReason?: undefined;
     } | {
         isActive: boolean;
-        startTime: Date | null;
-        minEndTime: Date | null;
+        startTime: Date;
+        minEndTime: Date;
         canActivate: boolean;
         canActivateReason: string | undefined;
         error?: undefined;

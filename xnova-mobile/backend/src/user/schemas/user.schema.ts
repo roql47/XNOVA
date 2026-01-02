@@ -299,14 +299,14 @@ export class ReturnProgress {
 // 휴가 모드 스키마
 @Schema({ _id: false })
 export class VacationMode {
-  @Prop({ default: false })
+  @Prop({ type: Boolean, default: false })
   isActive: boolean;
 
-  @Prop({ default: null })
-  startTime: Date | null;
+  @Prop({ type: Date, default: null })
+  startTime: Date;
 
-  @Prop({ default: null })
-  minEndTime: Date | null;  // 최소 48시간 후
+  @Prop({ type: Date, default: null })
+  minEndTime: Date;  // 최소 48시간 후
 }
 
 @Schema({ timestamps: true })
