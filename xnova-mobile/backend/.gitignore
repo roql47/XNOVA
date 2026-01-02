@@ -7,7 +7,7 @@ node_modules/
 .env.*.local 
  
 # Build output 
-dist/ 
+# dist/  # 서버 RAM 부족으로 빌드 불가 - dist 포함
 build/ 
  
 # IDE 
