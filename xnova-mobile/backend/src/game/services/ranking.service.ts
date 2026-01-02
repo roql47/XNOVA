@@ -47,17 +47,19 @@ export class RankingService {
   calculateBuildingScore(user: UserDocument): number {
     let totalCost = 0;
 
-    // 광산
-    const mines = user.mines || {};
-    for (const [type, level] of Object.entries(mines)) {
+    // 광산 - 직접 필드 접근 (Mongoose 객체 호환)
+    const mineTypes = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'];
+    for (const type of mineTypes) {
+      const level = user.mines?.[type] || 0;
       if (level > 0 && BUILDING_COSTS[type]) {
         totalCost += this.calculateLeveledCost(BUILDING_COSTS[type], level);
       }
     }
 
-    // 시설
-    const facilities = user.facilities || {};
-    for (const [type, level] of Object.entries(facilities)) {
+    // 시설 - 직접 필드 접근 (Mongoose 객체 호환)
+    const facilityTypes = ['robotFactory', 'shipyard', 'researchLab', 'nanoFactory', 'terraformer', 'missileSilo', 'allianceDepot', 'spaceDock'];
+    for (const type of facilityTypes) {
+      const level = user.facilities?.[type] || 0;
       if (level > 0 && BUILDING_COSTS[type]) {
         totalCost += this.calculateLeveledCost(BUILDING_COSTS[type], level);
       }
@@ -85,9 +87,17 @@ export class RankingService {
   // 연구 점수 계산 (누적 비용 기반, 가중치 적용)
   calculateResearchScore(user: UserDocument): number {
     let totalCost = 0;
-    const researchLevels = user.researchLevels || {};
 
-    for (const [type, level] of Object.entries(researchLevels)) {
+    // 연구 - 직접 필드 접근 (Mongoose 객체 호환)
+    const researchTypes = [
+      'energyTech', 'laserTech', 'ionTech', 'hyperspaceTech', 'plasmaTech',
+      'combustionDrive', 'impulseDrive', 'hyperspaceDrive',
+      'espionageTech', 'computerTech', 'astrophysics', 'intergalacticResearch',
+      'gravitonTech', 'weaponsTech', 'shieldingTech', 'armorTech'
+    ];
+
+    for (const type of researchTypes) {
+      const level = user.researchLevels?.[type] || 0;
       if (level > 0 && RESEARCH_DATA[type]) {
         const research = RESEARCH_DATA[type];
         // 가중치 적용: 메탈×1 + 크리스탈×2 + 듀테륨×3
@@ -108,9 +118,17 @@ export class RankingService {
   // 함대 점수 계산 (현재 보유 함대 기반, 가중치 적용)
   calculateFleetScore(user: UserDocument): number {
     let totalCost = 0;
-    const fleet = user.fleet || {};
 
-    for (const [type, count] of Object.entries(fleet)) {
+    // 함대 - 직접 필드 접근 (Mongoose 객체 호환)
+    const fleetTypes = [
+      'smallCargo', 'largeCargo', 'lightFighter', 'heavyFighter',
+      'cruiser', 'battleship', 'battlecruiser', 'bomber',
+      'destroyer', 'deathstar', 'colonyShip', 'recycler',
+      'espionageProbe', 'solarSatellite'
+    ];
+
+    for (const type of fleetTypes) {
+      const count = user.fleet?.[type] || 0;
       if (count > 0 && FLEET_DATA[type]) {
         const fleetData = FLEET_DATA[type];
         // 가중치 적용: 메탈×1 + 크리스탈×2 + 듀테륨×3
@@ -127,9 +145,16 @@ export class RankingService {
   // 방어시설 점수 계산 (현재 보유 방어시설 기반, 가중치 적용)
   calculateDefenseScore(user: UserDocument): number {
     let totalCost = 0;
-    const defense = user.defense || {};
 
-    for (const [type, count] of Object.entries(defense)) {
+    // 방어시설 - 직접 필드 접근 (Mongoose 객체 호환)
+    const defenseTypes = [
+      'rocketLauncher', 'lightLaser', 'heavyLaser', 'gaussCannon',
+      'ionCannon', 'plasmaTurret', 'smallShieldDome', 'largeShieldDome',
+      'antiBallisticMissile', 'interplanetaryMissile'
+    ];
+
+    for (const type of defenseTypes) {
+      const count = user.defense?.[type] || 0;
       if (count > 0 && DEFENSE_DATA[type]) {
         const defenseData = DEFENSE_DATA[type];
         // 가중치 적용: 메탈×1 + 크리스탈×2 + 듀테륨×3

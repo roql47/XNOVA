@@ -764,36 +764,45 @@ class _PlanetRow extends StatelessWidget {
             Expanded(
               child: InkWell(
                 onTap: onAttack,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // 행성 이름
-                    Text(
-                      isEmpty ? '빈 슬롯' : planet.playerName!,
-                      style: TextStyle(
-                        color: isEmpty 
-                            ? AppColors.textMuted
-                            : isOwn
-                                ? AppColors.accent
-                                : AppColors.textPrimary,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 13,
+                    // 행성 이름 + 좌표 (왼쪽)
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // 행성 이름
+                          Text(
+                            isEmpty ? '빈 슬롯' : planet.playerName!,
+                            style: TextStyle(
+                              color: isEmpty 
+                                  ? AppColors.textMuted
+                                  : isOwn
+                                      ? AppColors.accent
+                                      : AppColors.textPrimary,
+                              fontWeight: FontWeight.w500,
+                              fontSize: 13,
+                            ),
+                          ),
+                          // 좌표
+                          Text(
+                            planet.coordinate,
+                            style: const TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    // 활동 상태 표시
+                    // 활동 상태 표시 (오른쪽, 세로 가운데)
                     if (!isEmpty && !isOwn)
                       Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        padding: const EdgeInsets.only(left: 8),
                         child: _buildActivityIndicator(planet),
                       ),
-                    // 좌표
-                    Text(
-                      planet.coordinate,
-                      style: const TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 10,
-                      ),
-                    ),
                   ],
                 ),
               ),

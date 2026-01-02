@@ -32,14 +32,16 @@ let RankingService = class RankingService {
     }
     calculateBuildingScore(user) {
         let totalCost = 0;
-        const mines = user.mines || {};
-        for (const [type, level] of Object.entries(mines)) {
+        const mineTypes = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'];
+        for (const type of mineTypes) {
+            const level = user.mines?.[type] || 0;
             if (level > 0 && game_data_1.BUILDING_COSTS[type]) {
                 totalCost += this.calculateLeveledCost(game_data_1.BUILDING_COSTS[type], level);
             }
         }
-        const facilities = user.facilities || {};
-        for (const [type, level] of Object.entries(facilities)) {
+        const facilityTypes = ['robotFactory', 'shipyard', 'researchLab', 'nanoFactory', 'terraformer', 'missileSilo', 'allianceDepot', 'spaceDock'];
+        for (const type of facilityTypes) {
+            const level = user.facilities?.[type] || 0;
             if (level > 0 && game_data_1.BUILDING_COSTS[type]) {
                 totalCost += this.calculateLeveledCost(game_data_1.BUILDING_COSTS[type], level);
             }
@@ -59,8 +61,14 @@ let RankingService = class RankingService {
     }
     calculateResearchScore(user) {
         let totalCost = 0;
-        const researchLevels = user.researchLevels || {};
-        for (const [type, level] of Object.entries(researchLevels)) {
+        const researchTypes = [
+            'energyTech', 'laserTech', 'ionTech', 'hyperspaceTech', 'plasmaTech',
+            'combustionDrive', 'impulseDrive', 'hyperspaceDrive',
+            'espionageTech', 'computerTech', 'astrophysics', 'intergalacticResearch',
+            'gravitonTech', 'weaponsTech', 'shieldingTech', 'armorTech'
+        ];
+        for (const type of researchTypes) {
+            const level = user.researchLevels?.[type] || 0;
             if (level > 0 && game_data_1.RESEARCH_DATA[type]) {
                 const research = game_data_1.RESEARCH_DATA[type];
                 const baseCost = (research.cost.metal || 0) * RESOURCE_WEIGHTS.metal +
@@ -75,8 +83,14 @@ let RankingService = class RankingService {
     }
     calculateFleetScore(user) {
         let totalCost = 0;
-        const fleet = user.fleet || {};
-        for (const [type, count] of Object.entries(fleet)) {
+        const fleetTypes = [
+            'smallCargo', 'largeCargo', 'lightFighter', 'heavyFighter',
+            'cruiser', 'battleship', 'battlecruiser', 'bomber',
+            'destroyer', 'deathstar', 'colonyShip', 'recycler',
+            'espionageProbe', 'solarSatellite'
+        ];
+        for (const type of fleetTypes) {
+            const count = user.fleet?.[type] || 0;
             if (count > 0 && game_data_1.FLEET_DATA[type]) {
                 const fleetData = game_data_1.FLEET_DATA[type];
                 const unitCost = (fleetData.cost.metal || 0) * RESOURCE_WEIGHTS.metal +
@@ -89,8 +103,13 @@ let RankingService = class RankingService {
     }
     calculateDefenseScore(user) {
         let totalCost = 0;
-        const defense = user.defense || {};
-        for (const [type, count] of Object.entries(defense)) {
+        const defenseTypes = [
+            'rocketLauncher', 'lightLaser', 'heavyLaser', 'gaussCannon',
+            'ionCannon', 'plasmaTurret', 'smallShieldDome', 'largeShieldDome',
+            'antiBallisticMissile', 'interplanetaryMissile'
+        ];
+        for (const type of defenseTypes) {
+            const count = user.defense?.[type] || 0;
             if (count > 0 && game_data_1.DEFENSE_DATA[type]) {
                 const defenseData = game_data_1.DEFENSE_DATA[type];
                 const unitCost = (defenseData.cost.metal || 0) * RESOURCE_WEIGHTS.metal +
