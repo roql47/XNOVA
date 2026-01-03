@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../user/schemas/user.schema';
+import { Planet, PlanetDocument } from '../planet/schemas/planet.schema';
 import { Debris, DebrisDocument } from './schemas/debris.schema';
 import { MessageService } from '../message/message.service';
 import { NAME_MAPPING } from '../game/constants/game-data';
@@ -37,16 +38,18 @@ export interface SpyReport {
 export class GalaxyService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Planet.name) private planetModel: Model<PlanetDocument>,
     @InjectModel(Debris.name) private debrisModel: Model<DebrisDocument>,
     private messageService: MessageService,
   ) {}
 
   // 특정 시스템의 은하 지도 조회
   async getGalaxyMap(galaxy: number, system: number, currentUserId: string): Promise<PlanetInfo[]> {
-    // 해당 시스템의 모든 플레이어 조회
+    // 해당 시스템의 모든 플레이어 및 식민지 조회
     const pattern = new RegExp(`^${galaxy}:${system}:\\d+$`);
-    const [players, debrisFields] = await Promise.all([
+    const [players, colonies, debrisFields] = await Promise.all([
       this.userModel.find({ coordinate: pattern }).exec(),
+      this.planetModel.find({ coordinate: pattern }).populate('ownerId').exec(),
       this.debrisModel.find({ coordinate: pattern }).exec(),
       // 현재 사용자 활동 시간 업데이트
       this.userModel.findByIdAndUpdate(currentUserId, { lastActivity: new Date() }).exec(),
@@ -58,19 +61,55 @@ export class GalaxyService {
     for (let position = 1; position <= 15; position++) {
       const coord = `${galaxy}:${system}:${position}`;
       const player = players.find(p => p.coordinate === coord);
+      const colony = colonies.find(c => c.coordinate === coord);
       const debris = debrisFields.find(d => d.coordinate === coord);
 
-      const info: PlanetInfo = {
-        position,
-        coordinate: coord,
-        playerName: player ? player.playerName : null,
-        playerId: player ? player._id.toString() : null,
-        isOwnPlanet: player ? player._id.toString() === currentUserId : false,
-        hasDebris: !!debris && (debris.metal > 0 || debris.crystal > 0),
-        debrisAmount: debris ? { metal: debris.metal, crystal: debris.crystal } : undefined,
-        hasMoon: false, // TODO: 달 시스템 구현 시 추가
-        lastActivity: player?.lastActivity ? player.lastActivity.toISOString() : null,
-      };
+      let info: PlanetInfo;
+
+      if (player) {
+        // 모행성 (User 기반)
+        info = {
+          position,
+          coordinate: coord,
+          playerName: player.playerName,
+          playerId: player._id.toString(),
+          isOwnPlanet: player._id.toString() === currentUserId,
+          hasDebris: !!debris && (debris.metal > 0 || debris.crystal > 0),
+          debrisAmount: debris ? { metal: debris.metal, crystal: debris.crystal } : undefined,
+          hasMoon: false,
+          lastActivity: player?.lastActivity ? player.lastActivity.toISOString() : null,
+        };
+      } else if (colony) {
+        // 식민지 (Planet 기반)
+        const owner = colony.ownerId as any;
+        const ownerId = typeof owner === 'string' ? owner : owner?._id?.toString() || owner?.toString();
+        const ownerName = typeof owner === 'object' ? owner?.playerName : null;
+        
+        info = {
+          position,
+          coordinate: coord,
+          playerName: ownerName || colony.name || '식민지',
+          playerId: ownerId,
+          isOwnPlanet: ownerId === currentUserId,
+          hasDebris: !!debris && (debris.metal > 0 || debris.crystal > 0),
+          debrisAmount: debris ? { metal: debris.metal, crystal: debris.crystal } : undefined,
+          hasMoon: false,
+          lastActivity: null,
+        };
+      } else {
+        // 빈 좌표
+        info = {
+          position,
+          coordinate: coord,
+          playerName: null,
+          playerId: null,
+          isOwnPlanet: false,
+          hasDebris: !!debris && (debris.metal > 0 || debris.crystal > 0),
+          debrisAmount: debris ? { metal: debris.metal, crystal: debris.crystal } : undefined,
+          hasMoon: false,
+          lastActivity: null,
+        };
+      }
 
       planets.push(info);
     }

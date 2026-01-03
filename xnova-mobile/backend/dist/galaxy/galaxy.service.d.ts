@@ -1,5 +1,6 @@
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../user/schemas/user.schema';
+import { PlanetDocument } from '../planet/schemas/planet.schema';
 import { Debris, DebrisDocument } from './schemas/debris.schema';
 import { MessageService } from '../message/message.service';
 export interface PlanetInfo {
@@ -37,9 +38,10 @@ export interface SpyReport {
 }
 export declare class GalaxyService {
     private userModel;
+    private planetModel;
     private debrisModel;
     private messageService;
-    constructor(userModel: Model<UserDocument>, debrisModel: Model<DebrisDocument>, messageService: MessageService);
+    constructor(userModel: Model<UserDocument>, planetModel: Model<PlanetDocument>, debrisModel: Model<DebrisDocument>, messageService: MessageService);
     getGalaxyMap(galaxy: number, system: number, currentUserId: string): Promise<PlanetInfo[]>;
     updateDebris(coordinate: string, metal: number, crystal: number): Promise<void>;
     getDebris(coordinate: string): Promise<(import("mongoose").Document<unknown, {}, DebrisDocument, {}, import("mongoose").DefaultSchemaOptions> & Debris & import("mongoose").Document<import("mongoose").Types.ObjectId, any, any, Record<string, any>, {}> & Required<{

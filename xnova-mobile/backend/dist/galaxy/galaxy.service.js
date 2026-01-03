@@ -17,22 +17,26 @@ const common_1 = require("@nestjs/common");
 const mongoose_1 = require("@nestjs/mongoose");
 const mongoose_2 = require("mongoose");
 const user_schema_1 = require("../user/schemas/user.schema");
+const planet_schema_1 = require("../planet/schemas/planet.schema");
 const debris_schema_1 = require("./schemas/debris.schema");
 const message_service_1 = require("../message/message.service");
 const game_data_1 = require("../game/constants/game-data");
 let GalaxyService = class GalaxyService {
     userModel;
+    planetModel;
     debrisModel;
     messageService;
-    constructor(userModel, debrisModel, messageService) {
+    constructor(userModel, planetModel, debrisModel, messageService) {
         this.userModel = userModel;
+        this.planetModel = planetModel;
         this.debrisModel = debrisModel;
         this.messageService = messageService;
     }
     async getGalaxyMap(galaxy, system, currentUserId) {
         const pattern = new RegExp(`^${galaxy}:${system}:\\d+$`);
-        const [players, debrisFields] = await Promise.all([
+        const [players, colonies, debrisFields] = await Promise.all([
             this.userModel.find({ coordinate: pattern }).exec(),
+            this.planetModel.find({ coordinate: pattern }).populate('ownerId').exec(),
             this.debrisModel.find({ coordinate: pattern }).exec(),
             this.userModel.findByIdAndUpdate(currentUserId, { lastActivity: new Date() }).exec(),
         ]);
@@ -40,18 +44,51 @@ let GalaxyService = class GalaxyService {
         for (let position = 1; position <= 15; position++) {
             const coord = `${galaxy}:${system}:${position}`;
             const player = players.find(p => p.coordinate === coord);
+            const colony = colonies.find(c => c.coordinate === coord);
             const debris = debrisFields.find(d => d.coordinate === coord);
-            const info = {
-                position,
-                coordinate: coord,
-                playerName: player ? player.playerName : null,
-                playerId: player ? player._id.toString() : null,
-                isOwnPlanet: player ? player._id.toString() === currentUserId : false,
-                hasDebris: !!debris && (debris.metal > 0 || debris.crystal > 0),
-                debrisAmount: debris ? { metal: debris.metal, crystal: debris.crystal } : undefined,
-                hasMoon: false,
-                lastActivity: player?.lastActivity ? player.lastActivity.toISOString() : null,
-            };
+            let info;
+            if (player) {
+                info = {
+                    position,
+                    coordinate: coord,
+                    playerName: player.playerName,
+                    playerId: player._id.toString(),
+                    isOwnPlanet: player._id.toString() === currentUserId,
+                    hasDebris: !!debris && (debris.metal > 0 || debris.crystal > 0),
+                    debrisAmount: debris ? { metal: debris.metal, crystal: debris.crystal } : undefined,
+                    hasMoon: false,
+                    lastActivity: player?.lastActivity ? player.lastActivity.toISOString() : null,
+                };
+            }
+            else if (colony) {
+                const owner = colony.ownerId;
+                const ownerId = typeof owner === 'string' ? owner : owner?._id?.toString() || owner?.toString();
+                const ownerName = typeof owner === 'object' ? owner?.playerName : null;
+                info = {
+                    position,
+                    coordinate: coord,
+                    playerName: ownerName || colony.name || '식민지',
+                    playerId: ownerId,
+                    isOwnPlanet: ownerId === currentUserId,
+                    hasDebris: !!debris && (debris.metal > 0 || debris.crystal > 0),
+                    debrisAmount: debris ? { metal: debris.metal, crystal: debris.crystal } : undefined,
+                    hasMoon: false,
+                    lastActivity: null,
+                };
+            }
+            else {
+                info = {
+                    position,
+                    coordinate: coord,
+                    playerName: null,
+                    playerId: null,
+                    isOwnPlanet: false,
+                    hasDebris: !!debris && (debris.metal > 0 || debris.crystal > 0),
+                    debrisAmount: debris ? { metal: debris.metal, crystal: debris.crystal } : undefined,
+                    hasMoon: false,
+                    lastActivity: null,
+                };
+            }
             planets.push(info);
         }
         return planets;
@@ -370,8 +407,10 @@ exports.GalaxyService = GalaxyService;
 exports.GalaxyService = GalaxyService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(user_schema_1.User.name)),
-    __param(1, (0, mongoose_1.InjectModel)(debris_schema_1.Debris.name)),
+    __param(1, (0, mongoose_1.InjectModel)(planet_schema_1.Planet.name)),
+    __param(2, (0, mongoose_1.InjectModel)(debris_schema_1.Debris.name)),
     __metadata("design:paramtypes", [mongoose_2.Model,
+        mongoose_2.Model,
         mongoose_2.Model,
         message_service_1.MessageService])
 ], GalaxyService);

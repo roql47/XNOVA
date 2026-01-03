@@ -731,59 +731,73 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
             icon: const Icon(Icons.menu, color: AppColors.textSecondary, size: 22),
             onPressed: () => _scaffoldKey.currentState?.openDrawer(),
           ),
+          // XNOVA 로고
+          GestureDetector(
+            onTap: () => _onTabChanged(MainTab.overview),
+            child: Text(
+              'XNOVA',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.accent,
+                letterSpacing: 2,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // 행성 선택 버튼
           Expanded(
             child: GestureDetector(
-              onTap: () => _onTabChanged(MainTab.overview),
-              child: Column(
-                children: [
-                  Text(
-                    'XNOVA',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+              onTap: () => _showPlanetSelector(context),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.panelBackground,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.panelBorder.withOpacity(0.5)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      gameState.myPlanets.any((p) => p.id == gameState.activePlanetId && p.isHomePlanet)
+                          ? Icons.home_rounded
+                          : Icons.public,
+                      size: 14,
                       color: AppColors.accent,
-                      letterSpacing: 2,
                     ),
-                  ),
-                  // 행성 선택 버튼
-                  GestureDetector(
-                    onTap: () => _showPlanetSelector(context),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: AppColors.panelBorder),
-                      ),
-                      child: Row(
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
                             _getActivePlanetName(gameState),
                             style: const TextStyle(
-                              fontSize: 10,
+                              fontSize: 11,
                               color: AppColors.textPrimary,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w600,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(width: 4),
                           Text(
                             gameState.coordinate ?? '',
                             style: const TextStyle(
-                              fontSize: 10,
+                              fontSize: 9,
                               color: AppColors.textMuted,
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          Icon(Icons.expand_more, size: 14, color: AppColors.textMuted),
                         ],
                       ),
                     ),
-                  ),
-                ],
+                    Icon(Icons.unfold_more, size: 16, color: AppColors.textMuted),
+                  ],
+                ),
               ),
             ),
           ),
+          const SizedBox(width: 4),
           // 메시지 아이콘 (읽지 않은 메시지 배지)
           Stack(
             children: [
