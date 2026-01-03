@@ -27,4 +27,7 @@ export declare class PlanetService {
     }): Promise<void>;
     isCoordinateEmpty(coordinate: string): Promise<boolean>;
     savePlanet(planet: PlanetDocument): Promise<PlanetDocument>;
+    getUserActivePlanetId(userId: string): Promise<{
+        activePlanetId: string | null;
+    } | null>;
 }

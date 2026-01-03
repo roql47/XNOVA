@@ -224,5 +224,14 @@ export class PlanetService {
   async savePlanet(planet: PlanetDocument): Promise<PlanetDocument> {
     return planet.save();
   }
+
+  /**
+   * 유저의 활성 행성 ID 조회
+   */
+  async getUserActivePlanetId(userId: string): Promise<{ activePlanetId: string | null } | null> {
+    const user = await this.userService.findById(userId);
+    if (!user) return null;
+    return { activePlanetId: user.activePlanetId };
+  }
 }
 

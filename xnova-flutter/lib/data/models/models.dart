@@ -1113,3 +1113,43 @@ class SpyResponse {
   );
 }
 
+// ===== 다중 행성 관리 =====
+class MyPlanet {
+  final String id;
+  final String coordinate;
+  final String name;
+  final bool isHomePlanet;
+  final bool isActive;
+  final int maxFields;
+  final int usedFields;
+  final int temperature;
+  final String planetType;
+
+  MyPlanet({
+    required this.id,
+    required this.coordinate,
+    required this.name,
+    this.isHomePlanet = false,
+    this.isActive = false,
+    this.maxFields = 163,
+    this.usedFields = 0,
+    this.temperature = 50,
+    this.planetType = 'normaltemp',
+  });
+
+  factory MyPlanet.fromJson(Map<String, dynamic> json) {
+    final planetInfo = json['planetInfo'] as Map<String, dynamic>? ?? {};
+    return MyPlanet(
+      id: json['_id'] ?? json['id'] ?? '',
+      coordinate: json['coordinate'] ?? '',
+      name: planetInfo['planetName'] ?? json['name'] ?? '행성',
+      isHomePlanet: json['isHomePlanet'] ?? false,
+      isActive: json['isActive'] ?? false,
+      maxFields: planetInfo['maxFields'] ?? 163,
+      usedFields: planetInfo['usedFields'] ?? 0,
+      temperature: planetInfo['temperature'] ?? 50,
+      planetType: planetInfo['planetType'] ?? 'normaltemp',
+    );
+  }
+}
+

@@ -254,6 +254,8 @@ export declare class GameController {
         transportResult: any;
         deployProcessed: boolean;
         deployResult: any;
+        colonyProcessed: boolean;
+        colonyResult: any;
     }>;
     simulate(body: SimulationRequest): Promise<import("./services/battle-simulator.service").SimulationResult>;
     simulateSimple(body: {

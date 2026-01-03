@@ -153,6 +153,12 @@ let PlanetService = class PlanetService {
     async savePlanet(planet) {
         return planet.save();
     }
+    async getUserActivePlanetId(userId) {
+        const user = await this.userService.findById(userId);
+        if (!user)
+            return null;
+        return { activePlanetId: user.activePlanetId };
+    }
 };
 exports.PlanetService = PlanetService;
 exports.PlanetService = PlanetService = __decorate([

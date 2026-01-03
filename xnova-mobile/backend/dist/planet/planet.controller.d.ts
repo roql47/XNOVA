@@ -4,13 +4,22 @@ export declare class PlanetController {
     constructor(planetService: PlanetService);
     getMyPlanets(req: any): Promise<{
         success: boolean;
+        activePlanetId: string;
         planets: {
+            _id: string;
             id: string;
             name: string;
             coordinate: string;
+            isHomePlanet: boolean;
             isHomeworld: boolean;
             type: string;
-            planetInfo: import("./schemas/planet.schema").PlanetInfo;
+            planetInfo: {
+                planetName: string;
+                maxFields: number;
+                usedFields: number;
+                temperature: number;
+                planetType: string;
+            };
             resources: import("./schemas/planet.schema").PlanetResources;
         }[];
     }>;

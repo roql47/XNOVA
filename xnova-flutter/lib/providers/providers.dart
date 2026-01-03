@@ -384,6 +384,10 @@ class GameState {
   // 전투
   final BattleStatus? battleStatus;
 
+  // 다중 행성
+  final List<MyPlanet> myPlanets;
+  final String? activePlanetId;
+
   GameState({
     this.resources = const GameResources(),
     this.production = const GameProduction(),
@@ -408,6 +412,8 @@ class GameState {
     this.currentSystem = 1,
     this.galaxyPlanets = const [],
     this.battleStatus,
+    this.myPlanets = const [],
+    this.activePlanetId,
   });
 
   GameState copyWith({
@@ -438,6 +444,8 @@ class GameState {
     int? currentSystem,
     List<PlanetInfo>? galaxyPlanets,
     BattleStatus? battleStatus,
+    List<MyPlanet>? myPlanets,
+    String? activePlanetId,
   }) {
     return GameState(
       resources: resources ?? this.resources,
@@ -463,6 +471,8 @@ class GameState {
       currentSystem: currentSystem ?? this.currentSystem,
       galaxyPlanets: galaxyPlanets ?? this.galaxyPlanets,
       battleStatus: battleStatus ?? this.battleStatus,
+      myPlanets: myPlanets ?? this.myPlanets,
+      activePlanetId: activePlanetId ?? this.activePlanetId,
     );
   }
 }
@@ -515,10 +525,76 @@ class GameNotifier extends StateNotifier<GameState> {
         loadFleet(),
         loadDefense(),
         loadBattleStatus(),
+        loadMyPlanets(),
       ]);
       state = state.copyWith(isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  /// 내 행성 목록 로드
+  Future<void> loadMyPlanets() async {
+    try {
+      final response = await _apiService.getMyPlanets();
+      final planets = (response['planets'] as List?)
+          ?.map((p) => MyPlanet.fromJson(p))
+          .toList() ?? [];
+      final activePlanetId = response['activePlanetId']?.toString();
+      state = state.copyWith(
+        myPlanets: planets,
+        activePlanetId: activePlanetId,
+      );
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  /// 활성 행성 전환
+  Future<bool> switchPlanet(String planetId) async {
+    try {
+      await _apiService.switchPlanet(planetId);
+      // 행성 전환 후 모든 데이터 새로고침
+      await loadMyPlanets();
+      await loadProfile();
+      await loadAllData();
+      return true;
+    } catch (e) {
+      state = state.copyWith(error: '행성 전환에 실패했습니다.');
+      return false;
+    }
+  }
+
+  /// 행성 이름 변경
+  Future<bool> renamePlanet(String planetId, String newName) async {
+    try {
+      await _apiService.renamePlanet(planetId, newName);
+      await loadMyPlanets();
+      return true;
+    } catch (e) {
+      state = state.copyWith(error: '행성 이름 변경에 실패했습니다.');
+      return false;
+    }
+  }
+
+  /// 행성 포기
+  Future<bool> abandonPlanet(String planetId) async {
+    try {
+      await _apiService.abandonPlanet(planetId);
+      await loadMyPlanets();
+      await loadProfile();
+      await loadAllData();
+      return true;
+    } catch (e) {
+      String errorMsg = '행성 포기에 실패했습니다.';
+      if (e is DioException && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map && data['message'] != null) {
+          errorMsg = data['message'].toString();
+        }
+      }
+      state = state.copyWith(error: errorMsg);
+      return false;
     }
   }
 

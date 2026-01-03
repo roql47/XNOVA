@@ -23,15 +23,25 @@ let PlanetController = class PlanetController {
     }
     async getMyPlanets(req) {
         const planets = await this.planetService.getPlanetsByOwner(req.user.userId);
+        const user = await this.planetService.getUserActivePlanetId(req.user.userId);
         return {
             success: true,
+            activePlanetId: user?.activePlanetId || planets[0]?._id.toString(),
             planets: planets.map(p => ({
+                _id: p._id.toString(),
                 id: p._id.toString(),
                 name: p.name,
                 coordinate: p.coordinate,
+                isHomePlanet: p.isHomeworld,
                 isHomeworld: p.isHomeworld,
                 type: p.type,
-                planetInfo: p.planetInfo,
+                planetInfo: {
+                    planetName: p.name,
+                    maxFields: p.planetInfo?.maxFields || 163,
+                    usedFields: p.planetInfo?.usedFields || 0,
+                    temperature: p.planetInfo?.tempMax || 50,
+                    planetType: p.planetInfo?.planetType || 'normaltemp',
+                },
                 resources: p.resources,
             })),
         };

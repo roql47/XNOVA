@@ -158,6 +158,8 @@ export class GameController {
     transportResult: any;
     deployProcessed: boolean;
     deployResult: any;
+    colonyProcessed: boolean;
+    colonyResult: any;
   }> {
     // 내가 보낸 공격 처리
     const attackResult = await this.battleService.processAttackArrival(req.user.userId);
@@ -171,6 +173,8 @@ export class GameController {
     const transportResult = await this.battleService.processTransportArrival(req.user.userId);
     // 배치 도착 처리
     const deployResult = await this.battleService.processDeployArrival(req.user.userId);
+    // 식민 미션 완료 처리
+    const colonyResult = await this.colonyService.completeColonization(req.user.userId);
     
     return {
       attackProcessed: attackResult !== null,
@@ -185,6 +189,8 @@ export class GameController {
       transportResult,
       deployProcessed: deployResult !== null,
       deployResult,
+      colonyProcessed: colonyResult !== null && colonyResult.success,
+      colonyResult,
     };
   }
 

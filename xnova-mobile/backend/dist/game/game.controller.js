@@ -112,6 +112,7 @@ let GameController = class GameController {
         const returnResult = await this.battleService.processFleetReturn(req.user.userId);
         const transportResult = await this.battleService.processTransportArrival(req.user.userId);
         const deployResult = await this.battleService.processDeployArrival(req.user.userId);
+        const colonyResult = await this.colonyService.completeColonization(req.user.userId);
         return {
             attackProcessed: attackResult !== null,
             attackResult,
@@ -125,6 +126,8 @@ let GameController = class GameController {
             transportResult,
             deployProcessed: deployResult !== null,
             deployResult,
+            colonyProcessed: colonyResult !== null && colonyResult.success,
+            colonyResult,
         };
     }
     async simulate(body) {

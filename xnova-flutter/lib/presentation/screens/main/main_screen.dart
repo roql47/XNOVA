@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../providers/providers.dart';
+import '../../../data/models/models.dart';
 import '../../widgets/resource_bar.dart';
 import '../../widgets/guide_tutorial_overlay.dart';
 import '../../widgets/guide_steps_data.dart';
@@ -210,6 +211,266 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       default:
         break;
     }
+  }
+
+  // 활성 행성 이름 가져오기
+  String _getActivePlanetName(GameState gameState) {
+    if (gameState.myPlanets.isEmpty) {
+      return gameState.playerName ?? '행성';
+    }
+    final activePlanet = gameState.myPlanets.firstWhere(
+      (p) => p.id == gameState.activePlanetId,
+      orElse: () => gameState.myPlanets.first,
+    );
+    return activePlanet.name.isEmpty ? '행성' : activePlanet.name;
+  }
+
+  // 행성 선택 바텀시트
+  void _showPlanetSelector(BuildContext context) {
+    final gameState = ref.read(gameProvider);
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.panelBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '행성 선택',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.settings, color: AppColors.textMuted, size: 20),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _showPlanetManagement(context);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (gameState.myPlanets.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(20),
+                child: Center(
+                  child: Text(
+                    '행성 정보를 불러오는 중...',
+                    style: TextStyle(color: AppColors.textMuted),
+                  ),
+                ),
+              )
+            else
+              ...gameState.myPlanets.map((planet) => _PlanetListItem(
+                planet: planet,
+                isActive: planet.id == gameState.activePlanetId,
+                onTap: () async {
+                  Navigator.pop(context);
+                  if (planet.id != gameState.activePlanetId) {
+                    final success = await ref.read(gameProvider.notifier).switchPlanet(planet.id);
+                    if (success && mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('${planet.name}으로 전환했습니다.'),
+                          backgroundColor: AppColors.positive,
+                        ),
+                      );
+                    }
+                  }
+                },
+              )),
+            SizedBox(height: MediaQuery.of(context).padding.bottom),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 행성 관리 다이얼로그
+  void _showPlanetManagement(BuildContext context) {
+    final gameState = ref.read(gameProvider);
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.panelBackground,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.4,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '행성 관리',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                '행성 이름을 변경하거나 식민지를 포기할 수 있습니다.',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: ListView.builder(
+                  controller: scrollController,
+                  itemCount: gameState.myPlanets.length,
+                  itemBuilder: (context, index) {
+                    final planet = gameState.myPlanets[index];
+                    return _PlanetManageItem(
+                      planet: planet,
+                      onRename: () => _showRenameDialog(context, planet),
+                      onAbandon: planet.isHomePlanet ? null : () => _showAbandonDialog(context, planet),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 행성 이름 변경 다이얼로그
+  void _showRenameDialog(BuildContext context, MyPlanet planet) {
+    final controller = TextEditingController(text: planet.name);
+    
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.panelBackground,
+        title: const Text('행성 이름 변경', style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+        content: TextField(
+          controller: controller,
+          style: const TextStyle(color: AppColors.textPrimary),
+          decoration: InputDecoration(
+            hintText: '새 이름',
+            hintStyle: TextStyle(color: AppColors.textMuted.withOpacity(0.5)),
+            filled: true,
+            fillColor: AppColors.surface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          maxLength: 20,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('취소', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newName = controller.text.trim();
+              if (newName.isEmpty) return;
+              Navigator.pop(dialogContext);
+              Navigator.pop(context); // 관리 시트도 닫기
+              
+              final success = await ref.read(gameProvider.notifier).renamePlanet(planet.id, newName);
+              if (success && mounted) {
+                ScaffoldMessenger.of(this.context).showSnackBar(
+                  const SnackBar(content: Text('행성 이름이 변경되었습니다.'), backgroundColor: AppColors.positive),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
+            child: const Text('변경'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 행성 포기 다이얼로그
+  void _showAbandonDialog(BuildContext context, MyPlanet planet) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.panelBackground,
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber, color: AppColors.negative, size: 20),
+            const SizedBox(width: 8),
+            const Text('행성 포기', style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '${planet.name} (${planet.coordinate})을(를) 정말 포기하시겠습니까?',
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.negative.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.negative.withOpacity(0.3)),
+              ),
+              child: const Text(
+                '⚠️ 포기한 행성은 복구할 수 없습니다.\n모든 건물, 자원, 함대, 방어시설이 사라집니다.',
+                style: TextStyle(color: AppColors.negative, fontSize: 11),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('취소', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              Navigator.pop(context); // 관리 시트도 닫기
+              
+              final success = await ref.read(gameProvider.notifier).abandonPlanet(planet.id);
+              if (mounted) {
+                if (success) {
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    const SnackBar(content: Text('행성을 포기했습니다.'), backgroundColor: AppColors.positive),
+                  );
+                } else {
+                  final error = ref.read(gameProvider).error;
+                  ScaffoldMessenger.of(this.context).showSnackBar(
+                    SnackBar(content: Text(error ?? '행성 포기에 실패했습니다.')),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.negative),
+            child: const Text('포기'),
+          ),
+        ],
+      ),
+    );
   }
 
   // 관리자 전체 공지 다이얼로그
@@ -484,15 +745,41 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                       letterSpacing: 2,
                     ),
                   ),
-                  if (gameState.coordinate != null)
-                    Text(
-                      gameState.coordinate!,
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: AppColors.textMuted,
-                        letterSpacing: 1,
+                  // 행성 선택 버튼
+                  GestureDetector(
+                    onTap: () => _showPlanetSelector(context),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: AppColors.panelBorder),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _getActivePlanetName(gameState),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            gameState.coordinate ?? '',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(Icons.expand_more, size: 14, color: AppColors.textMuted),
+                        ],
                       ),
                     ),
+                  ),
                 ],
               ),
             ),
@@ -828,6 +1115,184 @@ class _DrawerMenuItem extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+// 행성 선택 리스트 아이템
+class _PlanetListItem extends StatelessWidget {
+  final MyPlanet planet;
+  final bool isActive;
+  final VoidCallback onTap;
+
+  const _PlanetListItem({
+    required this.planet,
+    required this.isActive,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        margin: const EdgeInsets.only(bottom: 4),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.accent.withOpacity(0.15) : AppColors.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isActive ? AppColors.accent : AppColors.panelBorder,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              planet.isHomePlanet ? Icons.home : Icons.public,
+              size: 18,
+              color: isActive ? AppColors.accent : AppColors.textMuted,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        planet.name,
+                        style: TextStyle(
+                          color: isActive ? AppColors.accent : AppColors.textPrimary,
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                        ),
+                      ),
+                      if (planet.isHomePlanet) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            '모행성',
+                            style: TextStyle(color: AppColors.warning, fontSize: 9, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${planet.coordinate} · 필드 ${planet.usedFields}/${planet.maxFields}',
+                    style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
+            if (isActive)
+              const Icon(Icons.check_circle, size: 18, color: AppColors.accent),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// 행성 관리 리스트 아이템
+class _PlanetManageItem extends StatelessWidget {
+  final MyPlanet planet;
+  final VoidCallback onRename;
+  final VoidCallback? onAbandon;
+
+  const _PlanetManageItem({
+    required this.planet,
+    required this.onRename,
+    this.onAbandon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.panelBorder),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            planet.isHomePlanet ? Icons.home : Icons.public,
+            size: 24,
+            color: planet.isHomePlanet ? AppColors.warning : AppColors.textMuted,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      planet.name,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (planet.isHomePlanet) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          '모행성',
+                          style: TextStyle(color: AppColors.warning, fontSize: 9, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '좌표: ${planet.coordinate}',
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                ),
+                Text(
+                  '필드: ${planet.usedFields}/${planet.maxFields} · 온도: ${planet.temperature}°C',
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.edit, size: 18),
+                color: AppColors.accent,
+                onPressed: onRename,
+                tooltip: '이름 변경',
+              ),
+              if (onAbandon != null)
+                IconButton(
+                  icon: const Icon(Icons.delete_forever, size: 18),
+                  color: AppColors.negative,
+                  onPressed: onAbandon,
+                  tooltip: '포기',
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
