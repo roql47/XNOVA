@@ -123,11 +123,10 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
 
   // 적재 가능량 계산
   int _calculateAvailableCapacity() {
-    final missionInfo = _calculateMissionInfo();
-    if (missionInfo == null) return 0;
-
     final fleet = Map<String, int>.from(_selectedFleet)
       ..removeWhere((key, value) => value == 0);
+    
+    if (fleet.isEmpty) return 0;
     
     int totalCapacity = 0;
     for (final entry in fleet.entries) {
@@ -135,8 +134,14 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
       totalCapacity += cargo * entry.value;
     }
 
-    final fuelConsumption = missionInfo['fuel'] as int;
-    return totalCapacity - fuelConsumption;
+    // 연료 소비량 차감
+    final missionInfo = _calculateMissionInfo();
+    if (missionInfo != null) {
+      final fuelConsumption = missionInfo['fuel'] as int;
+      return totalCapacity - fuelConsumption;
+    }
+    
+    return totalCapacity;
   }
 
   // 현재 적재 자원량
@@ -378,16 +383,17 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
                               onTap: () => setState(() => _missionType = MissionType.transport),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _MissionButton(
-                              icon: Icons.home_work,
-                              label: '배치',
-                              isSelected: _missionType == MissionType.deploy,
-                              color: AppColors.positive,
-                              onTap: () => setState(() => _missionType = MissionType.deploy),
-                            ),
-                          ),
+                          // 배치는 식민지 기능 추가 후 활성화
+                          // const SizedBox(width: 8),
+                          // Expanded(
+                          //   child: _MissionButton(
+                          //     icon: Icons.home_work,
+                          //     label: '배치',
+                          //     isSelected: _missionType == MissionType.deploy,
+                          //     color: AppColors.positive,
+                          //     onTap: () => setState(() => _missionType = MissionType.deploy),
+                          //   ),
+                          // ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -395,7 +401,7 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
                         _missionType == MissionType.attack
                             ? '적 행성을 공격하여 자원을 약탈합니다.'
                             : _missionType == MissionType.transport
-                                ? '자원을 목표 행성에 내리고, 함대만 귀환합니다.'
+                                ? '자원을 본인 행성에 내리고, 함대만 귀환합니다. (본인 행성만 가능)'
                                 : '함대와 자원을 모두 목표 행성에 배치합니다. (귀환 없음)',
                         style: const TextStyle(
                           color: AppColors.textMuted,
