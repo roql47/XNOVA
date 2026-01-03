@@ -325,8 +325,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                   );
                 }
               } catch (e) {
+                print('Broadcast error: $e');
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('공지 발송 중 오류가 발생했습니다.')),
+                  SnackBar(content: Text('공지 발송 중 오류: $e')),
                 );
               }
             },

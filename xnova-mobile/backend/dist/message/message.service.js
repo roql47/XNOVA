@@ -52,7 +52,7 @@ let MessageService = class MessageService {
         const user = await this.userModel.findById(userId).exec();
         if (!user)
             return false;
-        return user.coordinate === '1:1:1' && user.playerName?.toLowerCase() === 'admin';
+        return user.playerName?.toLowerCase() === 'admin';
     }
     async broadcastMessage(data) {
         const allUsers = await this.userModel.find({

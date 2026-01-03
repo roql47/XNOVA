@@ -84,37 +84,48 @@ let MessageController = class MessageController {
         return { isAdmin };
     }
     async broadcastMessage(req, dto) {
-        const isAdmin = await this.messageService.isAdmin(req.user.userId);
-        if (!isAdmin) {
-            return { success: false, message: '관리자 권한이 필요합니다.' };
+        console.log('Broadcast request received:', { userId: req.user.userId, dto });
+        try {
+            const isAdmin = await this.messageService.isAdmin(req.user.userId);
+            console.log('isAdmin check:', isAdmin);
+            if (!isAdmin) {
+                return { success: false, message: '관리자 권한이 필요합니다.' };
+            }
+            const sender = await this.userService.findById(req.user.userId);
+            console.log('sender:', sender?.playerName);
+            if (!sender) {
+                return { success: false, message: '발신자를 찾을 수 없습니다.' };
+            }
+            if (!dto.title || dto.title.trim().length === 0) {
+                return { success: false, message: '제목을 입력해주세요.' };
+            }
+            if (!dto.content || dto.content.trim().length === 0) {
+                return { success: false, message: '내용을 입력해주세요.' };
+            }
+            if (dto.title.length > 100) {
+                return { success: false, message: '제목은 100자 이하여야 합니다.' };
+            }
+            if (dto.content.length > 2000) {
+                return { success: false, message: '내용은 2000자 이하여야 합니다.' };
+            }
+            console.log('Sending broadcast message...');
+            const result = await this.messageService.broadcastMessage({
+                senderId: req.user.userId,
+                senderName: sender.playerName,
+                title: dto.title.trim(),
+                content: dto.content.trim(),
+            });
+            console.log('Broadcast result:', result);
+            return {
+                success: true,
+                message: `${result.count}명에게 공지를 발송했습니다.`,
+                count: result.count,
+            };
         }
-        const sender = await this.userService.findById(req.user.userId);
-        if (!sender) {
-            return { success: false, message: '발신자를 찾을 수 없습니다.' };
+        catch (error) {
+            console.error('Broadcast error:', error);
+            return { success: false, message: `서버 오류: ${error.message}` };
         }
-        if (!dto.title || dto.title.trim().length === 0) {
-            return { success: false, message: '제목을 입력해주세요.' };
-        }
-        if (!dto.content || dto.content.trim().length === 0) {
-            return { success: false, message: '내용을 입력해주세요.' };
-        }
-        if (dto.title.length > 100) {
-            return { success: false, message: '제목은 100자 이하여야 합니다.' };
-        }
-        if (dto.content.length > 2000) {
-            return { success: false, message: '내용은 2000자 이하여야 합니다.' };
-        }
-        const result = await this.messageService.broadcastMessage({
-            senderId: req.user.userId,
-            senderName: sender.playerName,
-            title: dto.title.trim(),
-            content: dto.content.trim(),
-        });
-        return {
-            success: true,
-            message: `${result.count}명에게 공지를 발송했습니다.`,
-            count: result.count,
-        };
     }
 };
 exports.MessageController = MessageController;

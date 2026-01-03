@@ -48,11 +48,12 @@ export class MessageService {
     });
   }
 
-  // 관리자 권한 체크 (좌표 1:1:1 & 행성명 admin)
+  // 관리자 권한 체크 (행성명 admin)
   async isAdmin(userId: string): Promise<boolean> {
     const user = await this.userModel.findById(userId).exec();
     if (!user) return false;
-    return user.coordinate === '1:1:1' && user.playerName?.toLowerCase() === 'admin';
+    // 행성명이 admin이면 관리자 (대소문자 무관)
+    return user.playerName?.toLowerCase() === 'admin';
   }
 
   // 전체 메시지 발송
