@@ -271,10 +271,23 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
             onPressed: () async {
               Navigator.pop(context);
               final success = await ref.read(gameProvider.notifier).recallFleet();
-              if (success && context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('함대가 귀환을 시작했습니다.')),
-                );
+              if (context.mounted) {
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('함대가 귀환을 시작했습니다.'),
+                      backgroundColor: AppColors.positive,
+                    ),
+                  );
+                } else {
+                  final error = ref.read(gameProvider).error;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(error ?? '함대 귀환에 실패했습니다.'),
+                      backgroundColor: AppColors.negative,
+                    ),
+                  );
+                }
               }
             },
             style: ElevatedButton.styleFrom(
@@ -306,8 +319,14 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
           if (gameState.battleStatus != null) ...[
             if (gameState.battleStatus!.pendingAttack != null)
               _BattleCard(
-                icon: Icons.flight_takeoff,
-                title: '공격 진행 중',
+                icon: gameState.battleStatus!.pendingAttack!.missionType == 'transport'
+                    ? Icons.local_shipping
+                    : gameState.battleStatus!.pendingAttack!.missionType == 'deploy'
+                        ? Icons.home_work
+                        : gameState.battleStatus!.pendingAttack!.missionType == 'recycle'
+                            ? Icons.blur_on
+                            : Icons.flight_takeoff,
+                title: gameState.battleStatus!.pendingAttack!.missionTitle,
                 target: gameState.battleStatus!.pendingAttack!.targetCoord,
                 fleet: gameState.battleStatus!.pendingAttack!.fleet,
                 finishTime: gameState.battleStatus!.pendingAttack!.finishDateTime,
@@ -318,7 +337,7 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
             if (gameState.battleStatus!.pendingReturn != null)
               _BattleCard(
                 icon: Icons.flight_land,
-                title: '귀환 중',
+                title: gameState.battleStatus!.pendingReturn!.returnTitle,
                 target: '본행성',
                 fleet: gameState.battleStatus!.pendingReturn!.fleet,
                 finishTime: gameState.battleStatus!.pendingReturn!.finishDateTime,

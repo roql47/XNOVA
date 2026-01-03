@@ -996,11 +996,22 @@ export class BattleService {
 
     if (user.pendingAttack) {
       const remaining = Math.max(0, (user.pendingAttack.arrivalTime.getTime() - Date.now()) / 1000);
+      // 미션 타입 결정
+      let missionType = 'attack';
+      if (user.pendingAttack.targetUserId === 'transport') {
+        missionType = 'transport';
+      } else if (user.pendingAttack.targetUserId === 'deploy') {
+        missionType = 'deploy';
+      } else if (user.pendingAttack.targetUserId === 'debris') {
+        missionType = 'recycle';
+      }
+      
       result.pendingAttack = {
         targetCoord: user.pendingAttack.targetCoord,
         fleet: user.pendingAttack.fleet,
         remainingTime: remaining,
         battleCompleted: user.pendingAttack.battleCompleted,
+        missionType,
       };
     }
 
@@ -1010,6 +1021,7 @@ export class BattleService {
         fleet: user.pendingReturn.fleet,
         loot: user.pendingReturn.loot,
         remainingTime: remaining,
+        missionType: (user.pendingReturn as any).missionType || 'attack',
       };
     }
 
@@ -1151,6 +1163,7 @@ export class BattleService {
       loot: { metal: metalLoot, crystal: crystalLoot, deuterium: 0 },
       returnTime,
       startTime: new Date(),
+      missionType: 'recycle',
     };
 
     user.pendingAttack = null;
@@ -1345,6 +1358,7 @@ export class BattleService {
         loot,
         returnTime,
         startTime: new Date(),
+        missionType: 'attack',
       };
       updatedAttacker.markModified('pendingReturn');
     } else {
@@ -1523,9 +1537,9 @@ export class BattleService {
     // 귀환 시간 = 현재까지 진행된 편도 비행 시간
     const returnTime = new Date(Date.now() + elapsedTime * 1000);
 
-    // 방어자의 incomingAttack 제거
+    // 방어자의 incomingAttack 제거 (공격 미션일 때만)
     const targetUserId = user.pendingAttack.targetUserId;
-    if (targetUserId && targetUserId !== 'debris') {
+    if (targetUserId && targetUserId !== 'debris' && targetUserId !== 'transport' && targetUserId !== 'deploy') {
       const target = await this.userModel.findById(targetUserId).exec();
       if (target && target.incomingAttack) {
         target.incomingAttack = null;
@@ -1537,12 +1551,36 @@ export class BattleService {
     // 귀환할 함대 정보 저장
     const returningFleet = { ...user.pendingAttack.fleet };
 
-    // pendingReturn 설정 (약탈 자원 없음)
+    // 미션 타입 결정
+    let missionType = 'attack';
+    if (user.pendingAttack.targetUserId === 'transport') {
+      missionType = 'transport';
+    } else if (user.pendingAttack.targetUserId === 'deploy') {
+      missionType = 'deploy';
+    } else if (user.pendingAttack.targetUserId === 'debris') {
+      missionType = 'recycle';
+    }
+
+    // 수송/배치 미션인 경우 수송하려던 자원을 돌려받음
+    let returnLoot = { metal: 0, crystal: 0, deuterium: 0 };
+    if (missionType === 'transport' || missionType === 'deploy') {
+      const transportResources = (user.pendingAttack as any).transportResources;
+      if (transportResources) {
+        returnLoot = {
+          metal: transportResources.metal || 0,
+          crystal: transportResources.crystal || 0,
+          deuterium: transportResources.deuterium || 0,
+        };
+      }
+    }
+
+    // pendingReturn 설정
     user.pendingReturn = {
       fleet: returningFleet,
-      loot: { metal: 0, crystal: 0, deuterium: 0 },
+      loot: returnLoot,
       returnTime,
       startTime: new Date(),
+      missionType,
     };
 
     // pendingAttack 초기화
@@ -1784,6 +1822,7 @@ export class BattleService {
       loot: { metal: 0, crystal: 0, deuterium: 0 },
       returnTime,
       startTime: new Date(),
+      missionType: 'transport',
     };
 
     user.pendingAttack = null;

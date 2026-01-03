@@ -678,11 +678,22 @@ let BattleService = class BattleService {
         };
         if (user.pendingAttack) {
             const remaining = Math.max(0, (user.pendingAttack.arrivalTime.getTime() - Date.now()) / 1000);
+            let missionType = 'attack';
+            if (user.pendingAttack.targetUserId === 'transport') {
+                missionType = 'transport';
+            }
+            else if (user.pendingAttack.targetUserId === 'deploy') {
+                missionType = 'deploy';
+            }
+            else if (user.pendingAttack.targetUserId === 'debris') {
+                missionType = 'recycle';
+            }
             result.pendingAttack = {
                 targetCoord: user.pendingAttack.targetCoord,
                 fleet: user.pendingAttack.fleet,
                 remainingTime: remaining,
                 battleCompleted: user.pendingAttack.battleCompleted,
+                missionType,
             };
         }
         if (user.pendingReturn) {
@@ -691,6 +702,7 @@ let BattleService = class BattleService {
                 fleet: user.pendingReturn.fleet,
                 loot: user.pendingReturn.loot,
                 remainingTime: remaining,
+                missionType: user.pendingReturn.missionType || 'attack',
             };
         }
         if (user.incomingAttack) {
@@ -793,6 +805,7 @@ let BattleService = class BattleService {
             loot: { metal: metalLoot, crystal: crystalLoot, deuterium: 0 },
             returnTime,
             startTime: new Date(),
+            missionType: 'recycle',
         };
         user.pendingAttack = null;
         user.markModified('pendingReturn');
@@ -936,6 +949,7 @@ let BattleService = class BattleService {
                 loot,
                 returnTime,
                 startTime: new Date(),
+                missionType: 'attack',
             };
             updatedAttacker.markModified('pendingReturn');
         }
@@ -1057,7 +1071,7 @@ let BattleService = class BattleService {
         }
         const returnTime = new Date(Date.now() + elapsedTime * 1000);
         const targetUserId = user.pendingAttack.targetUserId;
-        if (targetUserId && targetUserId !== 'debris') {
+        if (targetUserId && targetUserId !== 'debris' && targetUserId !== 'transport' && targetUserId !== 'deploy') {
             const target = await this.userModel.findById(targetUserId).exec();
             if (target && target.incomingAttack) {
                 target.incomingAttack = null;
@@ -1066,11 +1080,33 @@ let BattleService = class BattleService {
             }
         }
         const returningFleet = { ...user.pendingAttack.fleet };
+        let missionType = 'attack';
+        if (user.pendingAttack.targetUserId === 'transport') {
+            missionType = 'transport';
+        }
+        else if (user.pendingAttack.targetUserId === 'deploy') {
+            missionType = 'deploy';
+        }
+        else if (user.pendingAttack.targetUserId === 'debris') {
+            missionType = 'recycle';
+        }
+        let returnLoot = { metal: 0, crystal: 0, deuterium: 0 };
+        if (missionType === 'transport' || missionType === 'deploy') {
+            const transportResources = user.pendingAttack.transportResources;
+            if (transportResources) {
+                returnLoot = {
+                    metal: transportResources.metal || 0,
+                    crystal: transportResources.crystal || 0,
+                    deuterium: transportResources.deuterium || 0,
+                };
+            }
+        }
         user.pendingReturn = {
             fleet: returningFleet,
-            loot: { metal: 0, crystal: 0, deuterium: 0 },
+            loot: returnLoot,
             returnTime,
             startTime: new Date(),
+            missionType,
         };
         user.pendingAttack = null;
         user.markModified('pendingAttack');
@@ -1239,6 +1275,7 @@ let BattleService = class BattleService {
             loot: { metal: 0, crystal: 0, deuterium: 0 },
             returnTime,
             startTime: new Date(),
+            missionType: 'transport',
         };
         user.pendingAttack = null;
         user.markModified('pendingReturn');

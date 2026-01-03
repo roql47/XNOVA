@@ -751,6 +751,7 @@ class PendingAttackInfo {
   final Map<String, int> fleet;
   final double remainingTime;
   final bool battleCompleted;
+  final String missionType; // 'attack', 'transport', 'deploy', 'recycle'
   final DateTime createdAt;
 
   PendingAttackInfo({
@@ -758,6 +759,7 @@ class PendingAttackInfo {
     required this.fleet,
     required this.remainingTime,
     this.battleCompleted = false,
+    this.missionType = 'attack',
   }) : createdAt = DateTime.now();
 
   factory PendingAttackInfo.fromJson(Map<String, dynamic> json) => PendingAttackInfo(
@@ -765,30 +767,58 @@ class PendingAttackInfo {
     fleet: Map<String, int>.from(json['fleet'] ?? {}),
     remainingTime: (json['remainingTime'] ?? 0).toDouble(),
     battleCompleted: json['battleCompleted'] ?? false,
+    missionType: json['missionType'] ?? 'attack',
   );
 
   DateTime get finishDateTime => createdAt.add(Duration(seconds: remainingTime.toInt()));
+  
+  String get missionTitle {
+    switch (missionType) {
+      case 'transport':
+        return '수송 진행 중';
+      case 'deploy':
+        return '배치 진행 중';
+      case 'recycle':
+        return '수확 진행 중';
+      default:
+        return '공격 진행 중';
+    }
+  }
 }
 
 class PendingReturnInfo {
   final Map<String, int> fleet;
   final Map<String, int> loot;
   final double remainingTime;
+  final String missionType; // 'attack', 'transport', 'recycle'
   final DateTime createdAt;
 
   PendingReturnInfo({
     required this.fleet,
     required this.loot,
     required this.remainingTime,
+    this.missionType = 'attack',
   }) : createdAt = DateTime.now();
 
   factory PendingReturnInfo.fromJson(Map<String, dynamic> json) => PendingReturnInfo(
     fleet: Map<String, int>.from(json['fleet'] ?? {}),
     loot: Map<String, int>.from(json['loot'] ?? {}),
     remainingTime: (json['remainingTime'] ?? 0).toDouble(),
+    missionType: json['missionType'] ?? 'attack',
   );
 
   DateTime get finishDateTime => createdAt.add(Duration(seconds: remainingTime.toInt()));
+  
+  String get returnTitle {
+    switch (missionType) {
+      case 'transport':
+        return '수송 귀환 중';
+      case 'recycle':
+        return '수확 귀환 중';
+      default:
+        return '귀환 중';
+    }
+  }
 }
 
 class IncomingAttackInfo {

@@ -77,8 +77,14 @@ class OverviewTab extends ConsumerWidget {
           if (gameState.battleStatus != null) ...[
             if (gameState.battleStatus!.pendingAttack != null)
               _BattleStatusPanel(
-                icon: Icons.flight_takeoff,
-                title: '공격 진행 중',
+                icon: gameState.battleStatus!.pendingAttack!.missionType == 'transport'
+                    ? Icons.local_shipping
+                    : gameState.battleStatus!.pendingAttack!.missionType == 'deploy'
+                        ? Icons.home_work
+                        : gameState.battleStatus!.pendingAttack!.missionType == 'recycle'
+                            ? Icons.blur_on
+                            : Icons.flight_takeoff,
+                title: gameState.battleStatus!.pendingAttack!.missionTitle,
                 description: '목표: ${gameState.battleStatus!.pendingAttack!.targetCoord}',
                 finishTime: gameState.battleStatus!.pendingAttack!.finishDateTime,
                 onComplete: () => ref.read(gameProvider.notifier).processBattle(),
@@ -566,9 +572,9 @@ class _FleetReturnPanel extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      '귀환 중',
-                      style: TextStyle(
+                    Text(
+                      pendingReturn.returnTitle,
+                      style: const TextStyle(
                         color: AppColors.positive,
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
@@ -616,10 +622,10 @@ class _FleetReturnPanel extends StatelessWidget {
                 children: [
                   const Icon(Icons.flight_land, size: 24, color: AppColors.positive),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      '귀환 함대 정보',
-                      style: TextStyle(
+                      '${pendingReturn.returnTitle} 정보',
+                      style: const TextStyle(
                         color: AppColors.positive,
                         fontWeight: FontWeight.bold,
                         fontSize: 16,

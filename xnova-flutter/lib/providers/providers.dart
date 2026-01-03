@@ -860,7 +860,14 @@ class GameNotifier extends StateNotifier<GameState> {
       await loadBattleStatus();
       return true;
     } catch (e) {
-      state = state.copyWith(error: '함대 귀환에 실패했습니다.');
+      String errorMsg = '함대 귀환에 실패했습니다.';
+      if (e is DioException && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map && data['message'] != null) {
+          errorMsg = data['message'].toString();
+        }
+      }
+      state = state.copyWith(error: errorMsg);
       return false;
     }
   }
