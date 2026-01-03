@@ -327,6 +327,14 @@ class NavigationNotifier extends StateNotifier<NavigationState> {
     );
   }
 
+  void setColonizeTarget(String coordinate) {
+    state = state.copyWith(
+      selectedTab: MainTab.fleet,
+      targetCoordinate: coordinate,
+      missionType: 'colony',
+    );
+  }
+
   void clearAttackTarget() {
     state = state.copyWith(clearTarget: true);
   }
@@ -842,6 +850,30 @@ class GameNotifier extends StateNotifier<GameState> {
       return true;
     } catch (e) {
       String errorMsg = '배치에 실패했습니다.';
+      if (e is DioException && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map && data['message'] != null) {
+          errorMsg = data['message'].toString();
+        }
+      }
+      state = state.copyWith(error: errorMsg);
+      return false;
+    }
+  }
+
+  /// 식민 미션 (빈 좌표에 새로운 식민지 건설, 식민선 1대 소모)
+  Future<bool> colonize(String targetCoord, Map<String, int> fleet) async {
+    try {
+      await _apiService.startColonization(
+        targetCoord: targetCoord,
+        fleet: fleet,
+      );
+      await loadFleet();
+      await loadBattleStatus();
+      await loadResources();
+      return true;
+    } catch (e) {
+      String errorMsg = '식민에 실패했습니다.';
       if (e is DioException && e.response?.data != null) {
         final data = e.response!.data;
         if (data is Map && data['message'] != null) {

@@ -196,6 +196,9 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
                   onTransport: planet.playerName != null && !planet.isOwnPlanet
                       ? () => _showTransportDialog(context, planet)
                       : null,
+                  onColonize: planet.playerName == null
+                      ? () => _showColonizeDialog(context, planet)
+                      : null,
                 );
               },
             ),
@@ -668,6 +671,108 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
       ),
     );
   }
+
+  void _showColonizeDialog(BuildContext context, PlanetInfo planet) {
+    final gameState = ref.read(gameProvider);
+    final colonyShip = gameState.fleet.firstWhere(
+      (f) => f.type == 'colonyShip',
+      orElse: () => FleetInfo(type: 'colonyShip', name: '식민선', count: 0, cost: Cost(), stats: FleetStats()),
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.panelBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        title: Row(
+          children: [
+            Icon(Icons.rocket_launch, color: AppColors.positive, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '식민: ${planet.coordinate}',
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '이 좌표에 새로운 식민지를 건설하시겠습니까?',
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.rocket_launch, color: AppColors.positive, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    '보유 식민선: ',
+                    style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                  ),
+                  Text(
+                    '${colonyShip.count}대',
+                    style: TextStyle(
+                      color: colonyShip.count > 0 ? AppColors.positive : AppColors.negative,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('💡 식민 정보', style: TextStyle(color: AppColors.accent, fontSize: 11, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 4),
+                  Text(
+                    '• 식민선 1대가 소모됩니다\n'
+                    '• 빈 좌표에만 식민 가능합니다\n'
+                    '• 최대 9개의 행성을 보유할 수 있습니다',
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 10, height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('취소', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: colonyShip.count > 0 ? () {
+              Navigator.pop(context);
+              ref.read(navigationProvider.notifier).setColonizeTarget(planet.coordinate);
+            } : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.positive,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            child: const Text('식민 출발'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _PlanetRow extends StatelessWidget {
@@ -678,6 +783,7 @@ class _PlanetRow extends StatelessWidget {
   final VoidCallback? onSpy;
   final VoidCallback? onMessage;
   final VoidCallback? onTransport;
+  final VoidCallback? onColonize;
 
   const _PlanetRow({
     required this.position,
@@ -687,6 +793,7 @@ class _PlanetRow extends StatelessWidget {
     this.onSpy,
     this.onMessage,
     this.onTransport,
+    this.onColonize,
   });
 
   /// 활동 상태 표시 위젯
@@ -878,6 +985,37 @@ class _PlanetRow extends StatelessWidget {
                       Icons.home,
                       size: 16,
                       color: AppColors.accent,
+                    ),
+                  ),
+                // 빈 행성: 식민 버튼
+                if (isEmpty && onColonize != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: InkWell(
+                      onTap: onColonize,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.positive.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: AppColors.positive.withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.rocket_launch, size: 12, color: AppColors.positive),
+                            const SizedBox(width: 4),
+                            Text(
+                              '식민',
+                              style: TextStyle(
+                                color: AppColors.positive,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 if (!isEmpty && !isOwn) ...[

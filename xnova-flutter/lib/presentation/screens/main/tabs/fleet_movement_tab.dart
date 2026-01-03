@@ -14,7 +14,7 @@ class FleetMovementTab extends ConsumerStatefulWidget {
 }
 
 // 미션 타입
-enum MissionType { attack, transport, deploy }
+enum MissionType { attack, transport, deploy, colony }
 
 class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
   late final TextEditingController _targetController;
@@ -38,6 +38,10 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
       _missionType = MissionType.transport;
     } else if (navState.missionType == 'deploy') {
       _missionType = MissionType.deploy;
+    } else if (navState.missionType == 'colony') {
+      _missionType = MissionType.colony;
+      // 식민 미션은 식민선 1대만 자동 선택
+      _selectedFleet['colonyShip'] = 1;
     } else {
       _missionType = MissionType.attack;
     }
@@ -209,6 +213,17 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
           'deuterium': int.tryParse(_deuteriumController.text) ?? 0,
         };
         success = await ref.read(gameProvider.notifier).deploy(targetCoord, fleet, resources);
+        break;
+      case MissionType.colony:
+        missionName = '식민';
+        // 식민 미션은 식민선이 반드시 필요
+        if ((fleet['colonyShip'] ?? 0) < 1) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('식민 미션에는 식민선이 필요합니다.')),
+          );
+          return;
+        }
+        success = await ref.read(gameProvider.notifier).colonize(targetCoord, fleet);
         break;
     }
 
@@ -451,17 +466,23 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
                               onTap: () => setState(() => _missionType = MissionType.transport),
                             ),
                           ),
-                          // 배치는 식민지 기능 추가 후 활성화
-                          // const SizedBox(width: 8),
-                          // Expanded(
-                          //   child: _MissionButton(
-                          //     icon: Icons.home_work,
-                          //     label: '배치',
-                          //     isSelected: _missionType == MissionType.deploy,
-                          //     color: AppColors.positive,
-                          //     onTap: () => setState(() => _missionType = MissionType.deploy),
-                          //   ),
-                          // ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _MissionButton(
+                              icon: Icons.rocket_launch,
+                              label: '식민',
+                              isSelected: _missionType == MissionType.colony,
+                              color: AppColors.positive,
+                              onTap: () {
+                                setState(() {
+                                  _missionType = MissionType.colony;
+                                  // 식민 미션 선택 시 식민선 1대 자동 선택
+                                  _selectedFleet.clear();
+                                  _selectedFleet['colonyShip'] = 1;
+                                });
+                              },
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -470,7 +491,9 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
                             ? '적 행성을 공격하여 자원을 약탈합니다.'
                             : _missionType == MissionType.transport
                                 ? '자원을 목표 행성에 전달하고, 함대만 귀환합니다.'
-                                : '함대와 자원을 모두 목표 행성에 배치합니다. (귀환 없음)',
+                                : _missionType == MissionType.colony
+                                    ? '빈 좌표에 새로운 식민지를 건설합니다. (식민선 1대 소모)'
+                                    : '함대와 자원을 모두 목표 행성에 배치합니다. (귀환 없음)',
                         style: const TextStyle(
                           color: AppColors.textMuted,
                           fontSize: 10,
@@ -480,8 +503,8 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
                   ),
                 ),
                 
-                // 자원 적재 (수송/배치 미션일 때만 표시)
-                if (_missionType != MissionType.attack) ...[
+                // 자원 적재 (수송/배치 미션일 때만 표시, 식민 미션은 제외)
+                if (_missionType == MissionType.transport || _missionType == MissionType.deploy) ...[
                   const SizedBox(height: 14),
                   _ResourceLoadingPanel(
                     metalController: _metalController,
@@ -638,7 +661,9 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
                                 ? Icons.gps_fixed 
                                 : _missionType == MissionType.transport 
                                     ? Icons.local_shipping 
-                                    : Icons.home_work,
+                                    : _missionType == MissionType.colony
+                                        ? Icons.rocket_launch
+                                        : Icons.home_work,
                             size: 18, 
                             color: Colors.white.withOpacity(availableShips.isNotEmpty ? 1 : 0.5),
                           ),
@@ -648,7 +673,9 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
                                 ? '공격' 
                                 : _missionType == MissionType.transport 
                                     ? '수송' 
-                                    : '배치',
+                                    : _missionType == MissionType.colony
+                                        ? '식민'
+                                        : '배치',
                             style: TextStyle(
                               color: Colors.white.withOpacity(availableShips.isNotEmpty ? 1 : 0.5),
                               fontWeight: FontWeight.w600,
