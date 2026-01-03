@@ -200,6 +200,9 @@ export class Fleet {
 
   @Prop({ default: 0 })
   solarSatellite: number;
+
+  @Prop({ default: 0 })
+  colonyShip: number;
 }
 
 // 방어시설 스키마
@@ -332,8 +335,18 @@ export class User {
   @Prop({ required: true })
   playerName: string;
 
-  @Prop({ required: true, unique: true })
-  coordinate: string;
+  @Prop({ required: true })
+  coordinate: string;  // 현재 활성 행성 좌표 (호환성)
+
+  // 다중 행성 지원
+  @Prop({ default: null })
+  homePlanetId: string | null;  // 모행성 Planet ObjectId
+
+  @Prop({ default: null })
+  activePlanetId: string | null;  // 현재 활성 행성 Planet ObjectId
+
+  @Prop({ default: false })
+  isAdmin: boolean;  // 관리자 여부
 
   @Prop({ type: VacationMode, default: () => ({ isActive: false, startTime: null, minEndTime: null }) })
   vacationMode: VacationMode;

@@ -7,6 +7,7 @@ import { BattleService } from './services/battle.service';
 import type { BattleResult } from './services/battle.service';
 import { BattleSimulatorService } from './services/battle-simulator.service';
 import type { SimulationRequest, SimulationConfig, BattleSlot } from './services/battle-simulator.service';
+import { ColonyService } from './services/colony.service';
 export declare class GameController {
     private resourcesService;
     private buildingsService;
@@ -15,7 +16,8 @@ export declare class GameController {
     private defenseService;
     private battleService;
     private battleSimulatorService;
-    constructor(resourcesService: ResourcesService, buildingsService: BuildingsService, researchService: ResearchService, fleetService: FleetService, defenseService: DefenseService, battleService: BattleService, battleSimulatorService: BattleSimulatorService);
+    private colonyService;
+    constructor(resourcesService: ResourcesService, buildingsService: BuildingsService, researchService: ResearchService, fleetService: FleetService, defenseService: DefenseService, battleService: BattleService, battleSimulatorService: BattleSimulatorService, colonyService: ColonyService);
     getResources(req: any): Promise<{
         resources: {
             metal: number;
@@ -305,5 +307,28 @@ export declare class GameController {
         config?: Partial<SimulationConfig>;
     }): Promise<{
         sourceData: string;
+    }>;
+    startColonization(req: any, body: {
+        targetCoord: string;
+        fleet: Record<string, number>;
+    }): Promise<{
+        success: boolean;
+        message: string;
+        arrivalTime?: Date;
+    }>;
+    completeColonization(req: any): Promise<{
+        success: boolean;
+        colonized: boolean;
+        message: string;
+        planetId?: string;
+        planetName?: string;
+    }>;
+    recallColonization(req: any): Promise<{
+        success: boolean;
+        message: string;
+    }>;
+    completeReturn(req: any): Promise<{
+        success: boolean;
+        message: string;
     }>;
 }

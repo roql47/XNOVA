@@ -22,6 +22,7 @@ const fleet_service_1 = require("./services/fleet.service");
 const defense_service_1 = require("./services/defense.service");
 const battle_service_1 = require("./services/battle.service");
 const battle_simulator_service_1 = require("./services/battle-simulator.service");
+const colony_service_1 = require("./services/colony.service");
 let GameController = class GameController {
     resourcesService;
     buildingsService;
@@ -30,7 +31,8 @@ let GameController = class GameController {
     defenseService;
     battleService;
     battleSimulatorService;
-    constructor(resourcesService, buildingsService, researchService, fleetService, defenseService, battleService, battleSimulatorService) {
+    colonyService;
+    constructor(resourcesService, buildingsService, researchService, fleetService, defenseService, battleService, battleSimulatorService, colonyService) {
         this.resourcesService = resourcesService;
         this.buildingsService = buildingsService;
         this.researchService = researchService;
@@ -38,6 +40,7 @@ let GameController = class GameController {
         this.defenseService = defenseService;
         this.battleService = battleService;
         this.battleSimulatorService = battleSimulatorService;
+        this.colonyService = colonyService;
     }
     async getResources(req) {
         return this.resourcesService.getResources(req.user.userId);
@@ -147,6 +150,18 @@ let GameController = class GameController {
         return {
             sourceData: this.battleSimulatorService.generateBattleSourceData(body.attackers, body.defenders, config),
         };
+    }
+    async startColonization(req, body) {
+        return this.colonyService.startColonization(req.user.userId, body.targetCoord, body.fleet);
+    }
+    async completeColonization(req) {
+        return this.colonyService.completeColonization(req.user.userId);
+    }
+    async recallColonization(req) {
+        return this.colonyService.recallColonization(req.user.userId);
+    }
+    async completeReturn(req) {
+        return this.colonyService.completeReturn(req.user.userId);
     }
 };
 exports.GameController = GameController;
@@ -347,6 +362,35 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], GameController.prototype, "generateSourceData", null);
+__decorate([
+    (0, common_1.Post)('colony/start'),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "startColonization", null);
+__decorate([
+    (0, common_1.Post)('colony/complete'),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "completeColonization", null);
+__decorate([
+    (0, common_1.Post)('colony/recall'),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "recallColonization", null);
+__decorate([
+    (0, common_1.Post)('colony/return'),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "completeReturn", null);
 exports.GameController = GameController = __decorate([
     (0, common_1.Controller)('game'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
@@ -356,6 +400,7 @@ exports.GameController = GameController = __decorate([
         fleet_service_1.FleetService,
         defense_service_1.DefenseService,
         battle_service_1.BattleService,
-        battle_simulator_service_1.BattleSimulatorService])
+        battle_simulator_service_1.BattleSimulatorService,
+        colony_service_1.ColonyService])
 ], GameController);
 //# sourceMappingURL=game.controller.js.map

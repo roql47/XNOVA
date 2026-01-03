@@ -493,6 +493,7 @@ export class UserService {
         recycler: 0,
         espionageProbe: 0,
         solarSatellite: 0,
+        colonyShip: 0,
       },
       defense: {
         rocketLauncher: 0,
@@ -542,5 +543,25 @@ export class UserService {
     await this.userModel.findByIdAndDelete(userId).exec();
 
     return { success: true, message: '계정이 삭제되었습니다.' };
+  }
+
+  // 활성 행성 업데이트 (다중 행성 시스템)
+  async updateActivePlanet(userId: string, planetId: string): Promise<void> {
+    await this.userModel.findByIdAndUpdate(userId, {
+      activePlanetId: planetId,
+    }).exec();
+  }
+
+  // 모행성 ID 설정
+  async setHomePlanet(userId: string, planetId: string): Promise<void> {
+    await this.userModel.findByIdAndUpdate(userId, {
+      homePlanetId: planetId,
+      activePlanetId: planetId,
+    }).exec();
+  }
+
+  // 유저 좌표 업데이트 (활성 행성 변경 시 동기화용)
+  async updateUserCoordinate(userId: string, coordinate: string): Promise<void> {
+    await this.userModel.findByIdAndUpdate(userId, { coordinate }).exec();
   }
 }

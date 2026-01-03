@@ -70,19 +70,19 @@ exports.FLEET_DATA = {
     cruiser: {
         cost: { metal: 20000, crystal: 7000, deuterium: 2000 },
         stats: { attack: 400, shield: 50, hull: 27000, speed: 15000, cargo: 800, fuelConsumption: 300 },
-        rapidFire: { espionageProbe: 5, solarSatellite: 5, lightFighter: 6, rocketLauncher: 10 },
+        rapidFire: { espionageProbe: 5, solarSatellite: 5 },
         requirements: { shipyard: 5, impulseDrive: 4, ionTech: 2 },
     },
     battleship: {
         cost: { metal: 45000, crystal: 15000, deuterium: 0 },
         stats: { attack: 1000, shield: 200, hull: 60000, speed: 10000, cargo: 1500, fuelConsumption: 500 },
-        rapidFire: { espionageProbe: 5, solarSatellite: 5 },
+        rapidFire: { espionageProbe: 5, solarSatellite: 5, battlecruiser: 2, lightLaser: 10 },
         requirements: { shipyard: 7, hyperspaceDrive: 4 },
     },
     battlecruiser: {
         cost: { metal: 30000, crystal: 40000, deuterium: 15000 },
         stats: { attack: 700, shield: 400, hull: 70000, speed: 10000, cargo: 750, fuelConsumption: 250 },
-        rapidFire: { espionageProbe: 5, solarSatellite: 5, smallCargo: 3, largeCargo: 3, heavyFighter: 4, cruiser: 4, battleship: 7 },
+        rapidFire: { espionageProbe: 5, solarSatellite: 5, smallCargo: 3, largeCargo: 3, heavyFighter: 4, destroyer: 4, cruiser: 7 },
         requirements: { shipyard: 8, hyperspaceTech: 5, hyperspaceDrive: 5, laserTech: 12 },
     },
     bomber: {
@@ -94,7 +94,7 @@ exports.FLEET_DATA = {
     destroyer: {
         cost: { metal: 60000, crystal: 50000, deuterium: 15000 },
         stats: { attack: 2000, shield: 500, hull: 110000, speed: 5000, cargo: 2000, fuelConsumption: 1000 },
-        rapidFire: { espionageProbe: 5, solarSatellite: 5, lightLaser: 10, battlecruiser: 2 },
+        rapidFire: { espionageProbe: 5, solarSatellite: 5, lightFighter: 6, rocketLauncher: 10 },
         requirements: { shipyard: 9, hyperspaceDrive: 6, hyperspaceTech: 5 },
     },
     deathstar: {
@@ -102,8 +102,8 @@ exports.FLEET_DATA = {
         stats: { attack: 200000, shield: 50000, hull: 9000000, speed: 100, cargo: 1000000, fuelConsumption: 1 },
         rapidFire: {
             espionageProbe: 1250, solarSatellite: 1250, smallCargo: 250, largeCargo: 250,
-            lightFighter: 200, heavyFighter: 100, cruiser: 33, battleship: 30, battlecruiser: 15,
-            bomber: 25, destroyer: 5, recycler: 250, rocketLauncher: 200, lightLaser: 200,
+            lightFighter: 200, heavyFighter: 100, cruiser: 30, battleship: 5, battlecruiser: 15,
+            destroyer: 33, recycler: 250, rocketLauncher: 200, lightLaser: 200,
             heavyLaser: 100, gaussCannon: 50, ionCannon: 100,
         },
         requirements: { shipyard: 12, hyperspaceDrive: 7, hyperspaceTech: 6, gravitonTech: 1 },
@@ -125,6 +125,12 @@ exports.FLEET_DATA = {
         stats: { attack: 1, shield: 1, hull: 2000, speed: 0, cargo: 0, fuelConsumption: 0 },
         rapidFire: {},
         requirements: { shipyard: 1 },
+    },
+    colonyShip: {
+        cost: { metal: 10000, crystal: 20000, deuterium: 10000 },
+        stats: { attack: 50, shield: 100, hull: 30000, speed: 2500, cargo: 7500, fuelConsumption: 1000 },
+        rapidFire: { espionageProbe: 5, solarSatellite: 5 },
+        requirements: { shipyard: 4, impulseDrive: 3 },
     },
 };
 exports.DEFENSE_DATA = {
@@ -344,6 +350,7 @@ exports.SHIP_ENGINE_DATA = {
     deathstar: { defaultEngine: 'hyperspace', baseSpeed: 100 },
     battlecruiser: { defaultEngine: 'hyperspace', baseSpeed: 10000 },
     solarSatellite: { defaultEngine: 'none', baseSpeed: 0 },
+    colonyShip: { defaultEngine: 'impulse', baseSpeed: 2500 },
 };
 exports.ESPIONAGE_INFO_LEVELS = {
     1: ['resources'],
@@ -416,6 +423,7 @@ exports.NAME_MAPPING = {
     recycler: '수확선',
     espionageProbe: '무인정찰기',
     solarSatellite: '태양광인공위성',
+    colonyShip: '식민선',
     rocketLauncher: '미사일발사대',
     lightLaser: '경레이저포탑',
     heavyLaser: '중레이저포탑',

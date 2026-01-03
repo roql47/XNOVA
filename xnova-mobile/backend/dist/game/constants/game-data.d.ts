@@ -180,8 +180,6 @@ export declare const FLEET_DATA: {
         rapidFire: {
             espionageProbe: number;
             solarSatellite: number;
-            lightFighter: number;
-            rocketLauncher: number;
         };
         requirements: {
             shipyard: number;
@@ -206,6 +204,8 @@ export declare const FLEET_DATA: {
         rapidFire: {
             espionageProbe: number;
             solarSatellite: number;
+            battlecruiser: number;
+            lightLaser: number;
         };
         requirements: {
             shipyard: number;
@@ -232,8 +232,8 @@ export declare const FLEET_DATA: {
             smallCargo: number;
             largeCargo: number;
             heavyFighter: number;
+            destroyer: number;
             cruiser: number;
-            battleship: number;
         };
         requirements: {
             shipyard: number;
@@ -289,8 +289,8 @@ export declare const FLEET_DATA: {
         rapidFire: {
             espionageProbe: number;
             solarSatellite: number;
-            lightLaser: number;
-            battlecruiser: number;
+            lightFighter: number;
+            rocketLauncher: number;
         };
         requirements: {
             shipyard: number;
@@ -322,7 +322,6 @@ export declare const FLEET_DATA: {
             cruiser: number;
             battleship: number;
             battlecruiser: number;
-            bomber: number;
             destroyer: number;
             recycler: number;
             rocketLauncher: number;
@@ -397,6 +396,29 @@ export declare const FLEET_DATA: {
         rapidFire: {};
         requirements: {
             shipyard: number;
+        };
+    };
+    colonyShip: {
+        cost: {
+            metal: number;
+            crystal: number;
+            deuterium: number;
+        };
+        stats: {
+            attack: number;
+            shield: number;
+            hull: number;
+            speed: number;
+            cargo: number;
+            fuelConsumption: number;
+        };
+        rapidFire: {
+            espionageProbe: number;
+            solarSatellite: number;
+        };
+        requirements: {
+            shipyard: number;
+            impulseDrive: number;
         };
     };
 };
@@ -899,6 +921,10 @@ export declare const SHIP_ENGINE_DATA: {
         defaultEngine: string;
         baseSpeed: number;
     };
+    colonyShip: {
+        defaultEngine: string;
+        baseSpeed: number;
+    };
 };
 export declare const ESPIONAGE_INFO_LEVELS: {
     1: string[];
@@ -941,6 +967,7 @@ export declare const NAME_MAPPING: {
     recycler: string;
     espionageProbe: string;
     solarSatellite: string;
+    colonyShip: string;
     rocketLauncher: string;
     lightLaser: string;
     heavyLaser: string;

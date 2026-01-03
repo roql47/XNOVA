@@ -280,6 +280,7 @@ let Fleet = class Fleet {
     recycler;
     espionageProbe;
     solarSatellite;
+    colonyShip;
 };
 exports.Fleet = Fleet;
 __decorate([
@@ -334,6 +335,10 @@ __decorate([
     (0, mongoose_1.Prop)({ default: 0 }),
     __metadata("design:type", Number)
 ], Fleet.prototype, "solarSatellite", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 0 }),
+    __metadata("design:type", Number)
+], Fleet.prototype, "colonyShip", void 0);
 exports.Fleet = Fleet = __decorate([
     (0, mongoose_1.Schema)({ _id: false })
 ], Fleet);
@@ -533,6 +538,9 @@ let User = class User {
     googleId;
     playerName;
     coordinate;
+    homePlanetId;
+    activePlanetId;
+    isAdmin;
     vacationMode;
     resources;
     mines;
@@ -569,9 +577,21 @@ __decorate([
     __metadata("design:type", String)
 ], User.prototype, "playerName", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ required: true, unique: true }),
+    (0, mongoose_1.Prop)({ required: true }),
     __metadata("design:type", String)
 ], User.prototype, "coordinate", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: null }),
+    __metadata("design:type", Object)
+], User.prototype, "homePlanetId", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: null }),
+    __metadata("design:type", Object)
+], User.prototype, "activePlanetId", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: false }),
+    __metadata("design:type", Boolean)
+], User.prototype, "isAdmin", void 0);
 __decorate([
     (0, mongoose_1.Prop)({ type: VacationMode, default: () => ({ isActive: false, startTime: null, minEndTime: null }) }),
     __metadata("design:type", VacationMode)

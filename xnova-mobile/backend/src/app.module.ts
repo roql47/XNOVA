@@ -11,6 +11,7 @@ import { GalaxyModule } from './galaxy/galaxy.module';
 import { RankingModule } from './ranking/ranking.module';
 import { SocketModule } from './socket/socket.module';
 import { MessageModule } from './message/message.module';
+import { PlanetModule } from './planet/planet.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { MessageModule } from './message/message.module';
     RankingModule,
     SocketModule,
     MessageModule,
+    PlanetModule,
   ],
   providers: [
     // 전역 Rate Limiting 가드 적용

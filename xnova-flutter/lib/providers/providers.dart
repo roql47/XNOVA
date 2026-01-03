@@ -941,12 +941,20 @@ class GameNotifier extends StateNotifier<GameState> {
 
   Future<void> processBattle() async {
     try {
-      await _apiService.processBattle();
+      final result = await _apiService.processBattle();
+      
+      // 수송/배치 완료 후 상태 갱신
+      if (result['transportProcessed'] == true || result['deployProcessed'] == true) {
+        // 약간의 딜레이 후 상태 갱신 (서버 저장 완료 대기)
+        await Future.delayed(const Duration(milliseconds: 300));
+      }
+      
       await loadBattleStatus();
       await loadResources();
       await loadFleet();
     } catch (e) {
-      // ignore
+      // 에러 시에도 상태 갱신 시도
+      await loadBattleStatus();
     }
   }
 }

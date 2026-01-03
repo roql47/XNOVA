@@ -9,6 +9,7 @@ import { BattleService } from './services/battle.service';
 import type { BattleResult } from './services/battle.service';
 import { BattleSimulatorService } from './services/battle-simulator.service';
 import type { SimulationRequest, SimulationConfig, BattleSlot } from './services/battle-simulator.service';
+import { ColonyService } from './services/colony.service';
 
 @Controller('game')
 @UseGuards(JwtAuthGuard)
@@ -21,6 +22,7 @@ export class GameController {
     private defenseService: DefenseService,
     private battleService: BattleService,
     private battleSimulatorService: BattleSimulatorService,
+    private colonyService: ColonyService,
   ) {}
 
   // ===== 자원 =====
@@ -264,5 +266,42 @@ export class GameController {
         config,
       ),
     };
+  }
+
+  // ===== 식민지 =====
+
+  /**
+   * 식민 미션 시작
+   */
+  @Post('colony/start')
+  async startColonization(@Request() req, @Body() body: { 
+    targetCoord: string; 
+    fleet: Record<string, number>;
+  }) {
+    return this.colonyService.startColonization(req.user.userId, body.targetCoord, body.fleet);
+  }
+
+  /**
+   * 식민 미션 완료 처리
+   */
+  @Post('colony/complete')
+  async completeColonization(@Request() req) {
+    return this.colonyService.completeColonization(req.user.userId);
+  }
+
+  /**
+   * 식민 미션 귀환 (취소)
+   */
+  @Post('colony/recall')
+  async recallColonization(@Request() req) {
+    return this.colonyService.recallColonization(req.user.userId);
+  }
+
+  /**
+   * 함대 귀환 처리
+   */
+  @Post('colony/return')
+  async completeReturn(@Request() req) {
+    return this.colonyService.completeReturn(req.user.userId);
   }
 }

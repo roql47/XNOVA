@@ -360,5 +360,69 @@ class ApiService {
     final response = await _dio.delete('user/account', data: {'password': password});
     return response.data;
   }
+
+  // ===== 식민지 =====
+  // 내 행성 목록 조회
+  Future<Map<String, dynamic>> getMyPlanets() async {
+    final response = await _dio.get('planet/list');
+    return response.data;
+  }
+
+  // 특정 행성 상세 조회
+  Future<Map<String, dynamic>> getPlanetDetail(String planetId) async {
+    final response = await _dio.get('planet/$planetId');
+    return response.data;
+  }
+
+  // 활성 행성 전환
+  Future<Map<String, dynamic>> switchPlanet(String planetId) async {
+    final response = await _dio.post('planet/switch', data: {'planetId': planetId});
+    return response.data;
+  }
+
+  // 행성 포기
+  Future<Map<String, dynamic>> abandonPlanet(String planetId) async {
+    final response = await _dio.post('planet/abandon', data: {'planetId': planetId});
+    return response.data;
+  }
+
+  // 행성 이름 변경
+  Future<Map<String, dynamic>> renamePlanet(String planetId, String newName) async {
+    final response = await _dio.post('planet/rename', data: {
+      'planetId': planetId,
+      'newName': newName,
+    });
+    return response.data;
+  }
+
+  // 식민 미션 시작
+  Future<Map<String, dynamic>> startColonization({
+    required String targetCoord,
+    required Map<String, int> fleet,
+  }) async {
+    final response = await _dio.post('game/colony/start', data: {
+      'targetCoord': targetCoord,
+      'fleet': fleet,
+    });
+    return response.data;
+  }
+
+  // 식민 미션 완료 처리
+  Future<Map<String, dynamic>> completeColonization() async {
+    final response = await _dio.post('game/colony/complete');
+    return response.data;
+  }
+
+  // 식민 미션 귀환 (취소)
+  Future<Map<String, dynamic>> recallColonization() async {
+    final response = await _dio.post('game/colony/recall');
+    return response.data;
+  }
+
+  // 식민 함대 귀환 완료
+  Future<Map<String, dynamic>> completeColonyReturn() async {
+    final response = await _dio.post('game/colony/return');
+    return response.data;
+  }
 }
 

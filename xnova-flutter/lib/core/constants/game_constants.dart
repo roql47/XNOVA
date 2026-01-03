@@ -25,6 +25,7 @@ class GameConstants {
     'recycler': '수확선',
     'espionageProbe': '무인정찰기',
     'solarSatellite': '태양광인공위성',
+    'colonyShip': '식민선',
     
     // 방어시설
     'rocketLauncher': '미사일발사대',
@@ -127,6 +128,7 @@ class GameConstants {
     'recycler': {'attack': 1, 'shield': 10, 'hull': 16000},
     'espionageProbe': {'attack': 0, 'shield': 0, 'hull': 1000},
     'solarSatellite': {'attack': 1, 'shield': 1, 'hull': 2000},
+    'colonyShip': {'attack': 50, 'shield': 100, 'hull': 30000},
     
     // 방어시설
     'rocketLauncher': {'attack': 80, 'shield': 20, 'hull': 2000},

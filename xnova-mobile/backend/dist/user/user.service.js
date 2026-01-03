@@ -425,6 +425,7 @@ let UserService = class UserService {
                 recycler: 0,
                 espionageProbe: 0,
                 solarSatellite: 0,
+                colonyShip: 0,
             },
             defense: {
                 rocketLauncher: 0,
@@ -467,6 +468,20 @@ let UserService = class UserService {
         }
         await this.userModel.findByIdAndDelete(userId).exec();
         return { success: true, message: '계정이 삭제되었습니다.' };
+    }
+    async updateActivePlanet(userId, planetId) {
+        await this.userModel.findByIdAndUpdate(userId, {
+            activePlanetId: planetId,
+        }).exec();
+    }
+    async setHomePlanet(userId, planetId) {
+        await this.userModel.findByIdAndUpdate(userId, {
+            homePlanetId: planetId,
+            activePlanetId: planetId,
+        }).exec();
+    }
+    async updateUserCoordinate(userId, coordinate) {
+        await this.userModel.findByIdAndUpdate(userId, { coordinate }).exec();
     }
 };
 exports.UserService = UserService;

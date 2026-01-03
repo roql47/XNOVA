@@ -47,4 +47,7 @@ export declare class UserService {
         success: boolean;
         message: string;
     }>;
+    updateActivePlanet(userId: string, planetId: string): Promise<void>;
+    setHomePlanet(userId: string, planetId: string): Promise<void>;
+    updateUserCoordinate(userId: string, coordinate: string): Promise<void>;
 }

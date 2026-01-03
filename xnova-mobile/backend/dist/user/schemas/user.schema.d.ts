@@ -69,6 +69,7 @@ export declare class Fleet {
     recycler: number;
     espionageProbe: number;
     solarSatellite: number;
+    colonyShip: number;
 }
 export declare class Defense {
     rocketLauncher: number;
@@ -122,6 +123,9 @@ export declare class User {
     googleId?: string;
     playerName: string;
     coordinate: string;
+    homePlanetId: string | null;
+    activePlanetId: string | null;
+    isAdmin: boolean;
     vacationMode: VacationMode;
     resources: Resources;
     mines: Mines;
@@ -190,6 +194,33 @@ export declare const UserSchema: import("mongoose").Schema<User, import("mongoos
         id: string;
     }> | undefined;
     coordinate?: import("mongoose").SchemaDefinitionProperty<string, User, Document<unknown, {}, User, {
+        id: string;
+    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
+        _id: import("mongoose").Types.ObjectId;
+    } & {
+        __v: number;
+    }, "id"> & {
+        id: string;
+    }> | undefined;
+    homePlanetId?: import("mongoose").SchemaDefinitionProperty<string | null, User, Document<unknown, {}, User, {
+        id: string;
+    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
+        _id: import("mongoose").Types.ObjectId;
+    } & {
+        __v: number;
+    }, "id"> & {
+        id: string;
+    }> | undefined;
+    activePlanetId?: import("mongoose").SchemaDefinitionProperty<string | null, User, Document<unknown, {}, User, {
+        id: string;
+    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
+        _id: import("mongoose").Types.ObjectId;
+    } & {
+        __v: number;
+    }, "id"> & {
+        id: string;
+    }> | undefined;
+    isAdmin?: import("mongoose").SchemaDefinitionProperty<boolean, User, Document<unknown, {}, User, {
         id: string;
     }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
         _id: import("mongoose").Types.ObjectId;

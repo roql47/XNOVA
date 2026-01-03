@@ -13,11 +13,11 @@ const Map<String, Map<String, dynamic>> fleetData = {
   'solarSatellite': {'name': '태양광 인공위성', 'attack': 1, 'shield': 1, 'hull': 200, 'speed': 0, 'cargo': 0, 'cost': {'crystal': 2000, 'deuterium': 500}},
   'lightFighter': {'name': '전투기', 'attack': 50, 'shield': 10, 'hull': 400, 'speed': 12500, 'cargo': 50, 'cost': {'metal': 3000, 'crystal': 1000}},
   'heavyFighter': {'name': '공격기', 'attack': 150, 'shield': 25, 'hull': 1000, 'speed': 10000, 'cargo': 100, 'cost': {'metal': 6000, 'crystal': 4000}},
-  'cruiser': {'name': '구축함', 'attack': 400, 'shield': 50, 'hull': 2700, 'speed': 15000, 'cargo': 800, 'cost': {'metal': 20000, 'crystal': 7000, 'deuterium': 2000}},
-  'battleship': {'name': '순양함', 'attack': 1000, 'shield': 200, 'hull': 6000, 'speed': 10000, 'cargo': 1500, 'cost': {'metal': 45000, 'crystal': 15000}},
-  'battlecruiser': {'name': '순양전함', 'attack': 700, 'shield': 400, 'hull': 7000, 'speed': 10000, 'cargo': 750, 'cost': {'metal': 30000, 'crystal': 40000, 'deuterium': 15000}},
+  'cruiser': {'name': '순양함', 'attack': 400, 'shield': 50, 'hull': 2700, 'speed': 15000, 'cargo': 800, 'cost': {'metal': 20000, 'crystal': 7000, 'deuterium': 2000}},
+  'battleship': {'name': '전함', 'attack': 1000, 'shield': 200, 'hull': 6000, 'speed': 10000, 'cargo': 1500, 'cost': {'metal': 45000, 'crystal': 15000}},
+  'battlecruiser': {'name': '전투순양함', 'attack': 700, 'shield': 400, 'hull': 7000, 'speed': 10000, 'cargo': 750, 'cost': {'metal': 30000, 'crystal': 40000, 'deuterium': 15000}},
   'bomber': {'name': '폭격기', 'attack': 1000, 'shield': 500, 'hull': 7500, 'speed': 4000, 'cargo': 500, 'cost': {'metal': 50000, 'crystal': 25000, 'deuterium': 15000}},
-  'destroyer': {'name': '전함', 'attack': 2000, 'shield': 500, 'hull': 11000, 'speed': 5000, 'cargo': 2000, 'cost': {'metal': 60000, 'crystal': 50000, 'deuterium': 15000}},
+  'destroyer': {'name': '구축함', 'attack': 2000, 'shield': 500, 'hull': 11000, 'speed': 5000, 'cargo': 2000, 'cost': {'metal': 60000, 'crystal': 50000, 'deuterium': 15000}},
   'deathstar': {'name': '죽음의 별', 'attack': 200000, 'shield': 50000, 'hull': 900000, 'speed': 100, 'cargo': 1000000, 'cost': {'metal': 5000000, 'crystal': 4000000, 'deuterium': 1000000}},
 };
 
@@ -43,22 +43,22 @@ const Map<String, Map<String, int>> rapidFireData = {
   // 전투함선
   'lightFighter': {'espionageProbe': 5, 'solarSatellite': 5},
   'heavyFighter': {'espionageProbe': 5, 'solarSatellite': 5, 'smallCargo': 3},
-  'cruiser': {'espionageProbe': 5, 'solarSatellite': 5, 'lightFighter': 6, 'rocketLauncher': 10},
-  'battleship': {'espionageProbe': 5, 'solarSatellite': 5},
+  'cruiser': {'espionageProbe': 5, 'solarSatellite': 5},
+  'battleship': {'espionageProbe': 5, 'solarSatellite': 5, 'battlecruiser': 2, 'lightLaser': 10},
   'battlecruiser': {
     'espionageProbe': 5, 'solarSatellite': 5,
-    'smallCargo': 3, 'largeCargo': 3, 'heavyFighter': 4, 'cruiser': 4, 'battleship': 7,
+    'smallCargo': 3, 'largeCargo': 3, 'heavyFighter': 4, 'destroyer': 4, 'cruiser': 7,
   },
   'bomber': {
     'espionageProbe': 5, 'solarSatellite': 5,
     'rocketLauncher': 20, 'lightLaser': 20, 'heavyLaser': 10, 'ionCannon': 10, 'gaussCannon': 5, 'plasmaTurret': 5,
   },
-  'destroyer': {'espionageProbe': 5, 'solarSatellite': 5, 'battlecruiser': 2, 'lightLaser': 10},
+  'destroyer': {'espionageProbe': 5, 'solarSatellite': 5, 'lightFighter': 6, 'rocketLauncher': 10},
   'deathstar': {
     'espionageProbe': 1250, 'solarSatellite': 1250,
     'smallCargo': 250, 'largeCargo': 250, 'colonyShip': 250, 'recycler': 250,
-    'lightFighter': 200, 'heavyFighter': 100, 'cruiser': 33, 'battleship': 30,
-    'battlecruiser': 15, 'destroyer': 5,
+    'lightFighter': 200, 'heavyFighter': 100, 'cruiser': 30, 'battleship': 5,
+    'battlecruiser': 15, 'destroyer': 33,
     'rocketLauncher': 200, 'lightLaser': 200, 'heavyLaser': 100, 'ionCannon': 100, 'gaussCannon': 50,
   },
 };
