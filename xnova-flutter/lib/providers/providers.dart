@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../data/services/token_service.dart';
@@ -754,7 +755,7 @@ class GameNotifier extends StateNotifier<GameState> {
     }
   }
 
-  Future<void> attack(String targetCoord, Map<String, int> fleet) async {
+  Future<bool> attack(String targetCoord, Map<String, int> fleet) async {
     try {
       await _apiService.attack(AttackRequest(
         targetCoord: targetCoord,
@@ -762,8 +763,17 @@ class GameNotifier extends StateNotifier<GameState> {
       ));
       await loadFleet();
       await loadBattleStatus();
+      return true;
     } catch (e) {
-      state = state.copyWith(error: '공격에 실패했습니다.');
+      String errorMsg = '공격에 실패했습니다.';
+      if (e is DioException && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map && data['message'] != null) {
+          errorMsg = data['message'].toString();
+        }
+      }
+      state = state.copyWith(error: errorMsg);
+      return false;
     }
   }
 
@@ -793,7 +803,14 @@ class GameNotifier extends StateNotifier<GameState> {
       await loadResources();
       return true;
     } catch (e) {
-      state = state.copyWith(error: '수송에 실패했습니다.');
+      String errorMsg = '수송에 실패했습니다.';
+      if (e is DioException && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map && data['message'] != null) {
+          errorMsg = data['message'].toString();
+        }
+      }
+      state = state.copyWith(error: errorMsg);
       return false;
     }
   }
@@ -811,7 +828,14 @@ class GameNotifier extends StateNotifier<GameState> {
       await loadResources();
       return true;
     } catch (e) {
-      state = state.copyWith(error: '배치에 실패했습니다.');
+      String errorMsg = '배치에 실패했습니다.';
+      if (e is DioException && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map && data['message'] != null) {
+          errorMsg = data['message'].toString();
+        }
+      }
+      state = state.copyWith(error: errorMsg);
       return false;
     }
   }

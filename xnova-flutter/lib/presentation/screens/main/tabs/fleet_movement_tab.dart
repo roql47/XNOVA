@@ -152,44 +152,84 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
     return metal + crystal + deuterium;
   }
 
-  void _executeMission() {
-    if (_targetController.text.isEmpty) return;
-    if (_selectedFleet.isEmpty || _selectedFleet.values.every((v) => v == 0)) return;
+  Future<void> _executeMission() async {
+    if (_targetController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('목표 좌표를 입력해주세요.')),
+      );
+      return;
+    }
+    if (_selectedFleet.isEmpty || _selectedFleet.values.every((v) => v == 0)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('출격할 함선을 선택해주세요.')),
+      );
+      return;
+    }
     
     final fleet = Map<String, int>.from(_selectedFleet)
       ..removeWhere((key, value) => value == 0);
     final targetCoord = _targetController.text;
 
+    bool success = false;
+    String missionName = '';
+
     switch (_missionType) {
       case MissionType.attack:
-        ref.read(gameProvider.notifier).attack(targetCoord, fleet);
+        missionName = '공격';
+        try {
+          await ref.read(gameProvider.notifier).attack(targetCoord, fleet);
+          success = true;
+        } catch (e) {
+          success = false;
+        }
         break;
       case MissionType.transport:
+        missionName = '수송';
         final resources = {
           'metal': int.tryParse(_metalController.text) ?? 0,
           'crystal': int.tryParse(_crystalController.text) ?? 0,
           'deuterium': int.tryParse(_deuteriumController.text) ?? 0,
         };
-        ref.read(gameProvider.notifier).transport(targetCoord, fleet, resources);
+        success = await ref.read(gameProvider.notifier).transport(targetCoord, fleet, resources);
         break;
       case MissionType.deploy:
+        missionName = '배치';
         final resources = {
           'metal': int.tryParse(_metalController.text) ?? 0,
           'crystal': int.tryParse(_crystalController.text) ?? 0,
           'deuterium': int.tryParse(_deuteriumController.text) ?? 0,
         };
-        ref.read(gameProvider.notifier).deploy(targetCoord, fleet, resources);
+        success = await ref.read(gameProvider.notifier).deploy(targetCoord, fleet, resources);
         break;
     }
-    
-    _targetController.clear();
-    _metalController.text = '0';
-    _crystalController.text = '0';
-    _deuteriumController.text = '0';
-    setState(() {
-      _selectedFleet.clear();
-      _missionType = MissionType.attack;
-    });
+
+    if (mounted) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$targetCoord로 $missionName 함대가 출격했습니다!'),
+            backgroundColor: AppColors.positive,
+          ),
+        );
+        
+        _targetController.clear();
+        _metalController.text = '0';
+        _crystalController.text = '0';
+        _deuteriumController.text = '0';
+        setState(() {
+          _selectedFleet.clear();
+          _missionType = MissionType.attack;
+        });
+      } else {
+        final error = ref.read(gameProvider).error;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error ?? '$missionName에 실패했습니다.'),
+            backgroundColor: AppColors.negative,
+          ),
+        );
+      }
+    }
   }
 
   void _attack() {
