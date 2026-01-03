@@ -19,6 +19,7 @@ const mongoose_2 = require("mongoose");
 const user_schema_1 = require("../../user/schemas/user.schema");
 const resources_service_1 = require("./resources.service");
 const fleet_service_1 = require("./fleet.service");
+const ranking_service_1 = require("./ranking.service");
 const game_data_1 = require("../constants/game-data");
 const message_service_1 = require("../../message/message.service");
 const galaxy_service_1 = require("../../galaxy/galaxy.service");
@@ -29,13 +30,15 @@ let BattleService = class BattleService {
     userModel;
     resourcesService;
     fleetService;
+    rankingService;
     messageService;
     galaxyService;
     battleReportService;
-    constructor(userModel, resourcesService, fleetService, messageService, galaxyService, battleReportService) {
+    constructor(userModel, resourcesService, fleetService, rankingService, messageService, galaxyService, battleReportService) {
         this.userModel = userModel;
         this.resourcesService = resourcesService;
         this.fleetService = fleetService;
+        this.rankingService = rankingService;
         this.messageService = messageService;
         this.galaxyService = galaxyService;
         this.battleReportService = battleReportService;
@@ -601,6 +604,14 @@ let BattleService = class BattleService {
         }
         if (target._id.toString() === attackerId) {
             throw new common_1.BadRequestException('자신의 행성은 공격할 수 없습니다.');
+        }
+        const attackerScore = this.rankingService.calculatePlayerScores(attacker).totalScore;
+        const defenderScore = this.rankingService.calculatePlayerScores(target).totalScore;
+        if (attackerScore > defenderScore * 5) {
+            throw new common_1.BadRequestException(`상대방보다 점수가 5배 이상 높아 공격할 수 없습니다. (내 점수: ${attackerScore.toLocaleString()}, 상대 점수: ${defenderScore.toLocaleString()})`);
+        }
+        if (defenderScore > attackerScore * 5) {
+            throw new common_1.BadRequestException(`상대방보다 점수가 5배 이상 낮아 공격할 수 없습니다. (내 점수: ${attackerScore.toLocaleString()}, 상대 점수: ${defenderScore.toLocaleString()})`);
         }
         for (const type in fleet) {
             const count = fleet[type];
@@ -1437,9 +1448,11 @@ exports.BattleService = BattleService;
 exports.BattleService = BattleService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(user_schema_1.User.name)),
+    __param(3, (0, common_1.Inject)((0, common_1.forwardRef)(() => ranking_service_1.RankingService))),
     __metadata("design:paramtypes", [mongoose_2.Model,
         resources_service_1.ResourcesService,
         fleet_service_1.FleetService,
+        ranking_service_1.RankingService,
         message_service_1.MessageService,
         galaxy_service_1.GalaxyService,
         battle_report_service_1.BattleReportService])

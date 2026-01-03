@@ -1,9 +1,10 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, forwardRef, Inject } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../../user/schemas/user.schema';
 import { ResourcesService } from './resources.service';
 import { FleetService } from './fleet.service';
+import { RankingService } from './ranking.service';
 import { FLEET_DATA, DEFENSE_DATA, NAME_MAPPING } from '../constants/game-data';
 import { MessageService } from '../../message/message.service';
 import { GalaxyService } from '../../galaxy/galaxy.service';
@@ -64,6 +65,7 @@ export class BattleService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private resourcesService: ResourcesService,
     private fleetService: FleetService,
+    @Inject(forwardRef(() => RankingService)) private rankingService: RankingService,
     private messageService: MessageService,
     private galaxyService: GalaxyService,
     private battleReportService: BattleReportService,
@@ -892,6 +894,22 @@ export class BattleService {
 
     if (target._id.toString() === attackerId) {
       throw new BadRequestException('자신의 행성은 공격할 수 없습니다.');
+    }
+
+    // 점수 차이 확인 (5배 이상 차이나면 공격 불가)
+    const attackerScore = this.rankingService.calculatePlayerScores(attacker).totalScore;
+    const defenderScore = this.rankingService.calculatePlayerScores(target).totalScore;
+    
+    if (attackerScore > defenderScore * 5) {
+      throw new BadRequestException(
+        `상대방보다 점수가 5배 이상 높아 공격할 수 없습니다. (내 점수: ${attackerScore.toLocaleString()}, 상대 점수: ${defenderScore.toLocaleString()})`
+      );
+    }
+    
+    if (defenderScore > attackerScore * 5) {
+      throw new BadRequestException(
+        `상대방보다 점수가 5배 이상 낮아 공격할 수 없습니다. (내 점수: ${attackerScore.toLocaleString()}, 상대 점수: ${defenderScore.toLocaleString()})`
+      );
     }
 
     // 함대 확인
