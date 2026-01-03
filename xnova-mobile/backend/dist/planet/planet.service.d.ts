@@ -13,7 +13,7 @@ export declare class PlanetService {
     getPlanetById(planetId: string): Promise<PlanetDocument>;
     getPlanetByCoordinate(coordinate: string): Promise<PlanetDocument | null>;
     getPlanetCount(ownerId: string): Promise<number>;
-    switchActivePlanet(userId: string, planetId: string): Promise<PlanetDocument>;
+    switchActivePlanet(userId: string, planetId: string): Promise<any>;
     abandonPlanet(userId: string, planetId: string): Promise<{
         success: boolean;
         message: string;
@@ -30,4 +30,19 @@ export declare class PlanetService {
     getUserActivePlanetId(userId: string): Promise<{
         activePlanetId: string | null;
     } | null>;
+    getAllPlanetsWithHomeworld(userId: string): Promise<{
+        activePlanetId: string;
+        planets: Array<{
+            id: string;
+            name: string;
+            coordinate: string;
+            isHomePlanet: boolean;
+            type: string;
+            maxFields: number;
+            usedFields: number;
+            temperature: number;
+            planetType: string;
+            resources: any;
+        }>;
+    }>;
 }

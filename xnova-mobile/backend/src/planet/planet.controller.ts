@@ -8,30 +8,29 @@ export class PlanetController {
   constructor(private planetService: PlanetService) {}
 
   /**
-   * 내 행성 목록 조회
+   * 내 행성 목록 조회 (모행성 + 식민지)
    */
   @Get('list')
   async getMyPlanets(@Request() req) {
-    const planets = await this.planetService.getPlanetsByOwner(req.user.userId);
-    const user = await this.planetService.getUserActivePlanetId(req.user.userId);
+    const result = await this.planetService.getAllPlanetsWithHomeworld(req.user.userId);
     
     return {
       success: true,
-      activePlanetId: user?.activePlanetId || planets[0]?._id.toString(),
-      planets: planets.map(p => ({
-        _id: p._id.toString(),
-        id: p._id.toString(),
+      activePlanetId: result.activePlanetId,
+      planets: result.planets.map(p => ({
+        _id: p.id,
+        id: p.id,
         name: p.name,
         coordinate: p.coordinate,
-        isHomePlanet: p.isHomeworld,
-        isHomeworld: p.isHomeworld,
-        type: p.type,
+        isHomePlanet: p.isHomePlanet,
+        isHomeworld: p.isHomePlanet,
+        type: p.type || 'planet',
         planetInfo: {
           planetName: p.name,
-          maxFields: p.planetInfo?.maxFields || 163,
-          usedFields: p.planetInfo?.usedFields || 0,
-          temperature: p.planetInfo?.tempMax || 50,
-          planetType: p.planetInfo?.planetType || 'normaltemp',
+          maxFields: p.maxFields || 163,
+          usedFields: p.usedFields || 0,
+          temperature: p.temperature || 50,
+          planetType: p.planetType || 'normaltemp',
         },
         resources: p.resources,
       })),

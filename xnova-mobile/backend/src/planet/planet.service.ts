@@ -107,7 +107,26 @@ export class PlanetService {
   /**
    * 활성 행성 전환
    */
-  async switchActivePlanet(userId: string, planetId: string): Promise<PlanetDocument> {
+  async switchActivePlanet(userId: string, planetId: string): Promise<any> {
+    // 모행성인 경우
+    if (planetId.startsWith('home_')) {
+      const user = await this.userService.findById(userId);
+      if (!user) {
+        throw new NotFoundException('사용자를 찾을 수 없습니다.');
+      }
+      
+      // User의 activePlanetId 업데이트
+      await this.userService.updateActivePlanet(userId, planetId);
+      
+      return {
+        _id: planetId,
+        name: user.playerName || '모행성',
+        coordinate: user.coordinate,
+        isHomeworld: true,
+      };
+    }
+
+    // 식민지인 경우
     const planet = await this.planetModel.findById(planetId).exec();
     if (!planet) {
       throw new NotFoundException('행성을 찾을 수 없습니다.');
@@ -232,6 +251,71 @@ export class PlanetService {
     const user = await this.userService.findById(userId);
     if (!user) return null;
     return { activePlanetId: user.activePlanetId };
+  }
+
+  /**
+   * 모행성 + 식민지 전체 목록 조회
+   */
+  async getAllPlanetsWithHomeworld(userId: string): Promise<{
+    activePlanetId: string;
+    planets: Array<{
+      id: string;
+      name: string;
+      coordinate: string;
+      isHomePlanet: boolean;
+      type: string;
+      maxFields: number;
+      usedFields: number;
+      temperature: number;
+      planetType: string;
+      resources: any;
+    }>;
+  }> {
+    const user = await this.userService.findById(userId);
+    if (!user) {
+      return { activePlanetId: '', planets: [] };
+    }
+
+    const planets: any[] = [];
+
+    // 1. 모행성 추가 (User 스키마에서)
+    planets.push({
+      id: `home_${userId}`, // 모행성 ID (특별 식별자)
+      name: user.playerName || '모행성',
+      coordinate: user.coordinate,
+      isHomePlanet: true,
+      type: 'planet',
+      maxFields: user.planetInfo?.maxFields || 163,
+      usedFields: user.planetInfo?.usedFields || 0,
+      temperature: user.planetInfo?.temperature || 50,
+      planetType: user.planetInfo?.planetType || 'normaltemp',
+      resources: user.resources,
+    });
+
+    // 2. 식민지 추가 (Planet 컬렉션에서)
+    const colonies = await this.planetModel.find({ ownerId: userId, isHomeworld: false }).exec();
+    for (const colony of colonies) {
+      planets.push({
+        id: colony._id.toString(),
+        name: colony.name || '식민지',
+        coordinate: colony.coordinate,
+        isHomePlanet: false,
+        type: colony.type || 'planet',
+        maxFields: colony.planetInfo?.maxFields || 163,
+        usedFields: colony.planetInfo?.usedFields || 0,
+        temperature: colony.planetInfo?.tempMax || 50,
+        planetType: colony.planetInfo?.planetType || 'normaltemp',
+        resources: colony.resources,
+      });
+    }
+
+    // 활성 행성 ID 결정
+    let activePlanetId = user.activePlanetId;
+    if (!activePlanetId || activePlanetId === `home_${userId}`) {
+      activePlanetId = `home_${userId}`;
+    }
+
+    return { activePlanetId, planets };
   }
 }
 

@@ -20,7 +20,7 @@ export declare class PlanetController {
                 temperature: number;
                 planetType: string;
             };
-            resources: import("./schemas/planet.schema").PlanetResources;
+            resources: any;
         }[];
     }>;
     getPlanetDetail(req: any, planetId: string): Promise<{
@@ -54,9 +54,9 @@ export declare class PlanetController {
         success: boolean;
         message: string;
         planet: {
-            id: string;
-            name: string;
-            coordinate: string;
+            id: any;
+            name: any;
+            coordinate: any;
         };
     }>;
     abandonPlanet(req: any, body: {

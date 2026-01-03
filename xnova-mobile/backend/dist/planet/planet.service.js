@@ -81,6 +81,19 @@ let PlanetService = class PlanetService {
         return this.planetModel.countDocuments({ ownerId, type: 'planet' }).exec();
     }
     async switchActivePlanet(userId, planetId) {
+        if (planetId.startsWith('home_')) {
+            const user = await this.userService.findById(userId);
+            if (!user) {
+                throw new common_1.NotFoundException('사용자를 찾을 수 없습니다.');
+            }
+            await this.userService.updateActivePlanet(userId, planetId);
+            return {
+                _id: planetId,
+                name: user.playerName || '모행성',
+                coordinate: user.coordinate,
+                isHomeworld: true,
+            };
+        }
         const planet = await this.planetModel.findById(planetId).exec();
         if (!planet) {
             throw new common_1.NotFoundException('행성을 찾을 수 없습니다.');
@@ -158,6 +171,45 @@ let PlanetService = class PlanetService {
         if (!user)
             return null;
         return { activePlanetId: user.activePlanetId };
+    }
+    async getAllPlanetsWithHomeworld(userId) {
+        const user = await this.userService.findById(userId);
+        if (!user) {
+            return { activePlanetId: '', planets: [] };
+        }
+        const planets = [];
+        planets.push({
+            id: `home_${userId}`,
+            name: user.playerName || '모행성',
+            coordinate: user.coordinate,
+            isHomePlanet: true,
+            type: 'planet',
+            maxFields: user.planetInfo?.maxFields || 163,
+            usedFields: user.planetInfo?.usedFields || 0,
+            temperature: user.planetInfo?.temperature || 50,
+            planetType: user.planetInfo?.planetType || 'normaltemp',
+            resources: user.resources,
+        });
+        const colonies = await this.planetModel.find({ ownerId: userId, isHomeworld: false }).exec();
+        for (const colony of colonies) {
+            planets.push({
+                id: colony._id.toString(),
+                name: colony.name || '식민지',
+                coordinate: colony.coordinate,
+                isHomePlanet: false,
+                type: colony.type || 'planet',
+                maxFields: colony.planetInfo?.maxFields || 163,
+                usedFields: colony.planetInfo?.usedFields || 0,
+                temperature: colony.planetInfo?.tempMax || 50,
+                planetType: colony.planetInfo?.planetType || 'normaltemp',
+                resources: colony.resources,
+            });
+        }
+        let activePlanetId = user.activePlanetId;
+        if (!activePlanetId || activePlanetId === `home_${userId}`) {
+            activePlanetId = `home_${userId}`;
+        }
+        return { activePlanetId, planets };
     }
 };
 exports.PlanetService = PlanetService;
