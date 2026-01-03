@@ -62,8 +62,8 @@ export class DefenseService {
     const totalCost = (defenseData.cost.metal || 0) + (defenseData.cost.crystal || 0);
     const nanoBonus = Math.pow(2, nanoFactoryLevel);
 
-    // 1대당 건조 시간 (초) - 2배 상향
-    const singleUnitTime = (totalCost / (25 * (1 + robotFactoryLevel) * nanoBonus)) * 2;
+    // 1대당 건조 시간 (초) - 10배 속도
+    const singleUnitTime = (totalCost / (25 * (1 + robotFactoryLevel) * nanoBonus)) / 10;
     
     return singleUnitTime * quantity;
   }

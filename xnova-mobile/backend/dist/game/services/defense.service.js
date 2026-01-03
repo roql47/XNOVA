@@ -53,7 +53,7 @@ let DefenseService = class DefenseService {
             return 0;
         const totalCost = (defenseData.cost.metal || 0) + (defenseData.cost.crystal || 0);
         const nanoBonus = Math.pow(2, nanoFactoryLevel);
-        const singleUnitTime = (totalCost / (25 * (1 + robotFactoryLevel) * nanoBonus)) * 2;
+        const singleUnitTime = (totalCost / (25 * (1 + robotFactoryLevel) * nanoBonus)) / 10;
         return singleUnitTime * quantity;
     }
     async getDefense(userId) {
