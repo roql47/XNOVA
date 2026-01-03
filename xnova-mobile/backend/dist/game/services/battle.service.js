@@ -689,15 +689,20 @@ let BattleService = class BattleService {
         };
         if (user.pendingAttack) {
             const remaining = Math.max(0, (user.pendingAttack.arrivalTime.getTime() - Date.now()) / 1000);
-            let missionType = 'attack';
-            if (user.pendingAttack.targetUserId === 'transport') {
-                missionType = 'transport';
-            }
-            else if (user.pendingAttack.targetUserId === 'deploy') {
-                missionType = 'deploy';
-            }
-            else if (user.pendingAttack.targetUserId === 'debris') {
-                missionType = 'recycle';
+            let missionType = user.pendingAttack.missionType || 'attack';
+            if (!missionType || missionType === 'attack') {
+                if (user.pendingAttack.targetUserId === 'transport') {
+                    missionType = 'transport';
+                }
+                else if (user.pendingAttack.targetUserId === 'deploy') {
+                    missionType = 'deploy';
+                }
+                else if (user.pendingAttack.targetUserId === 'debris') {
+                    missionType = 'recycle';
+                }
+                else if (user.pendingAttack.targetUserId === '') {
+                    missionType = 'colony';
+                }
             }
             result.pendingAttack = {
                 targetCoord: user.pendingAttack.targetCoord,

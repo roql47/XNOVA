@@ -176,6 +176,7 @@ export class ColonyService {
       arrivalTime,
       battleCompleted: false,
       transportResources: undefined,
+      missionType: 'colony',
     };
 
     await user.save();
@@ -266,7 +267,7 @@ export class ColonyService {
         loot: { metal: 0, crystal: 0, deuterium: 0 },
         returnTime,
         startTime: new Date(),
-        missionType: 'colonize',
+        missionType: 'colony',
       };
     }
 

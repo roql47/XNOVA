@@ -104,6 +104,7 @@ export declare class AttackProgress {
         crystal: number;
         deuterium: number;
     };
+    missionType?: string;
 }
 export declare class ReturnProgress {
     fleet: Record<string, number>;

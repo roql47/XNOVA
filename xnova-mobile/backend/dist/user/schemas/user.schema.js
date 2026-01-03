@@ -439,6 +439,7 @@ let AttackProgress = class AttackProgress {
     arrivalTime;
     battleCompleted;
     transportResources;
+    missionType;
 };
 exports.AttackProgress = AttackProgress;
 __decorate([
@@ -477,6 +478,10 @@ __decorate([
     (0, mongoose_1.Prop)({ type: Object, default: null }),
     __metadata("design:type", Object)
 ], AttackProgress.prototype, "transportResources", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: String, default: 'attack' }),
+    __metadata("design:type", String)
+], AttackProgress.prototype, "missionType", void 0);
 exports.AttackProgress = AttackProgress = __decorate([
     (0, mongoose_1.Schema)({ _id: false })
 ], AttackProgress);

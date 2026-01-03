@@ -340,7 +340,9 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
                         ? Icons.home_work
                         : gameState.battleStatus!.pendingAttack!.missionType == 'recycle'
                             ? Icons.blur_on
-                            : Icons.flight_takeoff,
+                            : gameState.battleStatus!.pendingAttack!.missionType == 'colony'
+                                ? Icons.rocket_launch
+                                : Icons.flight_takeoff,
                 title: gameState.battleStatus!.pendingAttack!.missionTitle,
                 target: gameState.battleStatus!.pendingAttack!.targetCoord,
                 fleet: gameState.battleStatus!.pendingAttack!.fleet,

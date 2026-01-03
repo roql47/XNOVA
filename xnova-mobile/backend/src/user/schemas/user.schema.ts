@@ -287,6 +287,9 @@ export class AttackProgress {
 
   @Prop({ type: Object, default: null })
   transportResources?: { metal: number; crystal: number; deuterium: number };
+
+  @Prop({ type: String, default: 'attack' })
+  missionType?: string; // 'attack', 'transport', 'deploy', 'recycle', 'colony'
 }
 
 // 귀환 진행 상태 스키마

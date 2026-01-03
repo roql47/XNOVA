@@ -1014,14 +1014,18 @@ export class BattleService {
 
     if (user.pendingAttack) {
       const remaining = Math.max(0, (user.pendingAttack.arrivalTime.getTime() - Date.now()) / 1000);
-      // 미션 타입 결정
-      let missionType = 'attack';
-      if (user.pendingAttack.targetUserId === 'transport') {
-        missionType = 'transport';
-      } else if (user.pendingAttack.targetUserId === 'deploy') {
-        missionType = 'deploy';
-      } else if (user.pendingAttack.targetUserId === 'debris') {
-        missionType = 'recycle';
+      // 미션 타입 결정 (새 missionType 필드 우선, 없으면 targetUserId로 판단)
+      let missionType = (user.pendingAttack as any).missionType || 'attack';
+      if (!missionType || missionType === 'attack') {
+        if (user.pendingAttack.targetUserId === 'transport') {
+          missionType = 'transport';
+        } else if (user.pendingAttack.targetUserId === 'deploy') {
+          missionType = 'deploy';
+        } else if (user.pendingAttack.targetUserId === 'debris') {
+          missionType = 'recycle';
+        } else if (user.pendingAttack.targetUserId === '') {
+          missionType = 'colony';
+        }
       }
       
       result.pendingAttack = {

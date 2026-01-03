@@ -780,6 +780,8 @@ class PendingAttackInfo {
         return '배치 진행 중';
       case 'recycle':
         return '수확 진행 중';
+      case 'colony':
+        return '식민 진행 중';
       default:
         return '공격 진행 중';
     }
@@ -815,6 +817,9 @@ class PendingReturnInfo {
         return '수송 귀환 중';
       case 'recycle':
         return '수확 귀환 중';
+      case 'colony':
+      case 'colony_recall':
+        return '식민 귀환 중';
       default:
         return '귀환 중';
     }
