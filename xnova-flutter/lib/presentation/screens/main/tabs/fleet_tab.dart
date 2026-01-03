@@ -266,21 +266,20 @@ class _ShipCardState extends State<_ShipCard> {
         builder: (context, setModalState) => Container(
           decoration: BoxDecoration(
             color: AppColors.panelBackground,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            border: Border.all(color: AppColors.accent.withOpacity(0.3)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
           ),
           padding: EdgeInsets.only(
             left: 20,
             right: 20,
-            top: 16,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+            top: 12,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // 핸들바
               Container(
-                width: 40,
+                width: 36,
                 height: 4,
                 decoration: BoxDecoration(
                   color: AppColors.textMuted.withOpacity(0.3),
@@ -288,15 +287,16 @@ class _ShipCardState extends State<_ShipCard> {
                 ),
               ),
               const SizedBox(height: 16),
-              // 헤더 (이미지 + 이름)
+              // 컴팩트한 수량 조절
               Row(
                 children: [
+                  // 이미지
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 40,
+                    height: 40,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppColors.accent.withOpacity(0.5)),
+                      color: AppColors.surface,
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: _getShipImagePath(widget.ship.type) != null
@@ -306,29 +306,85 @@ class _ShipCardState extends State<_ShipCard> {
                             errorBuilder: (_, __, ___) => Icon(
                               Icons.rocket_launch,
                               color: AppColors.accent,
-                              size: 24,
+                              size: 20,
                             ),
                           )
-                        : Icon(Icons.rocket_launch, color: AppColors.accent, size: 24),
+                        : Icon(Icons.rocket_launch, color: AppColors.accent, size: 20),
                   ),
                   const SizedBox(width: 12),
+                  // 이름
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Text(
+                      widget.ship.name,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  // 수량 조절
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          widget.ship.name,
-                          style: const TextStyle(
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
+                        InkWell(
+                          onTap: () {
+                            if (tempQuantity > 1) {
+                              setModalState(() {
+                                tempQuantity--;
+                                controller.text = tempQuantity.toString();
+                              });
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            alignment: Alignment.center,
+                            child: Icon(Icons.remove, color: AppColors.textMuted, size: 18),
                           ),
                         ),
-                        Text(
-                          '보유: ${widget.ship.count}대',
-                          style: TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 12,
+                        SizedBox(
+                          width: 56,
+                          child: TextField(
+                            controller: controller,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppColors.accent,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                              isDense: true,
+                            ),
+                            onChanged: (value) {
+                              final qty = int.tryParse(value) ?? 1;
+                              setModalState(() => tempQuantity = qty > 0 ? qty : 1);
+                            },
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () {
+                            setModalState(() {
+                              tempQuantity++;
+                              controller.text = tempQuantity.toString();
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            alignment: Alignment.center,
+                            child: Icon(Icons.add, color: AppColors.accent, size: 18),
                           ),
                         ),
                       ],
@@ -336,108 +392,7 @@ class _ShipCardState extends State<_ShipCard> {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              // 수량 조절 영역
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // 감소 버튼
-                    _buildQuantityButton(
-                      icon: Icons.remove,
-                      onTap: () {
-                        if (tempQuantity > 1) {
-                          setModalState(() {
-                            tempQuantity--;
-                            controller.text = tempQuantity.toString();
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(width: 16),
-                    // 수량 입력
-                    SizedBox(
-                      width: 100,
-                      child: TextField(
-                        controller: controller,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: AppColors.accent,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        onChanged: (value) {
-                          final qty = int.tryParse(value) ?? 1;
-                          setModalState(() => tempQuantity = qty > 0 ? qty : 1);
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    // 증가 버튼
-                    _buildQuantityButton(
-                      icon: Icons.add,
-                      onTap: () {
-                        setModalState(() {
-                          tempQuantity++;
-                          controller.text = tempQuantity.toString();
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
               const SizedBox(height: 16),
-              // 빠른 선택 버튼
-              Row(
-                children: [1, 5, 10, 50, 100].map((num) {
-                  final isSelected = tempQuantity == num;
-                  return Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 3),
-                      child: InkWell(
-                        onTap: () {
-                          setModalState(() {
-                            tempQuantity = num;
-                            controller.text = num.toString();
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isSelected ? AppColors.accent : AppColors.surface,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: isSelected ? AppColors.accent : AppColors.panelBorder,
-                            ),
-                          ),
-                          child: Text(
-                            '$num',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: isSelected ? Colors.black : AppColors.textPrimary,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 20),
               // 확인 버튼
               SizedBox(
                 width: double.infinity,
@@ -452,16 +407,16 @@ class _ShipCardState extends State<_ShipCard> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.accent,
                     foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                   ),
                   child: Text(
                     '${tempQuantity}대 선택',
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
-                      fontSize: 15,
+                      fontSize: 14,
                     ),
                   ),
                 ),
@@ -469,23 +424,6 @@ class _ShipCardState extends State<_ShipCard> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildQuantityButton({required IconData icon, required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: AppColors.panelBackground,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.panelBorder),
-        ),
-        child: Icon(icon, color: AppColors.accent, size: 20),
       ),
     );
   }
