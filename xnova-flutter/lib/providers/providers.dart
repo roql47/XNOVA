@@ -282,20 +282,24 @@ enum MainTab {
 class NavigationState {
   final MainTab selectedTab;
   final String? targetCoordinate;
+  final String? missionType; // 'attack', 'transport', 'deploy'
 
   NavigationState({
     this.selectedTab = MainTab.overview,
     this.targetCoordinate,
+    this.missionType,
   });
 
   NavigationState copyWith({
     MainTab? selectedTab,
     String? targetCoordinate,
+    String? missionType,
     bool clearTarget = false,
   }) {
     return NavigationState(
       selectedTab: selectedTab ?? this.selectedTab,
       targetCoordinate: clearTarget ? null : (targetCoordinate ?? this.targetCoordinate),
+      missionType: clearTarget ? null : (missionType ?? this.missionType),
     );
   }
 }
@@ -311,6 +315,15 @@ class NavigationNotifier extends StateNotifier<NavigationState> {
     state = state.copyWith(
       selectedTab: MainTab.fleet,
       targetCoordinate: coordinate,
+      missionType: 'attack',
+    );
+  }
+
+  void setTransportTarget(String coordinate) {
+    state = state.copyWith(
+      selectedTab: MainTab.fleet,
+      targetCoordinate: coordinate,
+      missionType: 'transport',
     );
   }
 

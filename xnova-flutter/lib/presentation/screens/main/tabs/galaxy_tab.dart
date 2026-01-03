@@ -193,6 +193,9 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
                   onMessage: planet.playerName != null && !planet.isOwnPlanet
                       ? () => _showMessageDialog(context, planet)
                       : null,
+                  onTransport: planet.playerName != null && !planet.isOwnPlanet
+                      ? () => _showTransportDialog(context, planet)
+                      : null,
                 );
               },
             ),
@@ -622,6 +625,49 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
       );
     }
   }
+
+  void _showTransportDialog(BuildContext context, PlanetInfo planet) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.panelBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        title: Row(
+          children: [
+            Icon(Icons.local_shipping, color: AppColors.resourceDeuterium, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '수송: ${planet.coordinate}',
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          '${planet.playerName}의 행성으로 자원을 수송하시겠습니까?\n\n함대 탭에서 함선과 자원을 선택하여 수송할 수 있습니다.',
+          style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('취소', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ref.read(navigationProvider.notifier).setTransportTarget(planet.coordinate);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.resourceDeuterium,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            child: const Text('수송 지점으로 설정'),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _PlanetRow extends StatelessWidget {
@@ -631,6 +677,7 @@ class _PlanetRow extends StatelessWidget {
   final VoidCallback? onRecycle;
   final VoidCallback? onSpy;
   final VoidCallback? onMessage;
+  final VoidCallback? onTransport;
 
   const _PlanetRow({
     required this.position,
@@ -639,6 +686,7 @@ class _PlanetRow extends StatelessWidget {
     this.onRecycle,
     this.onSpy,
     this.onMessage,
+    this.onTransport,
   });
 
   /// 활동 상태 표시 위젯
@@ -842,6 +890,18 @@ class _PlanetRow extends StatelessWidget {
                         Icons.mail_outline,
                         size: 16,
                         color: AppColors.accent,
+                      ),
+                    ),
+                  ),
+                  // 수송 아이콘
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: InkWell(
+                      onTap: onTransport,
+                      child: Icon(
+                        Icons.local_shipping,
+                        size: 16,
+                        color: AppColors.resourceDeuterium,
                       ),
                     ),
                   ),

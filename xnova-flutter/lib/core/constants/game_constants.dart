@@ -248,8 +248,8 @@ class GameConstants {
           final speedFactor = ((tmpSpeed / 10) + 1) * ((tmpSpeed / 10) + 1);
           double consumption = (basicConsumption * count * distance) / 35000 * speedFactor;
 
-          // 소비량 조정 (게임 밸런스)
-          consumption = consumption / 500;
+          // 소비량 조정 (게임 밸런스) - 10배 증가
+          consumption = consumption / 50;
           consumption = consumption < 1 ? 1 : consumption;
 
           totalConsumption += consumption.round();

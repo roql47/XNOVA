@@ -268,8 +268,8 @@ export class FleetService {
         const speedFactor = Math.pow((tmpSpeed / 10 + 1), 2);
         let consumption = (basicConsumption * fleet[type] * distance) / 35000 * speedFactor;
 
-        // 소비량 조정 (게임 밸런스)
-        consumption = consumption / 500;
+        // 소비량 조정 (게임 밸런스) - 10배 증가
+        consumption = consumption / 50;
         consumption = Math.max(1, Math.round(consumption));
 
         totalConsumption += consumption;

@@ -204,7 +204,7 @@ let FleetService = class FleetService {
                 }
                 const speedFactor = Math.pow((tmpSpeed / 10 + 1), 2);
                 let consumption = (basicConsumption * fleet[type] * distance) / 35000 * speedFactor;
-                consumption = consumption / 500;
+                consumption = consumption / 50;
                 consumption = Math.max(1, Math.round(consumption));
                 totalConsumption += consumption;
             }

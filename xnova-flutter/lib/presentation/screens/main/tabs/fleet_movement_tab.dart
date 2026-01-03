@@ -33,6 +33,15 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
     _targetController = TextEditingController(text: navState.targetCoordinate);
     _targetCoord = navState.targetCoordinate;
     
+    // 미션 타입 설정
+    if (navState.missionType == 'transport') {
+      _missionType = MissionType.transport;
+    } else if (navState.missionType == 'deploy') {
+      _missionType = MissionType.deploy;
+    } else {
+      _missionType = MissionType.attack;
+    }
+    
     _metalController = TextEditingController(text: '0');
     _crystalController = TextEditingController(text: '0');
     _deuteriumController = TextEditingController(text: '0');
@@ -441,7 +450,7 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
                         _missionType == MissionType.attack
                             ? '적 행성을 공격하여 자원을 약탈합니다.'
                             : _missionType == MissionType.transport
-                                ? '자원을 본인 행성에 내리고, 함대만 귀환합니다. (본인 행성만 가능)'
+                                ? '자원을 목표 행성에 전달하고, 함대만 귀환합니다.'
                                 : '함대와 자원을 모두 목표 행성에 배치합니다. (귀환 없음)',
                         style: const TextStyle(
                           color: AppColors.textMuted,

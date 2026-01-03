@@ -1642,15 +1642,10 @@ export class BattleService {
       throw new BadRequestException('이미 함대가 활동 중입니다.');
     }
 
-    // 목표 행성 확인 (본인 소유 행성만 가능)
+    // 목표 행성 확인 (모든 행성에 수송 가능)
     const target = await this.userModel.findOne({ coordinate: targetCoord }).exec();
     if (!target) {
       throw new BadRequestException('해당 좌표에 행성이 존재하지 않습니다.');
-    }
-
-    // 자기 자신에게 수송 체크
-    if (target._id.toString() !== userId) {
-      throw new BadRequestException('수송 미션은 본인 소유의 행성에만 가능합니다.');
     }
 
     // 함대 보유 확인
@@ -1758,10 +1753,27 @@ export class BattleService {
     const targetCoord = user.pendingAttack.targetCoord;
     const transportResources = (user.pendingAttack as any).transportResources || { metal: 0, crystal: 0, deuterium: 0 };
 
-    // 목표 행성에 자원 추가 (본인 행성이므로 자기 자신에게)
-    user.resources.metal += transportResources.metal;
-    user.resources.crystal += transportResources.crystal;
-    user.resources.deuterium += transportResources.deuterium;
+    // 목표 행성 찾기
+    const target = await this.userModel.findOne({ coordinate: targetCoord }).exec();
+    
+    if (target) {
+      // 목표 행성에 자원 추가
+      target.resources.metal += transportResources.metal;
+      target.resources.crystal += transportResources.crystal;
+      target.resources.deuterium += transportResources.deuterium;
+      target.markModified('resources');
+      await target.save();
+
+      // 수신자에게 메시지 전송
+      await this.messageService.createMessage({
+        receiverId: target._id.toString(),
+        senderName: '수송 사령부',
+        title: `${user.coordinate}에서 자원 도착`,
+        content: `자원이 도착했습니다! 수신된 자원: 메탈 ${transportResources.metal}, 크리스탈 ${transportResources.crystal}, 듀테륨 ${transportResources.deuterium}`,
+        type: 'system',
+        metadata: { resources: transportResources, from: user.coordinate },
+      });
+    }
 
     // 귀환 설정 (자원 없이)
     const travelTime = user.pendingAttack.travelTime;
@@ -1777,10 +1789,9 @@ export class BattleService {
     user.pendingAttack = null;
     user.markModified('pendingReturn');
     user.markModified('pendingAttack');
-    user.markModified('resources');
     await user.save();
 
-    // 메시지
+    // 발신자에게 메시지 전송
     await this.messageService.createMessage({
       receiverId: userId,
       senderName: '수송 사령부',

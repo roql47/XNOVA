@@ -1138,9 +1138,6 @@ let BattleService = class BattleService {
         if (!target) {
             throw new common_1.BadRequestException('해당 좌표에 행성이 존재하지 않습니다.');
         }
-        if (target._id.toString() !== userId) {
-            throw new common_1.BadRequestException('수송 미션은 본인 소유의 행성에만 가능합니다.');
-        }
         for (const type in fleet) {
             if (fleet[type] > 0) {
                 if (!game_data_1.FLEET_DATA[type]) {
@@ -1219,9 +1216,22 @@ let BattleService = class BattleService {
         }
         const targetCoord = user.pendingAttack.targetCoord;
         const transportResources = user.pendingAttack.transportResources || { metal: 0, crystal: 0, deuterium: 0 };
-        user.resources.metal += transportResources.metal;
-        user.resources.crystal += transportResources.crystal;
-        user.resources.deuterium += transportResources.deuterium;
+        const target = await this.userModel.findOne({ coordinate: targetCoord }).exec();
+        if (target) {
+            target.resources.metal += transportResources.metal;
+            target.resources.crystal += transportResources.crystal;
+            target.resources.deuterium += transportResources.deuterium;
+            target.markModified('resources');
+            await target.save();
+            await this.messageService.createMessage({
+                receiverId: target._id.toString(),
+                senderName: '수송 사령부',
+                title: `${user.coordinate}에서 자원 도착`,
+                content: `자원이 도착했습니다! 수신된 자원: 메탈 ${transportResources.metal}, 크리스탈 ${transportResources.crystal}, 듀테륨 ${transportResources.deuterium}`,
+                type: 'system',
+                metadata: { resources: transportResources, from: user.coordinate },
+            });
+        }
         const travelTime = user.pendingAttack.travelTime;
         const returnTime = new Date(Date.now() + travelTime * 1000);
         user.pendingReturn = {
@@ -1233,7 +1243,6 @@ let BattleService = class BattleService {
         user.pendingAttack = null;
         user.markModified('pendingReturn');
         user.markModified('pendingAttack');
-        user.markModified('resources');
         await user.save();
         await this.messageService.createMessage({
             receiverId: userId,
