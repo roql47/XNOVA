@@ -387,8 +387,22 @@ class _MessageCard extends ConsumerWidget {
     );
   }
 
+  // HTML 태그 제거 (미리보기용 - 줄바꿈 제거)
   String _stripHtml(String html) {
     return html.replaceAll(RegExp(r'<[^>]*>'), '').replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
+  // HTML 태그 제거 (상세보기용 - 줄바꿈 유지)
+  String _stripHtmlPreserveNewlines(String html) {
+    // <br> 태그를 줄바꿈으로 변환
+    String result = html.replaceAll(RegExp(r'<br\s*/?>'), '\n');
+    // 나머지 HTML 태그 제거
+    result = result.replaceAll(RegExp(r'<[^>]*>'), '');
+    // 연속 공백 정리 (줄바꿈은 유지)
+    result = result.replaceAll(RegExp(r'[^\S\n]+'), ' ');
+    // 연속 줄바꿈 정리
+    result = result.replaceAll(RegExp(r'\n\s*\n'), '\n\n');
+    return result.trim();
   }
 
   Widget _buildBattleSummary(Map<String, dynamic> metadata) {
@@ -569,8 +583,8 @@ class _MessageCard extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  _stripHtml(message.content),
-                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                  _stripHtmlPreserveNewlines(message.content),
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, height: 1.5),
                 ),
               ],
             ),
