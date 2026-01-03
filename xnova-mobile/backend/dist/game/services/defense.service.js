@@ -47,14 +47,16 @@ let DefenseService = class DefenseService {
         }
         return { met: missing.length === 0, missing };
     }
-    getBuildTime(defenseType, quantity, robotFactoryLevel, nanoFactoryLevel) {
+    getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel) {
         const defenseData = game_data_1.DEFENSE_DATA[defenseType];
         if (!defenseData)
             return 0;
         const totalCost = (defenseData.cost.metal || 0) + (defenseData.cost.crystal || 0);
         const nanoBonus = Math.pow(2, nanoFactoryLevel);
-        const singleUnitTime = (totalCost / (25 * (1 + robotFactoryLevel) * nanoBonus)) / 10;
-        return singleUnitTime * quantity;
+        return (totalCost / (25 * (1 + robotFactoryLevel) * nanoBonus)) / 10;
+    }
+    getBuildTime(defenseType, quantity, robotFactoryLevel, nanoFactoryLevel) {
+        return this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel) * quantity;
     }
     async getDefense(userId) {
         const user = await this.userModel.findById(userId).exec();
@@ -124,9 +126,9 @@ let DefenseService = class DefenseService {
         }
         const robotFactoryLevel = user.facilities.robotFactory || 0;
         const nanoFactoryLevel = user.facilities.nanoFactory || 0;
-        const buildTime = this.getBuildTime(defenseType, quantity, robotFactoryLevel, nanoFactoryLevel);
+        const singleBuildTime = this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel);
         const startTime = new Date();
-        const finishTime = new Date(startTime.getTime() + buildTime * 1000);
+        const finishTime = new Date(startTime.getTime() + singleBuildTime * 1000);
         user.defenseProgress = {
             type: 'defense',
             name: defenseType,
@@ -140,7 +142,8 @@ let DefenseService = class DefenseService {
             defense: defenseType,
             quantity,
             totalCost,
-            buildTime,
+            buildTime: singleBuildTime,
+            totalBuildTime: singleBuildTime * quantity,
             finishTime,
         };
     }
@@ -153,14 +156,34 @@ let DefenseService = class DefenseService {
             return { completed: false };
         }
         const defenseType = user.defenseProgress.name;
-        const quantity = user.defenseProgress.quantity || 1;
-        user.defense[defenseType] = (user.defense[defenseType] || 0) + quantity;
-        user.defenseProgress = null;
+        const remainingQuantity = user.defenseProgress.quantity || 1;
+        user.defense[defenseType] = (user.defense[defenseType] || 0) + 1;
+        user.markModified('defense');
+        const newRemaining = remainingQuantity - 1;
+        if (newRemaining > 0) {
+            const robotFactoryLevel = user.facilities.robotFactory || 0;
+            const nanoFactoryLevel = user.facilities.nanoFactory || 0;
+            const singleBuildTime = this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel);
+            const newStartTime = new Date();
+            const newFinishTime = new Date(newStartTime.getTime() + singleBuildTime * 1000);
+            user.defenseProgress = {
+                type: 'defense',
+                name: defenseType,
+                quantity: newRemaining,
+                startTime: newStartTime,
+                finishTime: newFinishTime,
+            };
+        }
+        else {
+            user.defenseProgress = null;
+        }
+        user.markModified('defenseProgress');
         await user.save();
         return {
             completed: true,
             defense: defenseType,
-            quantity,
+            quantity: 1,
+            remaining: newRemaining,
         };
     }
 };

@@ -127,12 +127,14 @@ export declare class GameController {
             deuterium: number;
         };
         buildTime: number;
+        totalBuildTime: number;
         finishTime: Date;
     }>;
     completeFleet(req: any): Promise<{
         completed: boolean;
         fleet?: string;
         quantity?: number;
+        remaining?: number;
     }>;
     getDefense(req: any): Promise<{
         defense: import("./services/defense.service").DefenseInfo[];
@@ -152,12 +154,14 @@ export declare class GameController {
             deuterium: number;
         };
         buildTime: number;
+        totalBuildTime: number;
         finishTime: Date;
     }>;
     completeDefense(req: any): Promise<{
         completed: boolean;
         defense?: string;
         quantity?: number;
+        remaining?: number;
     }>;
     attack(req: any, body: {
         targetCoord: string;

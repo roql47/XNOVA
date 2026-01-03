@@ -24,6 +24,7 @@ export declare class DefenseService {
         met: boolean;
         missing: string[];
     };
+    getSingleBuildTime(defenseType: string, robotFactoryLevel: number, nanoFactoryLevel: number): number;
     getBuildTime(defenseType: string, quantity: number, robotFactoryLevel: number, nanoFactoryLevel: number): number;
     getDefense(userId: string): Promise<{
         defense: DefenseInfo[];
@@ -40,11 +41,13 @@ export declare class DefenseService {
             deuterium: number;
         };
         buildTime: number;
+        totalBuildTime: number;
         finishTime: Date;
     }>;
     completeBuild(userId: string): Promise<{
         completed: boolean;
         defense?: string;
         quantity?: number;
+        remaining?: number;
     }>;
 }

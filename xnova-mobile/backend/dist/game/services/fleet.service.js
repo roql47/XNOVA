@@ -47,14 +47,16 @@ let FleetService = class FleetService {
         }
         return { met: missing.length === 0, missing };
     }
-    getBuildTime(fleetType, quantity, shipyardLevel, nanoFactoryLevel) {
+    getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel) {
         const fleetData = game_data_1.FLEET_DATA[fleetType];
         if (!fleetData)
             return 0;
         const totalCost = (fleetData.cost.metal || 0) + (fleetData.cost.crystal || 0);
         const nanoBonus = Math.pow(2, nanoFactoryLevel);
-        const singleShipTime = (totalCost / (25 * (1 + shipyardLevel) * nanoBonus)) / 10;
-        return singleShipTime * quantity;
+        return (totalCost / (25 * (1 + shipyardLevel) * nanoBonus)) / 10;
+    }
+    getBuildTime(fleetType, quantity, shipyardLevel, nanoFactoryLevel) {
+        return this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel) * quantity;
     }
     async getFleet(userId) {
         const user = await this.userModel.findById(userId).exec();
@@ -116,9 +118,9 @@ let FleetService = class FleetService {
         }
         const shipyardLevel = user.facilities.shipyard || 0;
         const nanoFactoryLevel = user.facilities.nanoFactory || 0;
-        const buildTime = this.getBuildTime(fleetType, quantity, shipyardLevel, nanoFactoryLevel);
+        const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
         const startTime = new Date();
-        const finishTime = new Date(startTime.getTime() + buildTime * 1000);
+        const finishTime = new Date(startTime.getTime() + singleBuildTime * 1000);
         user.fleetProgress = {
             type: 'fleet',
             name: fleetType,
@@ -132,7 +134,8 @@ let FleetService = class FleetService {
             fleet: fleetType,
             quantity,
             totalCost,
-            buildTime,
+            buildTime: singleBuildTime,
+            totalBuildTime: singleBuildTime * quantity,
             finishTime,
         };
     }
@@ -145,14 +148,34 @@ let FleetService = class FleetService {
             return { completed: false };
         }
         const fleetType = user.fleetProgress.name;
-        const quantity = user.fleetProgress.quantity || 1;
-        user.fleet[fleetType] = (user.fleet[fleetType] || 0) + quantity;
-        user.fleetProgress = null;
+        const remainingQuantity = user.fleetProgress.quantity || 1;
+        user.fleet[fleetType] = (user.fleet[fleetType] || 0) + 1;
+        user.markModified('fleet');
+        const newRemaining = remainingQuantity - 1;
+        if (newRemaining > 0) {
+            const shipyardLevel = user.facilities.shipyard || 0;
+            const nanoFactoryLevel = user.facilities.nanoFactory || 0;
+            const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
+            const newStartTime = new Date();
+            const newFinishTime = new Date(newStartTime.getTime() + singleBuildTime * 1000);
+            user.fleetProgress = {
+                type: 'fleet',
+                name: fleetType,
+                quantity: newRemaining,
+                startTime: newStartTime,
+                finishTime: newFinishTime,
+            };
+        }
+        else {
+            user.fleetProgress = null;
+        }
+        user.markModified('fleetProgress');
         await user.save();
         return {
             completed: true,
             fleet: fleetType,
-            quantity,
+            quantity: 1,
+            remaining: newRemaining,
         };
     }
     calculateTotalCapacity(fleet) {

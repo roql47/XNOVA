@@ -53,8 +53,8 @@ export class FleetService {
     return { met: missing.length === 0, missing };
   }
 
-  // 함대 건조 시간 계산
-  getBuildTime(fleetType: string, quantity: number, shipyardLevel: number, nanoFactoryLevel: number): number {
+  // 함대 1대당 건조 시간 계산
+  getSingleBuildTime(fleetType: string, shipyardLevel: number, nanoFactoryLevel: number): number {
     const fleetData = FLEET_DATA[fleetType];
     if (!fleetData) return 0;
 
@@ -62,9 +62,12 @@ export class FleetService {
     const nanoBonus = Math.pow(2, nanoFactoryLevel);
 
     // 1대당 건조 시간 (초) - 10배 속도
-    const singleShipTime = (totalCost / (25 * (1 + shipyardLevel) * nanoBonus)) / 10;
-    
-    return singleShipTime * quantity;
+    return (totalCost / (25 * (1 + shipyardLevel) * nanoBonus)) / 10;
+  }
+
+  // 함대 건조 시간 계산 (하위 호환성 유지)
+  getBuildTime(fleetType: string, quantity: number, shipyardLevel: number, nanoFactoryLevel: number): number {
+    return this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel) * quantity;
   }
 
   // 함대 현황 조회
@@ -131,7 +134,7 @@ export class FleetService {
       throw new BadRequestException(`요구사항이 충족되지 않았습니다: ${requirements.missing.join(', ')}`);
     }
 
-    // 총 비용 계산
+    // 총 비용 계산 (전체 수량에 대해 한 번에 차감)
     const totalCost = {
       metal: (fleetData.cost.metal || 0) * quantity,
       crystal: (fleetData.cost.crystal || 0) * quantity,
@@ -144,19 +147,19 @@ export class FleetService {
       throw new BadRequestException('자원이 부족합니다.');
     }
 
-    // 건조 시간 계산
+    // 1대당 건조 시간 계산 (1대씩 완료되는 큐 시스템)
     const shipyardLevel = user.facilities.shipyard || 0;
     const nanoFactoryLevel = user.facilities.nanoFactory || 0;
-    const buildTime = this.getBuildTime(fleetType, quantity, shipyardLevel, nanoFactoryLevel);
+    const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
 
-    // 건조 진행 정보 저장
+    // 건조 진행 정보 저장 (1대 건조 시간만 설정, 남은 수량 저장)
     const startTime = new Date();
-    const finishTime = new Date(startTime.getTime() + buildTime * 1000);
+    const finishTime = new Date(startTime.getTime() + singleBuildTime * 1000);
 
     user.fleetProgress = {
       type: 'fleet',
       name: fleetType,
-      quantity,
+      quantity,  // 남은 수량
       startTime,
       finishTime,
     };
@@ -168,13 +171,14 @@ export class FleetService {
       fleet: fleetType,
       quantity,
       totalCost,
-      buildTime,
+      buildTime: singleBuildTime,  // 1대당 건조 시간
+      totalBuildTime: singleBuildTime * quantity,  // 총 건조 시간
       finishTime,
     };
   }
 
-  // 함대 건조 완료 처리
-  async completeBuild(userId: string): Promise<{ completed: boolean; fleet?: string; quantity?: number }> {
+  // 함대 건조 완료 처리 (1대씩 완료되는 큐 시스템)
+  async completeBuild(userId: string): Promise<{ completed: boolean; fleet?: string; quantity?: number; remaining?: number }> {
     const user = await this.userModel.findById(userId).exec();
     if (!user || !user.fleetProgress) {
       return { completed: false };
@@ -186,20 +190,44 @@ export class FleetService {
     }
 
     const fleetType = user.fleetProgress.name;
-    const quantity = user.fleetProgress.quantity || 1;
+    const remainingQuantity = user.fleetProgress.quantity || 1;
 
-    // 함대 추가
-    (user.fleet as any)[fleetType] = ((user.fleet as any)[fleetType] || 0) + quantity;
+    // 함대 1대 추가
+    (user.fleet as any)[fleetType] = ((user.fleet as any)[fleetType] || 0) + 1;
+    user.markModified('fleet');
 
-    // 건조 진행 정보 삭제
-    user.fleetProgress = null;
+    // 남은 수량 계산
+    const newRemaining = remainingQuantity - 1;
 
+    if (newRemaining > 0) {
+      // 다음 건조 시작 (1대당 건조 시간으로 갱신)
+      const shipyardLevel = user.facilities.shipyard || 0;
+      const nanoFactoryLevel = user.facilities.nanoFactory || 0;
+      const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
+
+      const newStartTime = new Date();
+      const newFinishTime = new Date(newStartTime.getTime() + singleBuildTime * 1000);
+
+      user.fleetProgress = {
+        type: 'fleet',
+        name: fleetType,
+        quantity: newRemaining,
+        startTime: newStartTime,
+        finishTime: newFinishTime,
+      };
+    } else {
+      // 모든 건조 완료
+      user.fleetProgress = null;
+    }
+
+    user.markModified('fleetProgress');
     await user.save();
 
     return {
       completed: true,
       fleet: fleetType,
-      quantity,
+      quantity: 1,
+      remaining: newRemaining,
     };
   }
 

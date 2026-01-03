@@ -23,6 +23,7 @@ export declare class FleetService {
         met: boolean;
         missing: string[];
     };
+    getSingleBuildTime(fleetType: string, shipyardLevel: number, nanoFactoryLevel: number): number;
     getBuildTime(fleetType: string, quantity: number, shipyardLevel: number, nanoFactoryLevel: number): number;
     getFleet(userId: string): Promise<{
         fleet: FleetInfo[];
@@ -39,12 +40,14 @@ export declare class FleetService {
             deuterium: number;
         };
         buildTime: number;
+        totalBuildTime: number;
         finishTime: Date;
     }>;
     completeBuild(userId: string): Promise<{
         completed: boolean;
         fleet?: string;
         quantity?: number;
+        remaining?: number;
     }>;
     calculateTotalCapacity(fleet: Record<string, number>): number;
     calculateFuelConsumption(fleet: Record<string, number>, distance: number, duration: number): number;

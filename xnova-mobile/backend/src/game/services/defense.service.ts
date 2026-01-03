@@ -54,8 +54,8 @@ export class DefenseService {
     return { met: missing.length === 0, missing };
   }
 
-  // 방어시설 건조 시간 계산
-  getBuildTime(defenseType: string, quantity: number, robotFactoryLevel: number, nanoFactoryLevel: number): number {
+  // 방어시설 1대당 건조 시간 계산
+  getSingleBuildTime(defenseType: string, robotFactoryLevel: number, nanoFactoryLevel: number): number {
     const defenseData = DEFENSE_DATA[defenseType];
     if (!defenseData) return 0;
 
@@ -63,9 +63,12 @@ export class DefenseService {
     const nanoBonus = Math.pow(2, nanoFactoryLevel);
 
     // 1대당 건조 시간 (초) - 10배 속도
-    const singleUnitTime = (totalCost / (25 * (1 + robotFactoryLevel) * nanoBonus)) / 10;
-    
-    return singleUnitTime * quantity;
+    return (totalCost / (25 * (1 + robotFactoryLevel) * nanoBonus)) / 10;
+  }
+
+  // 방어시설 건조 시간 계산 (하위 호환성 유지)
+  getBuildTime(defenseType: string, quantity: number, robotFactoryLevel: number, nanoFactoryLevel: number): number {
+    return this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel) * quantity;
   }
 
   // 방어시설 현황 조회
@@ -142,7 +145,7 @@ export class DefenseService {
       throw new BadRequestException(`요구사항이 충족되지 않았습니다: ${requirements.missing.join(', ')}`);
     }
 
-    // 총 비용 계산
+    // 총 비용 계산 (전체 수량에 대해 한 번에 차감)
     const totalCost = {
       metal: (defenseData.cost.metal || 0) * quantity,
       crystal: (defenseData.cost.crystal || 0) * quantity,
@@ -155,19 +158,19 @@ export class DefenseService {
       throw new BadRequestException('자원이 부족합니다.');
     }
 
-    // 건조 시간 계산
+    // 1대당 건조 시간 계산 (1대씩 완료되는 큐 시스템)
     const robotFactoryLevel = user.facilities.robotFactory || 0;
     const nanoFactoryLevel = user.facilities.nanoFactory || 0;
-    const buildTime = this.getBuildTime(defenseType, quantity, robotFactoryLevel, nanoFactoryLevel);
+    const singleBuildTime = this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel);
 
-    // 건조 진행 정보 저장
+    // 건조 진행 정보 저장 (1대 건조 시간만 설정, 남은 수량 저장)
     const startTime = new Date();
-    const finishTime = new Date(startTime.getTime() + buildTime * 1000);
+    const finishTime = new Date(startTime.getTime() + singleBuildTime * 1000);
 
     user.defenseProgress = {
       type: 'defense',
       name: defenseType,
-      quantity,
+      quantity,  // 남은 수량
       startTime,
       finishTime,
     };
@@ -179,13 +182,14 @@ export class DefenseService {
       defense: defenseType,
       quantity,
       totalCost,
-      buildTime,
+      buildTime: singleBuildTime,  // 1대당 건조 시간
+      totalBuildTime: singleBuildTime * quantity,  // 총 건조 시간
       finishTime,
     };
   }
 
-  // 방어시설 건조 완료 처리
-  async completeBuild(userId: string): Promise<{ completed: boolean; defense?: string; quantity?: number }> {
+  // 방어시설 건조 완료 처리 (1대씩 완료되는 큐 시스템)
+  async completeBuild(userId: string): Promise<{ completed: boolean; defense?: string; quantity?: number; remaining?: number }> {
     const user = await this.userModel.findById(userId).exec();
     if (!user || !user.defenseProgress) {
       return { completed: false };
@@ -197,20 +201,44 @@ export class DefenseService {
     }
 
     const defenseType = user.defenseProgress.name;
-    const quantity = user.defenseProgress.quantity || 1;
+    const remainingQuantity = user.defenseProgress.quantity || 1;
 
-    // 방어시설 추가
-    (user.defense as any)[defenseType] = ((user.defense as any)[defenseType] || 0) + quantity;
+    // 방어시설 1대 추가
+    (user.defense as any)[defenseType] = ((user.defense as any)[defenseType] || 0) + 1;
+    user.markModified('defense');
 
-    // 건조 진행 정보 삭제
-    user.defenseProgress = null;
+    // 남은 수량 계산
+    const newRemaining = remainingQuantity - 1;
 
+    if (newRemaining > 0) {
+      // 다음 건조 시작 (1대당 건조 시간으로 갱신)
+      const robotFactoryLevel = user.facilities.robotFactory || 0;
+      const nanoFactoryLevel = user.facilities.nanoFactory || 0;
+      const singleBuildTime = this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel);
+
+      const newStartTime = new Date();
+      const newFinishTime = new Date(newStartTime.getTime() + singleBuildTime * 1000);
+
+      user.defenseProgress = {
+        type: 'defense',
+        name: defenseType,
+        quantity: newRemaining,
+        startTime: newStartTime,
+        finishTime: newFinishTime,
+      };
+    } else {
+      // 모든 건조 완료
+      user.defenseProgress = null;
+    }
+
+    user.markModified('defenseProgress');
     await user.save();
 
     return {
       completed: true,
       defense: defenseType,
-      quantity,
+      quantity: 1,
+      remaining: newRemaining,
     };
   }
 }
