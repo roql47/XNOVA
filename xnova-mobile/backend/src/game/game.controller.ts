@@ -114,6 +114,24 @@ export class GameController {
     return this.battleService.startRecycle(req.user.userId, body.targetCoord, body.fleet);
   }
 
+  @Post('battle/transport')
+  async transport(@Request() req, @Body() body: { 
+    targetCoord: string; 
+    fleet: Record<string, number>;
+    resources: { metal: number; crystal: number; deuterium: number };
+  }) {
+    return this.battleService.startTransport(req.user.userId, body.targetCoord, body.fleet, body.resources);
+  }
+
+  @Post('battle/deploy')
+  async deploy(@Request() req, @Body() body: { 
+    targetCoord: string; 
+    fleet: Record<string, number>;
+    resources: { metal: number; crystal: number; deuterium: number };
+  }) {
+    return this.battleService.startDeploy(req.user.userId, body.targetCoord, body.fleet, body.resources);
+  }
+
   @Post('battle/recall')
   async recallFleet(@Request() req) {
     return this.battleService.recallFleet(req.user.userId);
@@ -134,6 +152,10 @@ export class GameController {
     incomingResults: any[];
     returnProcessed: boolean;
     returnResult: { returnedFleet: Record<string, number>; loot: Record<string, number> } | null;
+    transportProcessed: boolean;
+    transportResult: any;
+    deployProcessed: boolean;
+    deployResult: any;
   }> {
     // 내가 보낸 공격 처리
     const attackResult = await this.battleService.processAttackArrival(req.user.userId);
@@ -143,6 +165,10 @@ export class GameController {
     const incomingResults = await this.battleService.processIncomingAttacks(req.user.userId);
     // 내 함대 귀환 처리
     const returnResult = await this.battleService.processFleetReturn(req.user.userId);
+    // 수송 도착 처리
+    const transportResult = await this.battleService.processTransportArrival(req.user.userId);
+    // 배치 도착 처리
+    const deployResult = await this.battleService.processDeployArrival(req.user.userId);
     
     return {
       attackProcessed: attackResult !== null,
@@ -153,6 +179,10 @@ export class GameController {
       incomingResults,
       returnProcessed: returnResult !== null,
       returnResult,
+      transportProcessed: transportResult !== null,
+      transportResult,
+      deployProcessed: deployResult !== null,
+      deployResult,
     };
   }
 

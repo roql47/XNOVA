@@ -153,6 +153,42 @@ class ApiService {
     return AttackResponse.fromJson(response.data);
   }
 
+  /// 수송 미션 (자원을 목표 행성에 내리고, 함대만 귀환)
+  Future<Map<String, dynamic>> transport({
+    required String targetCoord,
+    required Map<String, int> fleet,
+    required Map<String, int> resources,
+  }) async {
+    final response = await _dio.post('game/battle/transport', data: {
+      'targetCoord': targetCoord,
+      'fleet': fleet,
+      'resources': {
+        'metal': resources['metal'] ?? 0,
+        'crystal': resources['crystal'] ?? 0,
+        'deuterium': resources['deuterium'] ?? 0,
+      },
+    });
+    return response.data;
+  }
+
+  /// 배치 미션 (함대 + 자원을 모두 목표 행성에 배치, 귀환 없음)
+  Future<Map<String, dynamic>> deploy({
+    required String targetCoord,
+    required Map<String, int> fleet,
+    required Map<String, int> resources,
+  }) async {
+    final response = await _dio.post('game/battle/deploy', data: {
+      'targetCoord': targetCoord,
+      'fleet': fleet,
+      'resources': {
+        'metal': resources['metal'] ?? 0,
+        'crystal': resources['crystal'] ?? 0,
+        'deuterium': resources['deuterium'] ?? 0,
+      },
+    });
+    return response.data;
+  }
+
   /// 함대 귀환 명령 (공격 도중 귀환)
   Future<Map<String, dynamic>> recallFleet() async {
     final response = await _dio.post('game/battle/recall');

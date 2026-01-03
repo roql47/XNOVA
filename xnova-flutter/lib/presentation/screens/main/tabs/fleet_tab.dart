@@ -212,7 +212,14 @@ class _ShipCard extends StatefulWidget {
 
 class _ShipCardState extends State<_ShipCard> {
   bool _isExpanded = false;
+  final _quantityController = TextEditingController(text: '1');
   int _quantity = 1;
+
+  @override
+  void dispose() {
+    _quantityController.dispose();
+    super.dispose();
+  }
 
   bool get canAfford {
     return widget.resources.metal >= widget.ship.cost.metal * _quantity &&
@@ -252,180 +259,6 @@ class _ShipCardState extends State<_ShipCard> {
       return '${minutes}분 ${secs}초';
     }
     return '${secs}초';
-  }
-
-  void _showQuantityDialog() {
-    int tempQuantity = _quantity;
-    final controller = TextEditingController(text: _quantity.toString());
-    
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Container(
-          decoration: BoxDecoration(
-            color: AppColors.panelBackground,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 12,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 핸들바
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.textMuted.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 16),
-              // 컴팩트한 수량 조절
-              Row(
-                children: [
-                  // 이미지
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      color: AppColors.surface,
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: _getShipImagePath(widget.ship.type) != null
-                        ? Image.asset(
-                            _getShipImagePath(widget.ship.type)!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Icon(
-                              Icons.rocket_launch,
-                              color: AppColors.accent,
-                              size: 20,
-                            ),
-                          )
-                        : Icon(Icons.rocket_launch, color: AppColors.accent, size: 20),
-                  ),
-                  const SizedBox(width: 12),
-                  // 이름
-                  Expanded(
-                    child: Text(
-                      widget.ship.name,
-                      style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                  // 수량 조절
-                  Container(
-                    decoration: BoxDecoration(
-                      color: AppColors.surface,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        InkWell(
-                          onTap: () {
-                            if (tempQuantity > 1) {
-                              setModalState(() {
-                                tempQuantity--;
-                                controller.text = tempQuantity.toString();
-                              });
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            alignment: Alignment.center,
-                            child: Icon(Icons.remove, color: AppColors.textMuted, size: 18),
-                          ),
-                        ),
-                        SizedBox(
-                          width: 56,
-                          child: TextField(
-                            controller: controller,
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: AppColors.accent,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            decoration: const InputDecoration(
-                              border: InputBorder.none,
-                              contentPadding: EdgeInsets.zero,
-                              isDense: true,
-                            ),
-                            onChanged: (value) {
-                              final qty = int.tryParse(value) ?? 1;
-                              setModalState(() => tempQuantity = qty > 0 ? qty : 1);
-                            },
-                          ),
-                        ),
-                        InkWell(
-                          onTap: () {
-                            setModalState(() {
-                              tempQuantity++;
-                              controller.text = tempQuantity.toString();
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            alignment: Alignment.center,
-                            child: Icon(Icons.add, color: AppColors.accent, size: 18),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // 확인 버튼
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    final qty = int.tryParse(controller.text) ?? 1;
-                    if (qty > 0) {
-                      setState(() => _quantity = qty);
-                    }
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  child: Text(
-                    '${tempQuantity}대 선택',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   @override
@@ -615,34 +448,43 @@ class _ShipCardState extends State<_ShipCard> {
                         ],
                       ),
                     ),
-                    // 수량 선택 및 건조 버튼
+                    // 수량 입력 및 건조 버튼
                     Column(
                       children: [
-                        // 수량 선택
-                        InkWell(
-                          onTap: _showQuantityDialog,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface,
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: AppColors.panelBorder),
+                        // 수량 직접 입력
+                        Container(
+                          width: 56,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: AppColors.panelBorder),
+                          ),
+                          child: TextField(
+                            controller: _quantityController,
+                            keyboardType: TextInputType.number,
+                            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: AppColors.accent,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '$_quantity',
-                                  style: const TextStyle(
-                                    color: AppColors.textPrimary,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Icon(Icons.edit, size: 12, color: AppColors.textMuted),
-                              ],
+                            decoration: const InputDecoration(
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.zero,
+                              isDense: true,
                             ),
+                            onChanged: (value) {
+                              final qty = int.tryParse(value) ?? 1;
+                              setState(() => _quantity = qty > 0 ? qty : 1);
+                            },
+                            onTap: () {
+                              _quantityController.selection = TextSelection(
+                                baseOffset: 0,
+                                extentOffset: _quantityController.text.length,
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(height: 8),

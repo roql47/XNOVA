@@ -183,6 +183,44 @@ export declare class GameController {
         travelTime: number;
         arrivalTime: Date;
     }>;
+    transport(req: any, body: {
+        targetCoord: string;
+        fleet: Record<string, number>;
+        resources: {
+            metal: number;
+            crystal: number;
+            deuterium: number;
+        };
+    }): Promise<{
+        message: string;
+        travelTime: number;
+        arrivalTime: Date;
+        fuelConsumption: number;
+        resources: {
+            metal: number;
+            crystal: number;
+            deuterium: number;
+        };
+    }>;
+    deploy(req: any, body: {
+        targetCoord: string;
+        fleet: Record<string, number>;
+        resources: {
+            metal: number;
+            crystal: number;
+            deuterium: number;
+        };
+    }): Promise<{
+        message: string;
+        travelTime: number;
+        arrivalTime: Date;
+        fuelConsumption: number;
+        resources: {
+            metal: number;
+            crystal: number;
+            deuterium: number;
+        };
+    }>;
     recallFleet(req: any): Promise<{
         message: string;
         fleet: {
@@ -210,6 +248,10 @@ export declare class GameController {
             returnedFleet: Record<string, number>;
             loot: Record<string, number>;
         } | null;
+        transportProcessed: boolean;
+        transportResult: any;
+        deployProcessed: boolean;
+        deployResult: any;
     }>;
     simulate(body: SimulationRequest): Promise<import("./services/battle-simulator.service").SimulationResult>;
     simulateSimple(body: {

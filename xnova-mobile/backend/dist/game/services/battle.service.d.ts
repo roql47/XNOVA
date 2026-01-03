@@ -113,4 +113,46 @@ export declare class BattleService {
         returnedFleet: Record<string, number>;
         loot: Record<string, number>;
     } | null>;
+    startTransport(userId: string, targetCoord: string, fleet: Record<string, number>, resources: {
+        metal: number;
+        crystal: number;
+        deuterium: number;
+    }): Promise<{
+        message: string;
+        travelTime: number;
+        arrivalTime: Date;
+        fuelConsumption: number;
+        resources: {
+            metal: number;
+            crystal: number;
+            deuterium: number;
+        };
+    }>;
+    processTransportArrival(userId: string): Promise<{
+        delivered: any;
+    } | null>;
+    startDeploy(userId: string, targetCoord: string, fleet: Record<string, number>, resources: {
+        metal: number;
+        crystal: number;
+        deuterium: number;
+    }): Promise<{
+        message: string;
+        travelTime: number;
+        arrivalTime: Date;
+        fuelConsumption: number;
+        resources: {
+            metal: number;
+            crystal: number;
+            deuterium: number;
+        };
+    }>;
+    processDeployArrival(userId: string): Promise<{
+        fleet: Record<string, number>;
+        resources: any;
+    } | null>;
+    calculateAvailableCapacity(fleet: Record<string, number>, distance: number): {
+        totalCapacity: number;
+        fuelConsumption: number;
+        availableCapacity: number;
+    };
 }

@@ -281,6 +281,9 @@ export class AttackProgress {
 
   @Prop({ default: false })
   battleCompleted: boolean;
+
+  @Prop({ type: Object, default: null })
+  transportResources?: { metal: number; crystal: number; deuterium: number };
 }
 
 // 귀환 진행 상태 스키마

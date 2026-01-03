@@ -13,15 +13,31 @@ class FleetMovementTab extends ConsumerStatefulWidget {
   ConsumerState<FleetMovementTab> createState() => _FleetMovementTabState();
 }
 
+// 미션 타입
+enum MissionType { attack, transport, deploy }
+
 class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
   late final TextEditingController _targetController;
+  late final TextEditingController _metalController;
+  late final TextEditingController _crystalController;
+  late final TextEditingController _deuteriumController;
+  
   final Map<String, int> _selectedFleet = {};
+  String? _targetCoord;
+  MissionType _missionType = MissionType.attack;
 
   @override
   void initState() {
     super.initState();
     final navState = ref.read(navigationProvider);
     _targetController = TextEditingController(text: navState.targetCoordinate);
+    _targetCoord = navState.targetCoordinate;
+    
+    _metalController = TextEditingController(text: '0');
+    _crystalController = TextEditingController(text: '0');
+    _deuteriumController = TextEditingController(text: '0');
+    
+    _targetController.addListener(_onTargetChanged);
     
     if (navState.targetCoordinate != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -30,23 +46,149 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
     }
   }
 
+  void _onTargetChanged() {
+    setState(() {
+      _targetCoord = _targetController.text;
+    });
+  }
+
+  // 좌표 형식 유효성 검사
+  bool _isValidCoordinate(String coord) {
+    final parts = coord.split(':');
+    if (parts.length != 3) return false;
+    for (final part in parts) {
+      if (int.tryParse(part) == null) return false;
+    }
+    return true;
+  }
+
+  // 출격 정보 계산
+  Map<String, dynamic>? _calculateMissionInfo() {
+    final gameState = ref.read(gameProvider);
+    final myCoord = gameState.coordinate;
+    
+    if (myCoord == null || _targetCoord == null || _targetCoord!.isEmpty) return null;
+    if (!_isValidCoordinate(_targetCoord!)) return null;
+    
+    final fleet = Map<String, int>.from(_selectedFleet)
+      ..removeWhere((key, value) => value == 0);
+    if (fleet.isEmpty) return null;
+
+    try {
+      final distance = GameConstants.calculateDistance(myCoord, _targetCoord!);
+      final minSpeed = GameConstants.getMinFleetSpeed(fleet);
+      final travelTime = GameConstants.calculateTravelTime(distance, minSpeed);
+      final fuelConsumption = GameConstants.calculateFleetFuelConsumption(fleet, distance, travelTime);
+
+      return {
+        'distance': distance,
+        'speed': minSpeed,
+        'travelTime': travelTime,
+        'fuel': fuelConsumption,
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  String _formatTime(double seconds) {
+    if (seconds <= 0) return '즉시';
+    final totalSeconds = seconds.toInt();
+    final hours = totalSeconds ~/ 3600;
+    final minutes = (totalSeconds % 3600) ~/ 60;
+    final secs = totalSeconds % 60;
+    if (hours > 0) {
+      return '${hours}시간 ${minutes}분 ${secs}초';
+    } else if (minutes > 0) {
+      return '${minutes}분 ${secs}초';
+    }
+    return '${secs}초';
+  }
+
+  String _formatNumber(int num) {
+    if (num >= 1000000) return '${(num / 1000000).toStringAsFixed(1)}M';
+    if (num >= 1000) return '${(num / 1000).toStringAsFixed(1)}K';
+    return num.toString();
+  }
+
   @override
   void dispose() {
+    _targetController.removeListener(_onTargetChanged);
     _targetController.dispose();
+    _metalController.dispose();
+    _crystalController.dispose();
+    _deuteriumController.dispose();
     super.dispose();
   }
 
-  void _attack() {
+  // 적재 가능량 계산
+  int _calculateAvailableCapacity() {
+    final missionInfo = _calculateMissionInfo();
+    if (missionInfo == null) return 0;
+
+    final fleet = Map<String, int>.from(_selectedFleet)
+      ..removeWhere((key, value) => value == 0);
+    
+    int totalCapacity = 0;
+    for (final entry in fleet.entries) {
+      final cargo = GameConstants.fleetCargo[entry.key] ?? 0;
+      totalCapacity += cargo * entry.value;
+    }
+
+    final fuelConsumption = missionInfo['fuel'] as int;
+    return totalCapacity - fuelConsumption;
+  }
+
+  // 현재 적재 자원량
+  int _getCurrentLoadedResources() {
+    final metal = int.tryParse(_metalController.text) ?? 0;
+    final crystal = int.tryParse(_crystalController.text) ?? 0;
+    final deuterium = int.tryParse(_deuteriumController.text) ?? 0;
+    return metal + crystal + deuterium;
+  }
+
+  void _executeMission() {
     if (_targetController.text.isEmpty) return;
     if (_selectedFleet.isEmpty || _selectedFleet.values.every((v) => v == 0)) return;
     
     final fleet = Map<String, int>.from(_selectedFleet)
       ..removeWhere((key, value) => value == 0);
-    
-    ref.read(gameProvider.notifier).attack(_targetController.text, fleet);
+    final targetCoord = _targetController.text;
+
+    switch (_missionType) {
+      case MissionType.attack:
+        ref.read(gameProvider.notifier).attack(targetCoord, fleet);
+        break;
+      case MissionType.transport:
+        final resources = {
+          'metal': int.tryParse(_metalController.text) ?? 0,
+          'crystal': int.tryParse(_crystalController.text) ?? 0,
+          'deuterium': int.tryParse(_deuteriumController.text) ?? 0,
+        };
+        ref.read(gameProvider.notifier).transport(targetCoord, fleet, resources);
+        break;
+      case MissionType.deploy:
+        final resources = {
+          'metal': int.tryParse(_metalController.text) ?? 0,
+          'crystal': int.tryParse(_crystalController.text) ?? 0,
+          'deuterium': int.tryParse(_deuteriumController.text) ?? 0,
+        };
+        ref.read(gameProvider.notifier).deploy(targetCoord, fleet, resources);
+        break;
+    }
     
     _targetController.clear();
-    setState(() => _selectedFleet.clear());
+    _metalController.text = '0';
+    _crystalController.text = '0';
+    _deuteriumController.text = '0';
+    setState(() {
+      _selectedFleet.clear();
+      _missionType = MissionType.attack;
+    });
+  }
+
+  void _attack() {
+    _executeMission();
   }
 
   void _showRecallConfirmDialog(BuildContext context, WidgetRef ref) {
@@ -194,22 +336,245 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
                   )),
                 
                 const SizedBox(height: 14),
+
+                // 미션 타입 선택
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.panelBorder),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '미션 선택',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _MissionButton(
+                              icon: Icons.gps_fixed,
+                              label: '공격',
+                              isSelected: _missionType == MissionType.attack,
+                              color: AppColors.negative,
+                              onTap: () => setState(() => _missionType = MissionType.attack),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _MissionButton(
+                              icon: Icons.local_shipping,
+                              label: '수송',
+                              isSelected: _missionType == MissionType.transport,
+                              color: AppColors.accent,
+                              onTap: () => setState(() => _missionType = MissionType.transport),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _MissionButton(
+                              icon: Icons.home_work,
+                              label: '배치',
+                              isSelected: _missionType == MissionType.deploy,
+                              color: AppColors.positive,
+                              onTap: () => setState(() => _missionType = MissionType.deploy),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _missionType == MissionType.attack
+                            ? '적 행성을 공격하여 자원을 약탈합니다.'
+                            : _missionType == MissionType.transport
+                                ? '자원을 목표 행성에 내리고, 함대만 귀환합니다.'
+                                : '함대와 자원을 모두 목표 행성에 배치합니다. (귀환 없음)',
+                        style: const TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // 자원 적재 (수송/배치 미션일 때만 표시)
+                if (_missionType != MissionType.attack) ...[
+                  const SizedBox(height: 14),
+                  _ResourceLoadingPanel(
+                    metalController: _metalController,
+                    crystalController: _crystalController,
+                    deuteriumController: _deuteriumController,
+                    availableCapacity: _calculateAvailableCapacity(),
+                    currentLoaded: _getCurrentLoadedResources(),
+                    currentMetal: gameState.resources.metal.toInt(),
+                    currentCrystal: gameState.resources.crystal.toInt(),
+                    currentDeuterium: gameState.resources.deuterium.toInt(),
+                    onChanged: () => setState(() {}),
+                  ),
+                ],
+                
+                const SizedBox(height: 14),
+                
+                // 예상 출격 정보 패널
+                Builder(
+                  builder: (context) {
+                    final missionInfo = _calculateMissionInfo();
+                    final hasEnoughFuel = missionInfo != null && 
+                        gameState.resources.deuterium >= missionInfo['fuel'];
+                    
+                    if (missionInfo != null) {
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 14),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: hasEnoughFuel 
+                              ? AppColors.accent.withOpacity(0.08) 
+                              : AppColors.negative.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: hasEnoughFuel 
+                                ? AppColors.accent.withOpacity(0.3) 
+                                : AppColors.negative.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline, 
+                                  size: 14, 
+                                  color: hasEnoughFuel ? AppColors.accent : AppColors.negative,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '출격 예상 정보',
+                                  style: TextStyle(
+                                    color: hasEnoughFuel ? AppColors.accent : AppColors.negative,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _MissionInfoItem(
+                                    icon: Icons.straighten,
+                                    label: '거리',
+                                    value: _formatNumber(missionInfo['distance']),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _MissionInfoItem(
+                                    icon: Icons.speed,
+                                    label: '속도',
+                                    value: _formatNumber(missionInfo['speed']),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _MissionInfoItem(
+                                    icon: Icons.schedule,
+                                    label: '편도 시간',
+                                    value: _formatTime(missionInfo['travelTime']),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _MissionInfoItem(
+                                    icon: Icons.local_gas_station,
+                                    label: '듀테륨 소비',
+                                    value: _formatNumber(missionInfo['fuel']),
+                                    valueColor: hasEnoughFuel 
+                                        ? AppColors.deuteriumColor 
+                                        : AppColors.negative,
+                                    isHighlighted: true,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (!hasEnoughFuel) ...[
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.negative.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.warning_amber, size: 14, color: AppColors.negative),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        '듀테륨이 부족합니다! (보유: ${_formatNumber(gameState.resources.deuterium.toInt())})',
+                                        style: const TextStyle(
+                                          color: AppColors.negative,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
                 
                 Material(
-                  color: availableShips.isNotEmpty ? AppColors.negative : AppColors.surface,
+                  color: availableShips.isNotEmpty 
+                      ? (_missionType == MissionType.attack 
+                          ? AppColors.negative 
+                          : _missionType == MissionType.transport 
+                              ? AppColors.accent 
+                              : AppColors.positive)
+                      : AppColors.surface,
                   borderRadius: BorderRadius.circular(6),
                   child: InkWell(
-                    onTap: availableShips.isNotEmpty ? _attack : null,
+                    onTap: availableShips.isNotEmpty ? _executeMission : null,
                     borderRadius: BorderRadius.circular(6),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.rocket_launch, size: 18, color: Colors.white.withOpacity(availableShips.isNotEmpty ? 1 : 0.5)),
+                          Icon(
+                            _missionType == MissionType.attack 
+                                ? Icons.gps_fixed 
+                                : _missionType == MissionType.transport 
+                                    ? Icons.local_shipping 
+                                    : Icons.home_work,
+                            size: 18, 
+                            color: Colors.white.withOpacity(availableShips.isNotEmpty ? 1 : 0.5),
+                          ),
                           const SizedBox(width: 8),
                           Text(
-                            '출격',
+                            _missionType == MissionType.attack 
+                                ? '공격' 
+                                : _missionType == MissionType.transport 
+                                    ? '수송' 
+                                    : '배치',
                             style: TextStyle(
                               color: Colors.white.withOpacity(availableShips.isNotEmpty ? 1 : 0.5),
                               fontWeight: FontWeight.w600,
@@ -593,6 +958,357 @@ class _ShipSelector extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// 출격 정보 표시 아이템
+class _MissionInfoItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color? valueColor;
+  final bool isHighlighted;
+
+  const _MissionInfoItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.valueColor,
+    this.isHighlighted = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: AppColors.textMuted),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 10,
+                ),
+              ),
+              Text(
+                value,
+                style: TextStyle(
+                  color: valueColor ?? AppColors.textPrimary,
+                  fontSize: isHighlighted ? 13 : 12,
+                  fontWeight: isHighlighted ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// 미션 선택 버튼
+class _MissionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _MissionButton({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: isSelected ? color : AppColors.panelBackground,
+      borderRadius: BorderRadius.circular(6),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: isSelected ? color : AppColors.panelBorder,
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: isSelected ? Colors.white : AppColors.textMuted,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : AppColors.textMuted,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// 자원 적재 패널
+class _ResourceLoadingPanel extends StatelessWidget {
+  final TextEditingController metalController;
+  final TextEditingController crystalController;
+  final TextEditingController deuteriumController;
+  final int availableCapacity;
+  final int currentLoaded;
+  final int currentMetal;
+  final int currentCrystal;
+  final int currentDeuterium;
+  final VoidCallback onChanged;
+
+  const _ResourceLoadingPanel({
+    required this.metalController,
+    required this.crystalController,
+    required this.deuteriumController,
+    required this.availableCapacity,
+    required this.currentLoaded,
+    required this.currentMetal,
+    required this.currentCrystal,
+    required this.currentDeuterium,
+    required this.onChanged,
+  });
+
+  String _formatNumber(int num) {
+    if (num >= 1000000) return '${(num / 1000000).toStringAsFixed(1)}M';
+    if (num >= 1000) return '${(num / 1000).toStringAsFixed(1)}K';
+    return num.toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final remainingCapacity = availableCapacity - currentLoaded;
+    final isOverloaded = currentLoaded > availableCapacity;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isOverloaded ? AppColors.negative : AppColors.panelBorder,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                '자원 적재',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isOverloaded 
+                      ? AppColors.negative.withOpacity(0.1) 
+                      : AppColors.accent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '${_formatNumber(currentLoaded)} / ${_formatNumber(availableCapacity)}',
+                  style: TextStyle(
+                    color: isOverloaded ? AppColors.negative : AppColors.accent,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          
+          // 메탈
+          _ResourceInputRow(
+            label: '메탈',
+            color: AppColors.metalColor,
+            controller: metalController,
+            available: currentMetal,
+            onChanged: onChanged,
+          ),
+          const SizedBox(height: 8),
+          
+          // 크리스탈
+          _ResourceInputRow(
+            label: '크리스탈',
+            color: AppColors.crystalColor,
+            controller: crystalController,
+            available: currentCrystal,
+            onChanged: onChanged,
+          ),
+          const SizedBox(height: 8),
+          
+          // 듀테륨
+          _ResourceInputRow(
+            label: '듀테륨',
+            color: AppColors.deuteriumColor,
+            controller: deuteriumController,
+            available: currentDeuterium,
+            onChanged: onChanged,
+          ),
+          
+          if (isOverloaded) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.negative.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.warning_amber, size: 14, color: AppColors.negative),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '적재 공간 초과! ${_formatNumber(currentLoaded - availableCapacity)} 줄여주세요.',
+                      style: const TextStyle(
+                        color: AppColors.negative,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// 자원 입력 행
+class _ResourceInputRow extends StatelessWidget {
+  final String label;
+  final Color color;
+  final TextEditingController controller;
+  final int available;
+  final VoidCallback onChanged;
+
+  const _ResourceInputRow({
+    required this.label,
+    required this.color,
+    required this.controller,
+    required this.available,
+    required this.onChanged,
+  });
+
+  String _formatNumber(int num) {
+    if (num >= 1000000) return '${(num / 1000000).toStringAsFixed(1)}M';
+    if (num >= 1000) return '${(num / 1000).toStringAsFixed(1)}K';
+    return num.toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 60,
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 11,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Container(
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.panelBackground,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: AppColors.panelBorder),
+            ),
+            child: TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: const InputDecoration(
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(horizontal: 8),
+                isDense: true,
+              ),
+              onChanged: (_) => onChanged(),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () {
+            controller.text = available.toString();
+            onChanged();
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '전체',
+              style: TextStyle(
+                color: color,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          '(${_formatNumber(available)})',
+          style: const TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 10,
+          ),
+        ),
+      ],
     );
   }
 }

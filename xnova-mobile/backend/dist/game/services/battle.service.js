@@ -1126,6 +1126,266 @@ let BattleService = class BattleService {
             loot,
         };
     }
+    async startTransport(userId, targetCoord, fleet, resources) {
+        const sender = await this.resourcesService.updateResources(userId);
+        if (!sender) {
+            throw new common_1.BadRequestException('사용자를 찾을 수 없습니다.');
+        }
+        if (sender.pendingAttack || sender.pendingReturn) {
+            throw new common_1.BadRequestException('이미 함대가 활동 중입니다.');
+        }
+        const target = await this.userModel.findOne({ coordinate: targetCoord }).exec();
+        if (!target) {
+            throw new common_1.BadRequestException('해당 좌표에 행성이 존재하지 않습니다.');
+        }
+        if (target._id.toString() !== userId) {
+            throw new common_1.BadRequestException('수송 미션은 본인 소유의 행성에만 가능합니다.');
+        }
+        for (const type in fleet) {
+            if (fleet[type] > 0) {
+                if (!game_data_1.FLEET_DATA[type]) {
+                    throw new common_1.BadRequestException(`알 수 없는 함대 유형: ${type}`);
+                }
+                if (type === 'solarSatellite') {
+                    throw new common_1.BadRequestException('태양광인공위성은 수송에 참여할 수 없습니다.');
+                }
+                if (!sender.fleet[type] || sender.fleet[type] < fleet[type]) {
+                    throw new common_1.BadRequestException(`${game_data_1.NAME_MAPPING[type] || type}을(를) ${fleet[type]}대 보유하고 있지 않습니다.`);
+                }
+            }
+        }
+        const distance = this.calculateDistance(sender.coordinate, targetCoord);
+        const minSpeed = this.fleetService.getFleetSpeed(fleet);
+        const travelTime = (distance / minSpeed) * 3600;
+        const fuelConsumption = this.fleetService.calculateFuelConsumption(fleet, distance, travelTime);
+        const totalCapacity = this.fleetService.calculateTotalCapacity(fleet);
+        const availableCapacity = totalCapacity - fuelConsumption;
+        if (availableCapacity < 0) {
+            throw new common_1.BadRequestException('적재 공간이 연료 소비량보다 적습니다.');
+        }
+        const totalResources = resources.metal + resources.crystal + resources.deuterium;
+        if (totalResources > availableCapacity) {
+            throw new common_1.BadRequestException(`적재 공간이 부족합니다. 가용: ${availableCapacity}, 요청: ${totalResources}`);
+        }
+        if (sender.resources.metal < resources.metal) {
+            throw new common_1.BadRequestException(`메탈이 부족합니다. 필요: ${resources.metal}, 보유: ${Math.floor(sender.resources.metal)}`);
+        }
+        if (sender.resources.crystal < resources.crystal) {
+            throw new common_1.BadRequestException(`크리스탈이 부족합니다. 필요: ${resources.crystal}, 보유: ${Math.floor(sender.resources.crystal)}`);
+        }
+        if (sender.resources.deuterium < resources.deuterium + fuelConsumption) {
+            throw new common_1.BadRequestException(`듀테륨이 부족합니다. 필요: ${resources.deuterium + fuelConsumption}, 보유: ${Math.floor(sender.resources.deuterium)}`);
+        }
+        sender.resources.metal -= resources.metal;
+        sender.resources.crystal -= resources.crystal;
+        sender.resources.deuterium -= resources.deuterium + fuelConsumption;
+        for (const type in fleet) {
+            if (fleet[type] > 0) {
+                sender.fleet[type] -= fleet[type];
+            }
+        }
+        const startTime = new Date();
+        const arrivalTime = new Date(startTime.getTime() + travelTime * 1000);
+        sender.pendingAttack = {
+            targetCoord,
+            targetUserId: 'transport',
+            fleet,
+            capacity: totalCapacity,
+            travelTime,
+            startTime,
+            arrivalTime,
+            battleCompleted: false,
+            transportResources: resources,
+        };
+        sender.markModified('fleet');
+        sender.markModified('resources');
+        sender.markModified('pendingAttack');
+        await sender.save();
+        return {
+            message: `${targetCoord} 좌표로 수송 함대가 출격했습니다.`,
+            travelTime,
+            arrivalTime,
+            fuelConsumption,
+            resources,
+        };
+    }
+    async processTransportArrival(userId) {
+        const user = await this.userModel.findById(userId).exec();
+        if (!user || !user.pendingAttack || user.pendingAttack.targetUserId !== 'transport') {
+            return null;
+        }
+        if (user.pendingAttack.arrivalTime.getTime() > Date.now()) {
+            return null;
+        }
+        const targetCoord = user.pendingAttack.targetCoord;
+        const transportResources = user.pendingAttack.transportResources || { metal: 0, crystal: 0, deuterium: 0 };
+        user.resources.metal += transportResources.metal;
+        user.resources.crystal += transportResources.crystal;
+        user.resources.deuterium += transportResources.deuterium;
+        const travelTime = user.pendingAttack.travelTime;
+        const returnTime = new Date(Date.now() + travelTime * 1000);
+        user.pendingReturn = {
+            fleet: user.pendingAttack.fleet,
+            loot: { metal: 0, crystal: 0, deuterium: 0 },
+            returnTime,
+            startTime: new Date(),
+        };
+        user.pendingAttack = null;
+        user.markModified('pendingReturn');
+        user.markModified('pendingAttack');
+        user.markModified('resources');
+        await user.save();
+        await this.messageService.createMessage({
+            receiverId: userId,
+            senderName: '수송 사령부',
+            title: `${targetCoord} 수송 완료`,
+            content: `자원 수송이 완료되었습니다. 전달된 자원: 메탈 ${transportResources.metal}, 크리스탈 ${transportResources.crystal}, 듀테륨 ${transportResources.deuterium}. 함대가 귀환 중입니다.`,
+            type: 'system',
+            metadata: { resources: transportResources },
+        });
+        return { delivered: transportResources };
+    }
+    async startDeploy(userId, targetCoord, fleet, resources) {
+        const sender = await this.resourcesService.updateResources(userId);
+        if (!sender) {
+            throw new common_1.BadRequestException('사용자를 찾을 수 없습니다.');
+        }
+        if (sender.pendingAttack || sender.pendingReturn) {
+            throw new common_1.BadRequestException('이미 함대가 활동 중입니다.');
+        }
+        const target = await this.userModel.findOne({ coordinate: targetCoord }).exec();
+        if (!target) {
+            throw new common_1.BadRequestException('해당 좌표에 행성이 존재하지 않습니다.');
+        }
+        if (target._id.toString() !== userId) {
+            throw new common_1.BadRequestException('배치 미션은 본인 소유의 행성에만 가능합니다.');
+        }
+        if (sender.coordinate === targetCoord) {
+            throw new common_1.BadRequestException('같은 행성에는 배치할 수 없습니다.');
+        }
+        for (const type in fleet) {
+            if (fleet[type] > 0) {
+                if (!game_data_1.FLEET_DATA[type]) {
+                    throw new common_1.BadRequestException(`알 수 없는 함대 유형: ${type}`);
+                }
+                if (type === 'solarSatellite') {
+                    throw new common_1.BadRequestException('태양광인공위성은 배치에 참여할 수 없습니다.');
+                }
+                if (!sender.fleet[type] || sender.fleet[type] < fleet[type]) {
+                    throw new common_1.BadRequestException(`${game_data_1.NAME_MAPPING[type] || type}을(를) ${fleet[type]}대 보유하고 있지 않습니다.`);
+                }
+            }
+        }
+        const distance = this.calculateDistance(sender.coordinate, targetCoord);
+        const minSpeed = this.fleetService.getFleetSpeed(fleet);
+        const travelTime = (distance / minSpeed) * 3600;
+        const fuelConsumption = this.fleetService.calculateFuelConsumption(fleet, distance, travelTime);
+        const totalCapacity = this.fleetService.calculateTotalCapacity(fleet);
+        const availableCapacity = totalCapacity - fuelConsumption;
+        if (availableCapacity < 0) {
+            throw new common_1.BadRequestException('적재 공간이 연료 소비량보다 적습니다.');
+        }
+        const totalResources = resources.metal + resources.crystal + resources.deuterium;
+        if (totalResources > availableCapacity) {
+            throw new common_1.BadRequestException(`적재 공간이 부족합니다. 가용: ${availableCapacity}, 요청: ${totalResources}`);
+        }
+        if (sender.resources.metal < resources.metal) {
+            throw new common_1.BadRequestException(`메탈이 부족합니다. 필요: ${resources.metal}, 보유: ${Math.floor(sender.resources.metal)}`);
+        }
+        if (sender.resources.crystal < resources.crystal) {
+            throw new common_1.BadRequestException(`크리스탈이 부족합니다. 필요: ${resources.crystal}, 보유: ${Math.floor(sender.resources.crystal)}`);
+        }
+        if (sender.resources.deuterium < resources.deuterium + fuelConsumption) {
+            throw new common_1.BadRequestException(`듀테륨이 부족합니다. 필요: ${resources.deuterium + fuelConsumption}, 보유: ${Math.floor(sender.resources.deuterium)}`);
+        }
+        sender.resources.metal -= resources.metal;
+        sender.resources.crystal -= resources.crystal;
+        sender.resources.deuterium -= resources.deuterium + fuelConsumption;
+        for (const type in fleet) {
+            if (fleet[type] > 0) {
+                sender.fleet[type] -= fleet[type];
+            }
+        }
+        const startTime = new Date();
+        const arrivalTime = new Date(startTime.getTime() + travelTime * 1000);
+        sender.pendingAttack = {
+            targetCoord,
+            targetUserId: 'deploy',
+            fleet,
+            capacity: totalCapacity,
+            travelTime,
+            startTime,
+            arrivalTime,
+            battleCompleted: false,
+            transportResources: resources,
+        };
+        sender.markModified('fleet');
+        sender.markModified('resources');
+        sender.markModified('pendingAttack');
+        await sender.save();
+        return {
+            message: `${targetCoord} 좌표로 배치 함대가 출격했습니다.`,
+            travelTime,
+            arrivalTime,
+            fuelConsumption,
+            resources,
+        };
+    }
+    async processDeployArrival(userId) {
+        const user = await this.userModel.findById(userId).exec();
+        if (!user || !user.pendingAttack || user.pendingAttack.targetUserId !== 'deploy') {
+            return null;
+        }
+        if (user.pendingAttack.arrivalTime.getTime() > Date.now()) {
+            return null;
+        }
+        const targetCoord = user.pendingAttack.targetCoord;
+        const deployFleet = user.pendingAttack.fleet;
+        const deployResources = user.pendingAttack.transportResources || { metal: 0, crystal: 0, deuterium: 0 };
+        for (const type in deployFleet) {
+            if (deployFleet[type] > 0) {
+                user.fleet[type] = (user.fleet[type] || 0) + deployFleet[type];
+            }
+        }
+        user.resources.metal += deployResources.metal;
+        user.resources.crystal += deployResources.crystal;
+        user.resources.deuterium += deployResources.deuterium;
+        user.pendingAttack = null;
+        user.pendingReturn = null;
+        user.markModified('pendingAttack');
+        user.markModified('pendingReturn');
+        user.markModified('fleet');
+        user.markModified('resources');
+        await user.save();
+        const fleetList = Object.entries(deployFleet)
+            .filter(([, count]) => count > 0)
+            .map(([type, count]) => `${game_data_1.NAME_MAPPING[type] || type}: ${count}`)
+            .join(', ');
+        await this.messageService.createMessage({
+            receiverId: userId,
+            senderName: '배치 사령부',
+            title: `${targetCoord} 배치 완료`,
+            content: `함대와 자원이 배치되었습니다.\n함대: ${fleetList}\n자원: 메탈 ${deployResources.metal}, 크리스탈 ${deployResources.crystal}, 듀테륨 ${deployResources.deuterium}`,
+            type: 'system',
+            metadata: { fleet: deployFleet, resources: deployResources },
+        });
+        return {
+            fleet: deployFleet,
+            resources: deployResources,
+        };
+    }
+    calculateAvailableCapacity(fleet, distance) {
+        const minSpeed = this.fleetService.getFleetSpeed(fleet);
+        const travelTime = (distance / minSpeed) * 3600;
+        const fuelConsumption = this.fleetService.calculateFuelConsumption(fleet, distance, travelTime);
+        const totalCapacity = this.fleetService.calculateTotalCapacity(fleet);
+        const availableCapacity = Math.max(0, totalCapacity - fuelConsumption);
+        return {
+            totalCapacity,
+            fuelConsumption,
+            availableCapacity,
+        };
+    }
 };
 exports.BattleService = BattleService;
 exports.BattleService = BattleService = __decorate([

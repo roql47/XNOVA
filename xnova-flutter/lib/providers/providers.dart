@@ -780,6 +780,42 @@ class GameNotifier extends StateNotifier<GameState> {
     }
   }
 
+  /// 수송 미션 (자원을 목표 행성에 내리고, 함대만 귀환)
+  Future<bool> transport(String targetCoord, Map<String, int> fleet, Map<String, int> resources) async {
+    try {
+      await _apiService.transport(
+        targetCoord: targetCoord,
+        fleet: fleet,
+        resources: resources,
+      );
+      await loadFleet();
+      await loadBattleStatus();
+      await loadResources();
+      return true;
+    } catch (e) {
+      state = state.copyWith(error: '수송에 실패했습니다.');
+      return false;
+    }
+  }
+
+  /// 배치 미션 (함대 + 자원을 모두 목표 행성에 배치, 귀환 없음)
+  Future<bool> deploy(String targetCoord, Map<String, int> fleet, Map<String, int> resources) async {
+    try {
+      await _apiService.deploy(
+        targetCoord: targetCoord,
+        fleet: fleet,
+        resources: resources,
+      );
+      await loadFleet();
+      await loadBattleStatus();
+      await loadResources();
+      return true;
+    } catch (e) {
+      state = state.copyWith(error: '배치에 실패했습니다.');
+      return false;
+    }
+  }
+
   /// 함대 귀환 명령 (공격 도중 귀환)
   Future<bool> recallFleet() async {
     try {

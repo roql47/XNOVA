@@ -57,6 +57,60 @@ class GameConstants {
     'armorTech': '장갑기술',
   };
 
+  // 함선 속도
+  static const Map<String, int> fleetSpeed = {
+    'smallCargo': 5000,
+    'largeCargo': 7500,
+    'lightFighter': 12500,
+    'heavyFighter': 10000,
+    'cruiser': 15000,
+    'battleship': 10000,
+    'battlecruiser': 10000,
+    'bomber': 4000,
+    'destroyer': 5000,
+    'deathstar': 100,
+    'recycler': 2000,
+    'espionageProbe': 1000000,
+    'solarSatellite': 0,
+    'colonyShip': 2500,
+  };
+
+  // 함선 적재량
+  static const Map<String, int> fleetCargo = {
+    'smallCargo': 5000,
+    'largeCargo': 25000,
+    'lightFighter': 50,
+    'heavyFighter': 100,
+    'cruiser': 800,
+    'battleship': 1500,
+    'battlecruiser': 750,
+    'bomber': 500,
+    'destroyer': 2000,
+    'deathstar': 1000000,
+    'recycler': 20000,
+    'espionageProbe': 5,
+    'solarSatellite': 0,
+    'colonyShip': 7500,
+  };
+
+  // 함선 연료 소비량
+  static const Map<String, int> fleetFuelConsumption = {
+    'smallCargo': 10,
+    'largeCargo': 50,
+    'lightFighter': 20,
+    'heavyFighter': 75,
+    'cruiser': 300,
+    'battleship': 500,
+    'battlecruiser': 250,
+    'bomber': 1000,
+    'destroyer': 1000,
+    'deathstar': 1,
+    'recycler': 300,
+    'espionageProbe': 1,
+    'solarSatellite': 0,
+    'colonyShip': 1000,
+  };
+
   // 함선/방어시설 기본 스탯 (공격력, 쉴드, 장갑)
   static const Map<String, Map<String, int>> unitStats = {
     // 함선
@@ -99,5 +153,110 @@ class GameConstants {
 
   static int getBaseHull(String type) {
     return unitStats[type]?['hull'] ?? 0;
+  }
+
+  // 함선 속도 조회
+  static int getFleetSpeed(String type) {
+    return fleetSpeed[type] ?? 10000;
+  }
+
+  // 함선 연료 소비량 조회
+  static int getFuelConsumption(String type) {
+    return fleetFuelConsumption[type] ?? 0;
+  }
+
+  // 함대의 최소 속도 계산 (가장 느린 함선 기준)
+  static int getMinFleetSpeed(Map<String, int> fleet) {
+    int minSpeed = 999999999;
+    for (final entry in fleet.entries) {
+      if (entry.value > 0) {
+        final speed = fleetSpeed[entry.key] ?? 10000;
+        if (speed > 0 && speed < minSpeed) {
+          minSpeed = speed;
+        }
+      }
+    }
+    return minSpeed == 999999999 ? 10000 : minSpeed;
+  }
+
+  // 좌표 간 거리 계산
+  static int calculateDistance(String coordA, String coordB) {
+    final partsA = coordA.split(':').map(int.parse).toList();
+    final partsB = coordB.split(':').map(int.parse).toList();
+
+    if (partsA.length < 3 || partsB.length < 3) return 0;
+
+    final galaxyA = partsA[0];
+    final systemA = partsA[1];
+    final planetA = partsA[2];
+
+    final galaxyB = partsB[0];
+    final systemB = partsB[1];
+    final planetB = partsB[2];
+
+    // 다른 은하
+    if (galaxyA != galaxyB) {
+      return 20000 * (galaxyA - galaxyB).abs();
+    }
+
+    // 같은 은하, 다른 시스템
+    if (systemA != systemB) {
+      return 2700 + (95 * (systemA - systemB).abs());
+    }
+
+    // 같은 시스템, 다른 행성
+    if (planetA != planetB) {
+      return 1000 + (5 * (planetA - planetB).abs());
+    }
+
+    // 같은 행성
+    return 5;
+  }
+
+  // 이동 시간 계산 (초 단위)
+  static double calculateTravelTime(int distance, int speed) {
+    if (speed <= 0) return 0;
+    return (distance / speed) * 3600;
+  }
+
+  // 함대 연료 소비량 계산
+  static int calculateFleetFuelConsumption(Map<String, int> fleet, int distance, double duration) {
+    int totalConsumption = 0;
+
+    for (final entry in fleet.entries) {
+      final type = entry.key;
+      final count = entry.value;
+      
+      if (count > 0) {
+        final basicConsumption = fleetFuelConsumption[type] ?? 0;
+        final shipSpeed = fleetSpeed[type] ?? 0;
+
+        if (basicConsumption > 0 && shipSpeed > 0) {
+          // 임시속도 계산
+          double tmpSpeed = 0;
+          if (duration > 0 && shipSpeed > 0) {
+            final sqrtTerm = (distance * 10 / shipSpeed);
+            final denominator = duration - 10;
+            if (denominator > 0 && sqrtTerm > 0) {
+              tmpSpeed = (35000 / denominator) * (sqrtTerm > 0 ? sqrtTerm.abs() : 1);
+              // 간소화된 근사값 사용
+              tmpSpeed = tmpSpeed.clamp(0, 100);
+            }
+          }
+
+          // 실제 소비량 공식
+          final speedFactor = ((tmpSpeed / 10) + 1) * ((tmpSpeed / 10) + 1);
+          double consumption = (basicConsumption * count * distance) / 35000 * speedFactor;
+
+          // 소비량 조정 (게임 밸런스)
+          consumption = consumption / 500;
+          consumption = consumption < 1 ? 1 : consumption;
+
+          totalConsumption += consumption.round();
+        }
+      }
+    }
+
+    return totalConsumption > 0 ? totalConsumption : 1;
   }
 }

@@ -90,6 +90,12 @@ let GameController = class GameController {
     async recycle(req, body) {
         return this.battleService.startRecycle(req.user.userId, body.targetCoord, body.fleet);
     }
+    async transport(req, body) {
+        return this.battleService.startTransport(req.user.userId, body.targetCoord, body.fleet, body.resources);
+    }
+    async deploy(req, body) {
+        return this.battleService.startDeploy(req.user.userId, body.targetCoord, body.fleet, body.resources);
+    }
     async recallFleet(req) {
         return this.battleService.recallFleet(req.user.userId);
     }
@@ -101,6 +107,8 @@ let GameController = class GameController {
         const recycleResult = await this.battleService.processRecycleArrival(req.user.userId);
         const incomingResults = await this.battleService.processIncomingAttacks(req.user.userId);
         const returnResult = await this.battleService.processFleetReturn(req.user.userId);
+        const transportResult = await this.battleService.processTransportArrival(req.user.userId);
+        const deployResult = await this.battleService.processDeployArrival(req.user.userId);
         return {
             attackProcessed: attackResult !== null,
             attackResult,
@@ -110,6 +118,10 @@ let GameController = class GameController {
             incomingResults,
             returnProcessed: returnResult !== null,
             returnResult,
+            transportProcessed: transportResult !== null,
+            transportResult,
+            deployProcessed: deployResult !== null,
+            deployResult,
         };
     }
     async simulate(body) {
@@ -263,6 +275,22 @@ __decorate([
     __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", Promise)
 ], GameController.prototype, "recycle", null);
+__decorate([
+    (0, common_1.Post)('battle/transport'),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "transport", null);
+__decorate([
+    (0, common_1.Post)('battle/deploy'),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "deploy", null);
 __decorate([
     (0, common_1.Post)('battle/recall'),
     __param(0, (0, common_1.Request)()),

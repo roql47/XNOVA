@@ -98,6 +98,11 @@ export declare class AttackProgress {
     startTime: Date;
     arrivalTime: Date;
     battleCompleted: boolean;
+    transportResources?: {
+        metal: number;
+        crystal: number;
+        deuterium: number;
+    };
 }
 export declare class ReturnProgress {
     fleet: Record<string, number>;
