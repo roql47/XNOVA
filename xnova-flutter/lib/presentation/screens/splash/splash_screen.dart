@@ -468,7 +468,7 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'v0.14',
+                  'v0.15',
                   style: GoogleFonts.orbitron(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
