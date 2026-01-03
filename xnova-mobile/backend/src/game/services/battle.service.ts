@@ -360,6 +360,11 @@ export class BattleService {
     const MAX_ROUNDS = 6;
 
     for (let round = 0; round < MAX_ROUNDS; round++) {
+      // 한쪽이 전멸하면 새 라운드 시작 전에 종료 (빈 라운드 추가하지 않음)
+      if (attackerUnits.length === 0 || defenderUnits.length === 0) {
+        break;
+      }
+
       // OGame 형식의 라운드 정보
       const roundInfo: OGameRoundInfo = {
         round: round + 1,
@@ -379,13 +384,6 @@ export class BattleService {
         destroyedDefenderShips: {},
         rapidFireCount: 0,
       };
-
-      // 한쪽이 전멸하면 종료
-      if (attackerUnits.length === 0 || defenderUnits.length === 0) {
-        this.countRemainingUnits(attackerUnits, defenderUnits, roundInfo);
-        result.rounds.push(roundInfo);
-        break;
-      }
 
       // 매 라운드 시작 시 쉴드 충전
       for (const unit of attackerUnits) {
@@ -795,40 +793,78 @@ export class BattleService {
 
   /**
    * OGame 방식의 약탈량 계산 (Plunder)
+   * 
+   * 📊 약탈 규칙:
+   * - 약탈 조건: 공격자 승리 && 적재량 > 0
    * - 약탈 가능량 = 행성 자원의 50%
-   * - 화물칸 1/3을 메탈로
-   * - 남은 화물칸 1/2을 크리스탈로
-   * - 나머지를 듀테륨으로
+   * - 적재 순서: 메탈 → 크리스탈 → 듀테륨
+   * 
+   * 📈 적재 비율:
+   * 1. 메탈: 적재량의 1/3 (또는 약탈 가능한 메탈량 중 작은 값)
+   * 2. 크리스탈: 남은 적재량의 1/2 (또는 약탈 가능한 크리스탈량 중 작은 값)
+   * 3. 듀테륨: 남은 적재량 전부 (또는 약탈 가능한 듀테륨량 중 작은 값)
+   * 
+   * 💡 자원 불균형 시: 메탈/크리스탈이 적으면 남은 공간에 듀테륨을 더 많이 적재
+   * 
+   * @example
+   * // 적재량: 90,000 / 행성자원: 메탈 1,000,000, 크리스탈 600,000, 듀테륨 400,000
+   * // 메탈: min(500,000, 30,000) = 30,000 → 남은 적재량: 60,000
+   * // 크리스탈: min(300,000, 30,000) = 30,000 → 남은 적재량: 30,000
+   * // 듀테륨: min(200,000, 30,000) = 30,000
+   * // 총 약탈: 90,000 (메탈 30,000 + 크리스탈 30,000 + 듀테륨 30,000)
    */
   calculateLoot(
     resources: { metal: number; crystal: number; deuterium: number },
     battleResult: BattleResult,
     capacity: number,
   ): { metal: number; crystal: number; deuterium: number } {
+    // 공격자 승리가 아니면 약탈 불가
     if (!battleResult.attackerWon) {
       return { metal: 0, crystal: 0, deuterium: 0 };
     }
 
-    // 약탈 가능량 = 자원의 50%
-    let m = Math.floor(resources.metal / 2);
-    let k = Math.floor(resources.crystal / 2);
-    let d = Math.floor(resources.deuterium / 2);
+    // 적재량이 0이면 약탈 불가
+    if (capacity <= 0) {
+      return { metal: 0, crystal: 0, deuterium: 0 };
+    }
 
-    // 화물칸 1/3을 메탈로
-    const mc = Math.min(Math.floor(capacity / 3), m);
-    
-    // 남은 화물칸 1/2을 크리스탈로
-    const remainingAfterMetal = capacity - mc;
-    const kc = Math.min(Math.floor(remainingAfterMetal / 2), k);
-    
-    // 나머지를 듀테륨으로
-    const remainingAfterCrystal = remainingAfterMetal - kc;
-    const dc = Math.min(remainingAfterCrystal, d);
+    // 약탈 가능량 = 행성 자원의 50%
+    const lootableMetal = Math.floor(resources.metal / 2);
+    const lootableCrystal = Math.floor(resources.crystal / 2);
+    const lootableDeuterium = Math.floor(resources.deuterium / 2);
+
+    let remainingCapacity = capacity;
+
+    // 1단계: 메탈 약탈 (적재량의 1/3)
+    let lootedMetal: number;
+    if (lootableMetal > Math.floor(remainingCapacity / 3)) {
+      lootedMetal = Math.floor(remainingCapacity / 3);
+    } else {
+      lootedMetal = lootableMetal;
+    }
+    remainingCapacity -= lootedMetal;
+
+    // 2단계: 크리스탈 약탈 (남은 적재량의 1/2)
+    let lootedCrystal: number;
+    if (lootableCrystal > Math.floor(remainingCapacity / 2)) {
+      lootedCrystal = Math.floor(remainingCapacity / 2);
+    } else {
+      lootedCrystal = lootableCrystal;
+    }
+    remainingCapacity -= lootedCrystal;
+
+    // 3단계: 듀테륨 약탈 (남은 적재량 전부)
+    let lootedDeuterium: number;
+    if (lootableDeuterium > remainingCapacity) {
+      lootedDeuterium = remainingCapacity;
+    } else {
+      lootedDeuterium = lootableDeuterium;
+    }
 
     return {
-      metal: mc,
-      crystal: kc,
-      deuterium: dc,
+      metal: lootedMetal,
+      crystal: lootedCrystal,
+      deuterium: lootedDeuterium,
     };
   }
 
@@ -1114,6 +1150,7 @@ export class BattleService {
       fleet: user.pendingAttack.fleet,
       loot: { metal: metalLoot, crystal: crystalLoot, deuterium: 0 },
       returnTime,
+      startTime: new Date(),
     };
 
     user.pendingAttack = null;
@@ -1307,6 +1344,7 @@ export class BattleService {
         fleet: battleResult.survivingAttackerFleet,
         loot,
         returnTime,
+        startTime: new Date(),
       };
       updatedAttacker.markModified('pendingReturn');
     } else {
@@ -1445,6 +1483,90 @@ export class BattleService {
       }
     }
     return results;
+  }
+
+  /**
+   * 함대 귀환 명령 (공격 도중 귀환)
+   * - 공격 중인 함대를 귀환시킴
+   * - 귀환 시간 = 현재까지 진행된 편도 비행 시간
+   * - 전투가 시작된 후에는 귀환 불가
+   */
+  async recallFleet(userId: string) {
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) {
+      throw new BadRequestException('사용자를 찾을 수 없습니다.');
+    }
+
+    // 이미 귀환 중인 경우
+    if (user.pendingReturn) {
+      throw new BadRequestException('이미 함대가 귀환 중입니다.');
+    }
+
+    // 출격 중인 함대가 없는 경우
+    if (!user.pendingAttack) {
+      throw new BadRequestException('귀환시킬 함대가 없습니다.');
+    }
+
+    // 전투가 이미 완료된 경우
+    if (user.pendingAttack.battleCompleted) {
+      throw new BadRequestException('전투가 이미 완료되어 귀환 중입니다.');
+    }
+
+    // 현재까지 진행된 시간 계산 (초 단위)
+    const elapsedTime = (Date.now() - user.pendingAttack.startTime.getTime()) / 1000;
+    
+    // 도착 예정 시간이 지났으면 귀환 불가 (전투 처리 필요)
+    if (Date.now() >= user.pendingAttack.arrivalTime.getTime()) {
+      throw new BadRequestException('함대가 이미 목표에 도착했습니다. 전투 결과를 확인하세요.');
+    }
+
+    // 귀환 시간 = 현재까지 진행된 편도 비행 시간
+    const returnTime = new Date(Date.now() + elapsedTime * 1000);
+
+    // 방어자의 incomingAttack 제거
+    const targetUserId = user.pendingAttack.targetUserId;
+    if (targetUserId && targetUserId !== 'debris') {
+      const target = await this.userModel.findById(targetUserId).exec();
+      if (target && target.incomingAttack) {
+        target.incomingAttack = null;
+        target.markModified('incomingAttack');
+        await target.save();
+      }
+    }
+
+    // 귀환할 함대 정보 저장
+    const returningFleet = { ...user.pendingAttack.fleet };
+
+    // pendingReturn 설정 (약탈 자원 없음)
+    user.pendingReturn = {
+      fleet: returningFleet,
+      loot: { metal: 0, crystal: 0, deuterium: 0 },
+      returnTime,
+      startTime: new Date(),
+    };
+
+    // pendingAttack 초기화
+    user.pendingAttack = null;
+    
+    user.markModified('pendingAttack');
+    user.markModified('pendingReturn');
+    await user.save();
+
+    // 알림 메시지
+    await this.messageService.createMessage({
+      receiverId: userId,
+      senderName: '함대 사령부',
+      title: '함대 귀환 명령',
+      content: `함대가 귀환 명령을 받았습니다. 예상 귀환 시간: ${Math.ceil(elapsedTime)}초`,
+      type: 'system',
+      metadata: { fleet: returningFleet },
+    });
+
+    return {
+      message: '함대가 귀환 중입니다.',
+      fleet: returningFleet,
+      returnTime: elapsedTime,
+    };
   }
 
   // 함대 귀환 처리

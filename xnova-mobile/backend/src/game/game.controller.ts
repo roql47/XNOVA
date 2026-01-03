@@ -114,6 +114,11 @@ export class GameController {
     return this.battleService.startRecycle(req.user.userId, body.targetCoord, body.fleet);
   }
 
+  @Post('battle/recall')
+  async recallFleet(@Request() req) {
+    return this.battleService.recallFleet(req.user.userId);
+  }
+
   @Get('battle/status')
   async getAttackStatus(@Request() req) {
     return this.battleService.getAttackStatus(req.user.userId);

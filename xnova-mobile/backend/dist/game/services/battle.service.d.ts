@@ -102,6 +102,13 @@ export declare class BattleService {
         attacker: any;
         defender: any;
     }>>;
+    recallFleet(userId: string): Promise<{
+        message: string;
+        fleet: {
+            [x: string]: number;
+        };
+        returnTime: number;
+    }>;
     processFleetReturn(userId: string): Promise<{
         returnedFleet: Record<string, number>;
         loot: Record<string, number>;

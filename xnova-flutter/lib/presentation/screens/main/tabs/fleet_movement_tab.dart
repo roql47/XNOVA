@@ -49,6 +49,49 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
     setState(() => _selectedFleet.clear());
   }
 
+  void _showRecallConfirmDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.panelBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber, color: AppColors.warning, size: 20),
+            SizedBox(width: 8),
+            Text('함대 귀환', style: TextStyle(color: AppColors.textPrimary, fontSize: 16)),
+          ],
+        ),
+        content: const Text(
+          '함대를 귀환시키시겠습니까?\n\n귀환 시간은 현재까지 진행된 비행 시간과 동일합니다.\n약탈 자원 없이 귀환합니다.',
+          style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final success = await ref.read(gameProvider.notifier).recallFleet();
+              if (success && context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('함대가 귀환을 시작했습니다.')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.warning,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            child: const Text('귀환'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final gameState = ref.watch(gameProvider);
@@ -73,6 +116,8 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
                 fleet: gameState.battleStatus!.pendingAttack!.fleet,
                 finishTime: gameState.battleStatus!.pendingAttack!.finishDateTime,
                 onComplete: () => ref.read(gameProvider.notifier).processBattle(),
+                showRecallButton: !gameState.battleStatus!.pendingAttack!.battleCompleted,
+                onRecall: () => _showRecallConfirmDialog(context, ref),
               ),
             if (gameState.battleStatus!.pendingReturn != null)
               _BattleCard(
@@ -193,6 +238,8 @@ class _BattleCard extends StatelessWidget {
   final DateTime finishTime;
   final VoidCallback onComplete;
   final Map<String, int>? loot;
+  final bool showRecallButton;
+  final VoidCallback? onRecall;
 
   const _BattleCard({
     required this.icon,
@@ -202,6 +249,8 @@ class _BattleCard extends StatelessWidget {
     required this.finishTime,
     required this.onComplete,
     this.loot,
+    this.showRecallButton = false,
+    this.onRecall,
   });
 
   @override
@@ -299,10 +348,39 @@ class _BattleCard extends StatelessWidget {
               children: [
                 Icon(Icons.schedule, size: 14, color: AppColors.textMuted),
                 const SizedBox(width: 6),
-                ProgressTimer(
-                  finishTime: finishTime,
-                  onComplete: onComplete,
+                Expanded(
+                  child: ProgressTimer(
+                    finishTime: finishTime,
+                    onComplete: onComplete,
+                  ),
                 ),
+                if (showRecallButton && onRecall != null)
+                  Material(
+                    color: AppColors.warning,
+                    borderRadius: BorderRadius.circular(4),
+                    child: InkWell(
+                      onTap: onRecall,
+                      borderRadius: BorderRadius.circular(4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.u_turn_left, size: 14, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text(
+                              '귀환',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ],
@@ -310,7 +388,6 @@ class _BattleCard extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _LootItem extends StatelessWidget {

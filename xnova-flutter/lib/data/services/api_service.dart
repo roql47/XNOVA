@@ -153,6 +153,12 @@ class ApiService {
     return AttackResponse.fromJson(response.data);
   }
 
+  /// 함대 귀환 명령 (공격 도중 귀환)
+  Future<Map<String, dynamic>> recallFleet() async {
+    final response = await _dio.post('game/battle/recall');
+    return response.data;
+  }
+
   Future<BattleStatus> getBattleStatus() async {
     final response = await _dio.get('game/battle/status');
     return BattleStatus.fromJson(response.data);

@@ -780,6 +780,18 @@ class GameNotifier extends StateNotifier<GameState> {
     }
   }
 
+  /// 함대 귀환 명령 (공격 도중 귀환)
+  Future<bool> recallFleet() async {
+    try {
+      await _apiService.recallFleet();
+      await loadBattleStatus();
+      return true;
+    } catch (e) {
+      state = state.copyWith(error: '함대 귀환에 실패했습니다.');
+      return false;
+    }
+  }
+
   void clearError() {
     state = state.copyWith(error: null);
   }

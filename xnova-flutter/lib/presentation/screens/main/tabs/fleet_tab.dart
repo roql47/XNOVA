@@ -115,14 +115,6 @@ class _FleetTabState extends ConsumerState<FleetTab> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: gameState.fleet.any((s) => (_quantities[s.type] ?? 0) > 0)
-          ? FloatingActionButton.extended(
-              onPressed: _dispatchFleet,
-              backgroundColor: AppColors.negative,
-              icon: const Icon(Icons.send, size: 18),
-              label: const Text('함대 출격', style: TextStyle(fontSize: 13)),
-            )
-          : null,
       body: RefreshIndicator(
         onRefresh: () => ref.read(gameProvider.notifier).loadFleet(),
         color: AppColors.accent,

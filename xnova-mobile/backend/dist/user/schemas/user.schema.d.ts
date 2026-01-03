@@ -103,6 +103,7 @@ export declare class ReturnProgress {
     fleet: Record<string, number>;
     loot: Record<string, number>;
     returnTime: Date;
+    startTime: Date;
 }
 export declare class VacationMode {
     isActive: boolean;

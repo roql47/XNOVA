@@ -232,6 +232,9 @@ let BattleService = class BattleService {
         }
         const MAX_ROUNDS = 6;
         for (let round = 0; round < MAX_ROUNDS; round++) {
+            if (attackerUnits.length === 0 || defenderUnits.length === 0) {
+                break;
+            }
             const roundInfo = {
                 round: round + 1,
                 ashoot: 0,
@@ -246,11 +249,6 @@ let BattleService = class BattleService {
                 destroyedDefenderShips: {},
                 rapidFireCount: 0,
             };
-            if (attackerUnits.length === 0 || defenderUnits.length === 0) {
-                this.countRemainingUnits(attackerUnits, defenderUnits, roundInfo);
-                result.rounds.push(roundInfo);
-                break;
-            }
             for (const unit of attackerUnits) {
                 unit.shield = unit.maxShield;
             }
@@ -553,18 +551,40 @@ let BattleService = class BattleService {
         if (!battleResult.attackerWon) {
             return { metal: 0, crystal: 0, deuterium: 0 };
         }
-        let m = Math.floor(resources.metal / 2);
-        let k = Math.floor(resources.crystal / 2);
-        let d = Math.floor(resources.deuterium / 2);
-        const mc = Math.min(Math.floor(capacity / 3), m);
-        const remainingAfterMetal = capacity - mc;
-        const kc = Math.min(Math.floor(remainingAfterMetal / 2), k);
-        const remainingAfterCrystal = remainingAfterMetal - kc;
-        const dc = Math.min(remainingAfterCrystal, d);
+        if (capacity <= 0) {
+            return { metal: 0, crystal: 0, deuterium: 0 };
+        }
+        const lootableMetal = Math.floor(resources.metal / 2);
+        const lootableCrystal = Math.floor(resources.crystal / 2);
+        const lootableDeuterium = Math.floor(resources.deuterium / 2);
+        let remainingCapacity = capacity;
+        let lootedMetal;
+        if (lootableMetal > Math.floor(remainingCapacity / 3)) {
+            lootedMetal = Math.floor(remainingCapacity / 3);
+        }
+        else {
+            lootedMetal = lootableMetal;
+        }
+        remainingCapacity -= lootedMetal;
+        let lootedCrystal;
+        if (lootableCrystal > Math.floor(remainingCapacity / 2)) {
+            lootedCrystal = Math.floor(remainingCapacity / 2);
+        }
+        else {
+            lootedCrystal = lootableCrystal;
+        }
+        remainingCapacity -= lootedCrystal;
+        let lootedDeuterium;
+        if (lootableDeuterium > remainingCapacity) {
+            lootedDeuterium = remainingCapacity;
+        }
+        else {
+            lootedDeuterium = lootableDeuterium;
+        }
         return {
-            metal: mc,
-            crystal: kc,
-            deuterium: dc,
+            metal: lootedMetal,
+            crystal: lootedCrystal,
+            deuterium: lootedDeuterium,
         };
     }
     async startAttack(attackerId, targetCoord, fleet) {
@@ -772,6 +792,7 @@ let BattleService = class BattleService {
             fleet: user.pendingAttack.fleet,
             loot: { metal: metalLoot, crystal: crystalLoot, deuterium: 0 },
             returnTime,
+            startTime: new Date(),
         };
         user.pendingAttack = null;
         user.markModified('pendingReturn');
@@ -914,6 +935,7 @@ let BattleService = class BattleService {
                 fleet: battleResult.survivingAttackerFleet,
                 loot,
                 returnTime,
+                startTime: new Date(),
             };
             updatedAttacker.markModified('pendingReturn');
         }
@@ -1014,6 +1036,59 @@ let BattleService = class BattleService {
             }
         }
         return results;
+    }
+    async recallFleet(userId) {
+        const user = await this.userModel.findById(userId).exec();
+        if (!user) {
+            throw new common_1.BadRequestException('사용자를 찾을 수 없습니다.');
+        }
+        if (user.pendingReturn) {
+            throw new common_1.BadRequestException('이미 함대가 귀환 중입니다.');
+        }
+        if (!user.pendingAttack) {
+            throw new common_1.BadRequestException('귀환시킬 함대가 없습니다.');
+        }
+        if (user.pendingAttack.battleCompleted) {
+            throw new common_1.BadRequestException('전투가 이미 완료되어 귀환 중입니다.');
+        }
+        const elapsedTime = (Date.now() - user.pendingAttack.startTime.getTime()) / 1000;
+        if (Date.now() >= user.pendingAttack.arrivalTime.getTime()) {
+            throw new common_1.BadRequestException('함대가 이미 목표에 도착했습니다. 전투 결과를 확인하세요.');
+        }
+        const returnTime = new Date(Date.now() + elapsedTime * 1000);
+        const targetUserId = user.pendingAttack.targetUserId;
+        if (targetUserId && targetUserId !== 'debris') {
+            const target = await this.userModel.findById(targetUserId).exec();
+            if (target && target.incomingAttack) {
+                target.incomingAttack = null;
+                target.markModified('incomingAttack');
+                await target.save();
+            }
+        }
+        const returningFleet = { ...user.pendingAttack.fleet };
+        user.pendingReturn = {
+            fleet: returningFleet,
+            loot: { metal: 0, crystal: 0, deuterium: 0 },
+            returnTime,
+            startTime: new Date(),
+        };
+        user.pendingAttack = null;
+        user.markModified('pendingAttack');
+        user.markModified('pendingReturn');
+        await user.save();
+        await this.messageService.createMessage({
+            receiverId: userId,
+            senderName: '함대 사령부',
+            title: '함대 귀환 명령',
+            content: `함대가 귀환 명령을 받았습니다. 예상 귀환 시간: ${Math.ceil(elapsedTime)}초`,
+            type: 'system',
+            metadata: { fleet: returningFleet },
+        });
+        return {
+            message: '함대가 귀환 중입니다.',
+            fleet: returningFleet,
+            returnTime: elapsedTime,
+        };
     }
     async processFleetReturn(userId) {
         const user = await this.userModel.findById(userId).exec();

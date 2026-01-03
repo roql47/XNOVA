@@ -474,6 +474,7 @@ let ReturnProgress = class ReturnProgress {
     fleet;
     loot;
     returnTime;
+    startTime;
 };
 exports.ReturnProgress = ReturnProgress;
 __decorate([
@@ -488,6 +489,10 @@ __decorate([
     (0, mongoose_1.Prop)(),
     __metadata("design:type", Date)
 ], ReturnProgress.prototype, "returnTime", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", Date)
+], ReturnProgress.prototype, "startTime", void 0);
 exports.ReturnProgress = ReturnProgress = __decorate([
     (0, mongoose_1.Schema)({ _id: false })
 ], ReturnProgress);

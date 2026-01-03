@@ -294,6 +294,9 @@ export class ReturnProgress {
 
   @Prop()
   returnTime: Date;
+
+  @Prop()
+  startTime: Date;
 }
 
 // 휴가 모드 스키마

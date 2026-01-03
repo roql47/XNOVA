@@ -179,6 +179,13 @@ export declare class GameController {
         travelTime: number;
         arrivalTime: Date;
     }>;
+    recallFleet(req: any): Promise<{
+        message: string;
+        fleet: {
+            [x: string]: number;
+        };
+        returnTime: number;
+    }>;
     getAttackStatus(req: any): Promise<any>;
     processBattle(req: any): Promise<{
         attackProcessed: boolean;
