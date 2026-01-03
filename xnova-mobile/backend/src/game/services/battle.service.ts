@@ -1214,7 +1214,8 @@ export class BattleService {
     }
 
     // 식민 미션은 여기서 처리하지 않음 (ColonyService에서 처리)
-    if (attacker.pendingAttack.missionType === 'colony') {
+    // missionType이 'colony'이거나, targetUserId가 빈 문자열인 경우 (식민 미션의 특징)
+    if (attacker.pendingAttack.missionType === 'colony' || !attacker.pendingAttack.targetUserId) {
       return null;
     }
 
