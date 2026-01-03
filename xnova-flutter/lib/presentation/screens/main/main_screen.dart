@@ -81,6 +81,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
   // 채팅 화면 표시 상태
   bool _showChat = false;
   
+  // 관리자 여부
+  bool _isAdmin = false;
+  
   // 자동 완료 체크 타이머
   Timer? _autoCompleteTimer;
   
@@ -97,10 +100,25 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       ref.read(gameProvider.notifier).loadAllData();
       ref.read(gameProvider.notifier).loadProfile();
       ref.read(messageProvider.notifier).loadMessages(); // 메시지 로드
+      _checkAdminStatus(); // 관리자 권한 확인
       
       // 1초마다 자동 완료 체크 시작
       _startAutoCompleteTimer();
     });
+  }
+  
+  Future<void> _checkAdminStatus() async {
+    try {
+      final apiService = ref.read(apiServiceProvider);
+      final isAdmin = await apiService.checkAdmin();
+      if (mounted) {
+        setState(() {
+          _isAdmin = isAdmin;
+        });
+      }
+    } catch (e) {
+      // ignore
+    }
   }
   
   @override
@@ -192,6 +210,134 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       default:
         break;
     }
+  }
+
+  // 관리자 전체 공지 다이얼로그
+  void _showBroadcastDialog() {
+    final titleController = TextEditingController();
+    final contentController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.panelBackground,
+        title: Row(
+          children: [
+            Icon(Icons.campaign, color: AppColors.warning, size: 20),
+            const SizedBox(width: 8),
+            const Text(
+              '전체 공지 발송',
+              style: TextStyle(color: AppColors.textPrimary, fontSize: 16),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.8,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                ),
+                child: const Text(
+                  '⚠️ 모든 유저에게 공지 메시지가 발송됩니다.',
+                  style: TextStyle(color: AppColors.warning, fontSize: 11),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: titleController,
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: '제목',
+                  hintStyle: TextStyle(color: AppColors.textMuted.withOpacity(0.5)),
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: contentController,
+                maxLines: 5,
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: '공지 내용',
+                  hintStyle: TextStyle(color: AppColors.textMuted.withOpacity(0.5)),
+                  filled: true,
+                  fillColor: AppColors.surface,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.all(12),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('취소', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.send, size: 16),
+            label: const Text('발송'),
+            onPressed: () async {
+              final title = titleController.text.trim();
+              final content = contentController.text.trim();
+              
+              if (title.isEmpty || content.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('제목과 내용을 입력해주세요.')),
+                );
+                return;
+              }
+
+              Navigator.pop(dialogContext);
+
+              try {
+                final apiService = ref.read(apiServiceProvider);
+                final result = await apiService.broadcastMessage(
+                  title: title,
+                  content: content,
+                );
+
+                if (result['success'] == true) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(result['message'] ?? '공지가 발송되었습니다.'),
+                      backgroundColor: AppColors.positive,
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(result['message'] ?? '발송에 실패했습니다.')),
+                  );
+                }
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('공지 발송 중 오류가 발생했습니다.')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.warning,
+              foregroundColor: Colors.black,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -353,13 +499,21 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
           // 메시지 아이콘 (읽지 않은 메시지 배지)
           Stack(
             children: [
-              IconButton(
-                icon: Icon(
-                  unreadCount > 0 ? Icons.mail : Icons.mail_outline,
-                  color: unreadCount > 0 ? AppColors.accent : AppColors.textMuted,
-                  size: 20,
+              GestureDetector(
+                onTap: () => _onTabChanged(MainTab.messages),
+                onLongPress: _isAdmin ? () => _showBroadcastDialog() : null,
+                child: IconButton(
+                  icon: Icon(
+                    _isAdmin 
+                        ? Icons.campaign  // 관리자는 확성기 아이콘
+                        : (unreadCount > 0 ? Icons.mail : Icons.mail_outline),
+                    color: _isAdmin 
+                        ? AppColors.warning  // 관리자는 노란색
+                        : (unreadCount > 0 ? AppColors.accent : AppColors.textMuted),
+                    size: 20,
+                  ),
+                  onPressed: () => _onTabChanged(MainTab.messages),
                 ),
-                onPressed: () => _onTabChanged(MainTab.messages),
               ),
               if (unreadCount > 0)
                 Positioned(
@@ -383,6 +537,27 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                         fontWeight: FontWeight.bold,
                       ),
                       textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              // 관리자 배지
+              if (_isAdmin)
+                Positioned(
+                  right: 4,
+                  bottom: 4,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'ADM',
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 6,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),

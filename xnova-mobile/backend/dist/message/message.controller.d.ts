@@ -5,6 +5,10 @@ declare class SendMessageDto {
     title: string;
     content: string;
 }
+declare class BroadcastMessageDto {
+    title: string;
+    content: string;
+}
 export declare class MessageController {
     private readonly messageService;
     private readonly userService;
@@ -20,5 +24,17 @@ export declare class MessageController {
     }>;
     markAsRead(req: any, id: string): Promise<import("mongoose").UpdateWriteOpResult>;
     deleteMessage(req: any, id: string): Promise<import("mongodb").DeleteResult>;
+    checkAdmin(req: any): Promise<{
+        isAdmin: boolean;
+    }>;
+    broadcastMessage(req: any, dto: BroadcastMessageDto): Promise<{
+        success: boolean;
+        message: string;
+        count?: undefined;
+    } | {
+        success: boolean;
+        message: string;
+        count: number;
+    }>;
 }
 export {};

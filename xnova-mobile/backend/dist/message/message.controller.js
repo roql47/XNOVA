@@ -22,6 +22,10 @@ class SendMessageDto {
     title;
     content;
 }
+class BroadcastMessageDto {
+    title;
+    content;
+}
 let MessageController = class MessageController {
     messageService;
     userService;
@@ -75,6 +79,43 @@ let MessageController = class MessageController {
     async deleteMessage(req, id) {
         return this.messageService.deleteMessage(id, req.user.userId);
     }
+    async checkAdmin(req) {
+        const isAdmin = await this.messageService.isAdmin(req.user.userId);
+        return { isAdmin };
+    }
+    async broadcastMessage(req, dto) {
+        const isAdmin = await this.messageService.isAdmin(req.user.userId);
+        if (!isAdmin) {
+            return { success: false, message: '관리자 권한이 필요합니다.' };
+        }
+        const sender = await this.userService.findById(req.user.userId);
+        if (!sender) {
+            return { success: false, message: '발신자를 찾을 수 없습니다.' };
+        }
+        if (!dto.title || dto.title.trim().length === 0) {
+            return { success: false, message: '제목을 입력해주세요.' };
+        }
+        if (!dto.content || dto.content.trim().length === 0) {
+            return { success: false, message: '내용을 입력해주세요.' };
+        }
+        if (dto.title.length > 100) {
+            return { success: false, message: '제목은 100자 이하여야 합니다.' };
+        }
+        if (dto.content.length > 2000) {
+            return { success: false, message: '내용은 2000자 이하여야 합니다.' };
+        }
+        const result = await this.messageService.broadcastMessage({
+            senderId: req.user.userId,
+            senderName: sender.playerName,
+            title: dto.title.trim(),
+            content: dto.content.trim(),
+        });
+        return {
+            success: true,
+            message: `${result.count}명에게 공지를 발송했습니다.`,
+            count: result.count,
+        };
+    }
 };
 exports.MessageController = MessageController;
 __decorate([
@@ -109,6 +150,21 @@ __decorate([
     __metadata("design:paramtypes", [Object, String]),
     __metadata("design:returntype", Promise)
 ], MessageController.prototype, "deleteMessage", null);
+__decorate([
+    (0, common_1.Get)('admin/check'),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], MessageController.prototype, "checkAdmin", null);
+__decorate([
+    (0, common_1.Post)('broadcast'),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, BroadcastMessageDto]),
+    __metadata("design:returntype", Promise)
+], MessageController.prototype, "broadcastMessage", null);
 exports.MessageController = MessageController = __decorate([
     (0, common_1.Controller)('messages'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),

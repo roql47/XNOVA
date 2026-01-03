@@ -23,75 +23,53 @@ class OverviewTab extends ConsumerWidget {
       child: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          // 건설/연구 진행 상황 (두 줄 레이아웃)
+          // 건설/연구 진행 상황
           if (gameState.constructionProgress != null || gameState.researchProgress != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  // 건설 진행
-                  if (gameState.constructionProgress != null)
-                    Expanded(
-                      child: _CompactProgressCard(
+              child: _buildProgressRow(
+                left: gameState.constructionProgress != null
+                    ? _CompactProgressCard(
                         type: 'building',
                         name: gameState.constructionProgress!.name,
                         finishTime: gameState.constructionProgress!.finishDateTime,
                         onComplete: () => ref.read(gameProvider.notifier).completeBuilding(),
-                      ),
-                    )
-                  else
-                    const Expanded(child: SizedBox()),
-                  const SizedBox(width: 8),
-                  // 연구 진행
-                  if (gameState.researchProgress != null)
-                    Expanded(
-                      child: _CompactProgressCard(
+                      )
+                    : null,
+                right: gameState.researchProgress != null
+                    ? _CompactProgressCard(
                         type: 'research',
                         name: gameState.researchProgress!.name,
                         finishTime: gameState.researchProgress!.finishDateTime,
                         onComplete: () => ref.read(gameProvider.notifier).completeResearch(),
-                      ),
-                    )
-                  else
-                    const Expanded(child: SizedBox()),
-                ],
+                      )
+                    : null,
               ),
             ),
           
-          // 함대/방어시설 건조 진행 상황 (두 줄 레이아웃)
+          // 함대/방어시설 건조 진행 상황
           if (gameState.fleetProgress != null || gameState.defenseProgress != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                children: [
-                  // 함대 건조
-                  if (gameState.fleetProgress != null)
-                    Expanded(
-                      child: _CompactProgressCard(
+              child: _buildProgressRow(
+                left: gameState.fleetProgress != null
+                    ? _CompactProgressCard(
                         type: 'fleet',
                         name: gameState.fleetProgress!.name,
                         quantity: gameState.fleetProgress!.quantity,
                         finishTime: gameState.fleetProgress!.finishDateTime,
                         onComplete: () => ref.read(gameProvider.notifier).completeFleet(),
-                      ),
-                    )
-                  else
-                    const Expanded(child: SizedBox()),
-                  const SizedBox(width: 8),
-                  // 방어시설 건설
-                  if (gameState.defenseProgress != null)
-                    Expanded(
-                      child: _CompactProgressCard(
+                      )
+                    : null,
+                right: gameState.defenseProgress != null
+                    ? _CompactProgressCard(
                         type: 'defense',
                         name: gameState.defenseProgress!.name,
                         quantity: gameState.defenseProgress!.quantity,
                         finishTime: gameState.defenseProgress!.finishDateTime,
                         onComplete: () => ref.read(gameProvider.notifier).completeDefense(),
-                      ),
-                    )
-                  else
-                    const Expanded(child: SizedBox()),
-                ],
+                      )
+                    : null,
               ),
             ),
           
@@ -191,6 +169,24 @@ class _InfoGrid extends StatelessWidget {
       ),
     );
   }
+}
+
+// 진행 상황 Row 빌더 (하나만 있으면 전체 너비, 둘 다 있으면 50%씩)
+Widget _buildProgressRow({Widget? left, Widget? right}) {
+  if (left != null && right != null) {
+    return Row(
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: 8),
+        Expanded(child: right),
+      ],
+    );
+  } else if (left != null) {
+    return left;
+  } else if (right != null) {
+    return right;
+  }
+  return const SizedBox.shrink();
 }
 
 // 홈화면용 컴팩트 진행 카드 (원형 이미지 + 시간)

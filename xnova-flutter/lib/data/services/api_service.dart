@@ -190,6 +190,28 @@ class ApiService {
     return response.data;
   }
 
+  // 관리자 권한 확인
+  Future<bool> checkAdmin() async {
+    try {
+      final response = await _dio.get('messages/admin/check');
+      return response.data['isAdmin'] ?? false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // 전체 공지 메시지 발송 (관리자 전용)
+  Future<Map<String, dynamic>> broadcastMessage({
+    required String title,
+    required String content,
+  }) async {
+    final response = await _dio.post('messages/broadcast', data: {
+      'title': title,
+      'content': content,
+    });
+    return response.data;
+  }
+
   // ===== 은하 =====
   Future<GalaxyResponse> getGalaxyMap(int galaxy, int system) async {
     final response = await _dio.get('galaxy/$galaxy/$system');

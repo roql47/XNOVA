@@ -10,6 +10,11 @@ class SendMessageDto {
   content: string;
 }
 
+class BroadcastMessageDto {
+  title: string;
+  content: string;
+}
+
 @Controller('messages')
 @UseGuards(JwtAuthGuard)
 export class MessageController {
@@ -80,6 +85,57 @@ export class MessageController {
   @Delete(':id')
   async deleteMessage(@Request() req, @Param('id') id: string) {
     return this.messageService.deleteMessage(id, req.user.userId);
+  }
+
+  // 관리자 권한 확인
+  @Get('admin/check')
+  async checkAdmin(@Request() req) {
+    const isAdmin = await this.messageService.isAdmin(req.user.userId);
+    return { isAdmin };
+  }
+
+  // 전체 메시지 발송 (관리자 전용)
+  @Post('broadcast')
+  async broadcastMessage(@Request() req, @Body() dto: BroadcastMessageDto) {
+    // 관리자 권한 확인
+    const isAdmin = await this.messageService.isAdmin(req.user.userId);
+    if (!isAdmin) {
+      return { success: false, message: '관리자 권한이 필요합니다.' };
+    }
+
+    // 발신자 정보 가져오기
+    const sender = await this.userService.findById(req.user.userId);
+    if (!sender) {
+      return { success: false, message: '발신자를 찾을 수 없습니다.' };
+    }
+
+    // 제목/내용 검증
+    if (!dto.title || dto.title.trim().length === 0) {
+      return { success: false, message: '제목을 입력해주세요.' };
+    }
+    if (!dto.content || dto.content.trim().length === 0) {
+      return { success: false, message: '내용을 입력해주세요.' };
+    }
+    if (dto.title.length > 100) {
+      return { success: false, message: '제목은 100자 이하여야 합니다.' };
+    }
+    if (dto.content.length > 2000) {
+      return { success: false, message: '내용은 2000자 이하여야 합니다.' };
+    }
+
+    // 전체 메시지 발송
+    const result = await this.messageService.broadcastMessage({
+      senderId: req.user.userId,
+      senderName: sender.playerName,
+      title: dto.title.trim(),
+      content: dto.content.trim(),
+    });
+
+    return { 
+      success: true, 
+      message: `${result.count}명에게 공지를 발송했습니다.`,
+      count: result.count,
+    };
   }
 }
 

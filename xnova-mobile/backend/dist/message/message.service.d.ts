@@ -1,8 +1,10 @@
 import { Model, Types } from 'mongoose';
 import { Message, MessageDocument } from './schemas/message.schema';
+import { UserDocument } from '../user/schemas/user.schema';
 export declare class MessageService {
     private messageModel;
-    constructor(messageModel: Model<MessageDocument>);
+    private userModel;
+    constructor(messageModel: Model<MessageDocument>, userModel: Model<UserDocument>);
     createMessage(data: {
         receiverId: string;
         senderName: string;
@@ -22,4 +24,14 @@ export declare class MessageService {
     })[]>;
     markAsRead(messageId: string, userId: string): Promise<import("mongoose").UpdateWriteOpResult>;
     deleteMessage(messageId: string, userId: string): Promise<import("mongodb").DeleteResult>;
+    isAdmin(userId: string): Promise<boolean>;
+    broadcastMessage(data: {
+        senderId: string;
+        senderName: string;
+        title: string;
+        content: string;
+    }): Promise<{
+        success: boolean;
+        count: number;
+    }>;
 }

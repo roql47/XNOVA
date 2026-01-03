@@ -13,13 +13,17 @@ const message_schema_1 = require("./schemas/message.schema");
 const message_service_1 = require("./message.service");
 const message_controller_1 = require("./message.controller");
 const user_module_1 = require("../user/user.module");
+const user_schema_1 = require("../user/schemas/user.schema");
 let MessageModule = class MessageModule {
 };
 exports.MessageModule = MessageModule;
 exports.MessageModule = MessageModule = __decorate([
     (0, common_1.Module)({
         imports: [
-            mongoose_1.MongooseModule.forFeature([{ name: message_schema_1.Message.name, schema: message_schema_1.MessageSchema }]),
+            mongoose_1.MongooseModule.forFeature([
+                { name: message_schema_1.Message.name, schema: message_schema_1.MessageSchema },
+                { name: user_schema_1.User.name, schema: user_schema_1.UserSchema },
+            ]),
             user_module_1.UserModule,
         ],
         providers: [message_service_1.MessageService],

@@ -17,10 +17,13 @@ const common_1 = require("@nestjs/common");
 const mongoose_1 = require("@nestjs/mongoose");
 const mongoose_2 = require("mongoose");
 const message_schema_1 = require("./schemas/message.schema");
+const user_schema_1 = require("../user/schemas/user.schema");
 let MessageService = class MessageService {
     messageModel;
-    constructor(messageModel) {
+    userModel;
+    constructor(messageModel, userModel) {
         this.messageModel = messageModel;
+        this.userModel = userModel;
     }
     async createMessage(data) {
         const newMessage = new this.messageModel({
@@ -45,11 +48,39 @@ let MessageService = class MessageService {
             receiverId: new mongoose_2.Types.ObjectId(userId),
         });
     }
+    async isAdmin(userId) {
+        const user = await this.userModel.findById(userId).exec();
+        if (!user)
+            return false;
+        return user.coordinate === '1:1:1' && user.playerName?.toLowerCase() === 'admin';
+    }
+    async broadcastMessage(data) {
+        const allUsers = await this.userModel.find({
+            _id: { $ne: new mongoose_2.Types.ObjectId(data.senderId) }
+        }).exec();
+        const messages = allUsers.map(user => ({
+            receiverId: user._id,
+            senderName: `[공지] ${data.senderName}`,
+            title: data.title,
+            content: data.content,
+            type: 'system',
+            metadata: {
+                isAnnouncement: true,
+                senderId: data.senderId,
+            },
+        }));
+        if (messages.length > 0) {
+            await this.messageModel.insertMany(messages);
+        }
+        return { success: true, count: messages.length };
+    }
 };
 exports.MessageService = MessageService;
 exports.MessageService = MessageService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(message_schema_1.Message.name)),
-    __metadata("design:paramtypes", [mongoose_2.Model])
+    __param(1, (0, mongoose_1.InjectModel)(user_schema_1.User.name)),
+    __metadata("design:paramtypes", [mongoose_2.Model,
+        mongoose_2.Model])
 ], MessageService);
 //# sourceMappingURL=message.service.js.map

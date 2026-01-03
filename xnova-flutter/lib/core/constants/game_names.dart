@@ -18,15 +18,18 @@ const Map<String, String> buildingNames = {
 
 // 건물 이미지 경로
 const Map<String, String> buildingImages = {
-  'metalMine': 'assets/images/metal_mine.webp',
-  'crystalMine': 'assets/images/crystal_mine.webp',
+  'metalMine': 'assets/images/metalmine.webp',
+  'crystalMine': 'assets/images/crystalmine.webp',
   'deuteriumMine': 'assets/images/deuterium_synthesizer.webp',
-  'solarPlant': 'assets/images/solar_plant.webp',
+  'solarPlant': 'assets/images/solarplant.webp',
   'fusionReactor': 'assets/images/fusion_reactor.webp',
   'robotFactory': 'assets/images/robotics_factory.webp',
   'shipyard': 'assets/images/shipyard.webp',
-  'researchLab': 'assets/images/research_lab.webp',
+  'researchLab': 'assets/images/research_rab.webp',
   'nanoFactory': 'assets/images/nanite_factory.webp',
+  'metalStorage': 'assets/images/metal_storage.webp',
+  'crystalStorage': 'assets/images/crystal_storage.webp',
+  'deuteriumStorage': 'assets/images/deuterium_tank.webp',
 };
 
 // 연구 한글 이름
@@ -89,13 +92,13 @@ const Map<String, String> fleetNames = {
 
 // 함대 이미지 경로
 const Map<String, String> fleetImages = {
-  'smallCargo': 'assets/images/small_cargo.webp',
-  'largeCargo': 'assets/images/large_cargo.webp',
+  'smallCargo': 'assets/images/small_cargo_ship.webp',
+  'largeCargo': 'assets/images/large_cargo_ship.webp',
   'lightFighter': 'assets/images/light_fighter.webp',
   'heavyFighter': 'assets/images/heavy_fighter.webp',
   'cruiser': 'assets/images/cruiser.webp',
   'battleship': 'assets/images/battleship.webp',
-  'battlecruiser': 'assets/images/battlecruiser.webp',
+  'battlecruiser': 'assets/images/battlecruiser.jpg',
   'bomber': 'assets/images/bomber.webp',
   'destroyer': 'assets/images/destroyer.webp',
   'deathstar': 'assets/images/deathstar.webp',
@@ -129,8 +132,8 @@ const Map<String, String> defenseImages = {
   'plasmaTurret': 'assets/images/plasma_turret.webp',
   'smallShieldDome': 'assets/images/small_shield_dome.webp',
   'largeShieldDome': 'assets/images/large_shield_dome.webp',
-  'antiBallisticMissile': 'assets/images/anti_ballistic_missiles.webp',
-  'interplanetaryMissile': 'assets/images/interplanetary_missiles.webp',
+  'antiBallisticMissile': 'assets/images/anti-ballistic_missile.webp',
+  'interplanetaryMissile': 'assets/images/interplanetary_missile.jpg',
 };
 
 // 모든 이름을 통합 검색
