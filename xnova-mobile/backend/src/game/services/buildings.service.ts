@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../../user/schemas/user.schema';
+import { Planet, PlanetDocument } from '../../planet/schemas/planet.schema';
 import { ResourcesService } from './resources.service';
 import { BUILDING_COSTS, NAME_MAPPING } from '../constants/game-data';
 
@@ -51,8 +52,15 @@ const PLANET_TYPES = [
 export class BuildingsService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Planet.name) private planetModel: Model<PlanetDocument>,
     private resourcesService: ResourcesService,
   ) {}
+
+  // 활성 행성이 모행성인지 확인
+  isHomePlanet(activePlanetId: string | null, userId: string): boolean {
+    if (!activePlanetId) return true;
+    return activePlanetId.startsWith('home_') || activePlanetId === `home_${userId}`;
+  }
 
   // 행성 위치에서 position 추출 (좌표 형식: "1:1:4")
   extractPlanetPosition(coordinate: string): number {
@@ -197,13 +205,105 @@ export class BuildingsService {
     return Math.ceil((totalCost / (25 * facilityBonus * nanoBonus)) * 4 / 10);
   }
 
-  // 건물 현황 조회
+  // 식민지 필드 정보 계산
+  calculateColonyUsedFields(planet: PlanetDocument): number {
+    let usedFields = 0;
+
+    if (planet.mines) {
+      usedFields += planet.mines.metalMine || 0;
+      usedFields += planet.mines.crystalMine || 0;
+      usedFields += planet.mines.deuteriumMine || 0;
+      usedFields += planet.mines.solarPlant || 0;
+      usedFields += planet.mines.fusionReactor || 0;
+    }
+
+    if (planet.facilities) {
+      usedFields += planet.facilities.robotFactory || 0;
+      usedFields += planet.facilities.nanoFactory || 0;
+      usedFields += planet.facilities.shipyard || 0;
+      usedFields += planet.facilities.researchLab || 0;
+      usedFields += planet.facilities.terraformer || 0;
+      usedFields += planet.facilities.allianceDepot || 0;
+      usedFields += planet.facilities.missileSilo || 0;
+      usedFields += planet.facilities.metalStorage || 0;
+      usedFields += planet.facilities.crystalStorage || 0;
+      usedFields += planet.facilities.deuteriumTank || 0;
+    }
+
+    return usedFields;
+  }
+
+  // 식민지 최대 필드 계산
+  getColonyMaxFields(planet: PlanetDocument): number {
+    const baseFields = planet.planetInfo?.maxFields || 163;
+    const terraformerLevel = planet.facilities?.terraformer || 0;
+    return baseFields + this.getTerraformerBonus(terraformerLevel);
+  }
+
+  // 식민지 필드 정보
+  getColonyFieldInfo(planet: PlanetDocument): { used: number; max: number; remaining: number; percentage: number } {
+    const usedFields = this.calculateColonyUsedFields(planet);
+    const maxFields = this.getColonyMaxFields(planet);
+    return {
+      used: usedFields,
+      max: maxFields,
+      remaining: maxFields - usedFields,
+      percentage: Math.round((usedFields / maxFields) * 100)
+    };
+  }
+
+  // 건물 현황 조회 (활성 행성 기준)
   async getBuildings(userId: string) {
     const user = await this.userModel.findById(userId).exec();
     if (!user) return null;
 
-    const mines = user.mines;
-    const facilities = user.facilities;
+    const isHome = this.isHomePlanet(user.activePlanetId, userId);
+    let mines: any;
+    let facilities: any;
+    let constructionProgress: any;
+    let fieldInfo: any;
+    let planetInfo: any;
+
+    if (isHome) {
+      // 모행성 데이터
+      mines = user.mines || {};
+      facilities = user.facilities || {};
+      constructionProgress = user.constructionProgress;
+      fieldInfo = this.getFieldInfo(user);
+      planetInfo = {
+        temperature: user.planetInfo?.temperature ?? 50,
+        planetType: user.planetInfo?.planetType ?? 'normaltemp',
+        planetName: user.planetInfo?.planetName ?? user.playerName,
+        diameter: user.planetInfo?.diameter ?? 12800,
+      };
+    } else {
+      // 식민지 데이터
+      const planet = await this.planetModel.findById(user.activePlanetId).exec();
+      if (!planet) {
+        // 식민지 못찾으면 모행성으로 폴백
+        mines = user.mines || {};
+        facilities = user.facilities || {};
+        constructionProgress = user.constructionProgress;
+        fieldInfo = this.getFieldInfo(user);
+        planetInfo = {
+          temperature: user.planetInfo?.temperature ?? 50,
+          planetType: user.planetInfo?.planetType ?? 'normaltemp',
+          planetName: user.planetInfo?.planetName ?? user.playerName,
+          diameter: user.planetInfo?.diameter ?? 12800,
+        };
+      } else {
+        mines = planet.mines || {};
+        facilities = planet.facilities || {};
+        constructionProgress = planet.constructionProgress;
+        fieldInfo = this.getColonyFieldInfo(planet);
+        planetInfo = {
+          temperature: planet.planetInfo?.tempMax ?? 50,
+          planetType: planet.planetInfo?.planetType ?? 'normaltemp',
+          planetName: planet.name || '식민지',
+          diameter: planet.planetInfo?.diameter ?? 12800,
+        };
+      }
+    }
 
     // 각 건물의 업그레이드 비용 및 시간 계산
     const buildingsInfo: BuildingInfo[] = [];
@@ -211,7 +311,7 @@ export class BuildingsService {
     // 광산
     const mineTypes = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'];
     for (const key of mineTypes) {
-      const level = (mines as any)[key] || 0;
+      const level = mines[key] || 0;
       const cost = this.getUpgradeCost(key, level);
       const time = this.getConstructionTime(key, level, facilities.robotFactory || 0, facilities.nanoFactory || 0);
       
@@ -262,7 +362,7 @@ export class BuildingsService {
     // 시설
     const facilityTypes = ['robotFactory', 'shipyard', 'researchLab', 'nanoFactory'];
     for (const key of facilityTypes) {
-      const level = (facilities as any)[key] || 0;
+      const level = facilities[key] || 0;
       const cost = this.getUpgradeCost(key, level);
       const time = this.getConstructionTime(key, level, facilities.robotFactory || 0, facilities.nanoFactory || 0);
       
@@ -276,38 +376,51 @@ export class BuildingsService {
       });
     }
 
-    // 필드 정보 계산
-    const fieldInfo = this.getFieldInfo(user);
-
     return {
       buildings: buildingsInfo,
-      constructionProgress: user.constructionProgress,
+      constructionProgress,
       fieldInfo: {
         used: fieldInfo.used,
         max: fieldInfo.max,
         remaining: fieldInfo.remaining,
         percentage: fieldInfo.percentage,
       },
-      planetInfo: {
-        temperature: user.planetInfo?.temperature ?? 50,
-        planetType: user.planetInfo?.planetType ?? 'normaltemp',
-        planetName: user.planetInfo?.planetName ?? user.playerName,
-        diameter: user.planetInfo?.diameter ?? 12800,
-      },
+      planetInfo,
+      isHomePlanet: isHome,
     };
   }
 
-  // 건물 업그레이드 시작
+  // 건물 업그레이드 시작 (활성 행성 기준)
   async startUpgrade(userId: string, buildingType: string) {
-    const user = await this.resourcesService.updateResources(userId);
-    if (!user) {
+    const result = await this.resourcesService.updateResourcesWithPlanet(userId);
+    if (!result) {
       throw new BadRequestException('사용자를 찾을 수 없습니다.');
     }
 
+    const { user, planet } = result;
+    const isHome = this.isHomePlanet(user.activePlanetId, userId);
+
+    // 활성 행성 데이터
+    let mines: any;
+    let facilities: any;
+    let constructionProgress: any;
+
+    if (isHome) {
+      mines = user.mines || {};
+      facilities = user.facilities || {};
+      constructionProgress = user.constructionProgress;
+    } else if (planet) {
+      mines = planet.mines || {};
+      facilities = planet.facilities || {};
+      constructionProgress = planet.constructionProgress;
+    } else {
+      throw new BadRequestException('행성을 찾을 수 없습니다.');
+    }
+
     // 이미 건설 진행 중인지 확인
-    if (user.constructionProgress) {
-      const remainingTime = Math.max(0, (user.constructionProgress.finishTime.getTime() - Date.now()) / 1000);
-      throw new BadRequestException(`이미 ${NAME_MAPPING[user.constructionProgress.name] || user.constructionProgress.name} 건설이 진행 중입니다. 완료까지 ${Math.ceil(remainingTime)}초 남았습니다.`);
+    if (constructionProgress) {
+      const remainingTime = Math.max(0, (constructionProgress.finishTime.getTime() - Date.now()) / 1000);
+      throw new BadRequestException(`이미 ${NAME_MAPPING[constructionProgress.name] || constructionProgress.name} 건설이 진행 중입니다. 완료까지 ${Math.ceil(remainingTime)}초 남았습니다.`);
     }
 
     // 건물 타입 확인
@@ -320,18 +433,25 @@ export class BuildingsService {
       throw new BadRequestException('알 수 없는 건물 유형입니다.');
     }
 
-    // 필드 체크 (테라포머 제외 - 테라포머는 필드를 늘려주므로 예외)
+    // 필드 체크
     if (FIELD_CONSUMING_BUILDINGS.includes(buildingType) && buildingType !== 'terraformer') {
-      if (this.isFieldsFull(user)) {
-        const fieldInfo = this.getFieldInfo(user);
-        throw new BadRequestException(`필드가 가득 찼습니다. (${fieldInfo.used}/${fieldInfo.max}) 테라포머를 건설하여 필드를 확장하세요.`);
+      if (isHome) {
+        if (this.isFieldsFull(user)) {
+          const fieldInfo = this.getFieldInfo(user);
+          throw new BadRequestException(`필드가 가득 찼습니다. (${fieldInfo.used}/${fieldInfo.max}) 테라포머를 건설하여 필드를 확장하세요.`);
+        }
+      } else if (planet) {
+        const fieldInfo = this.getColonyFieldInfo(planet);
+        if (fieldInfo.remaining <= 0) {
+          throw new BadRequestException(`필드가 가득 찼습니다. (${fieldInfo.used}/${fieldInfo.max}) 테라포머를 건설하여 필드를 확장하세요.`);
+        }
       }
     }
 
     // 현재 레벨 확인
     const currentLevel = isMine 
-      ? ((user.mines as any)[buildingType] || 0)
-      : ((user.facilities as any)[buildingType] || 0);
+      ? (mines[buildingType] || 0)
+      : (facilities[buildingType] || 0);
 
     // 비용 계산
     const cost = this.getUpgradeCost(buildingType, currentLevel);
@@ -339,7 +459,7 @@ export class BuildingsService {
       throw new BadRequestException('건물 비용을 계산할 수 없습니다.');
     }
 
-    // 자원 확인 및 차감
+    // 자원 확인 및 차감 (활성 행성에서)
     const hasResources = await this.resourcesService.deductResources(userId, cost);
     if (!hasResources) {
       throw new BadRequestException('자원이 부족합니다.');
@@ -349,22 +469,28 @@ export class BuildingsService {
     const constructionTime = this.getConstructionTime(
       buildingType,
       currentLevel,
-      user.facilities.robotFactory || 0,
-      user.facilities.nanoFactory || 0,
+      facilities.robotFactory || 0,
+      facilities.nanoFactory || 0,
     );
 
     // 건설 진행 정보 저장
     const startTime = new Date();
     const finishTime = new Date(startTime.getTime() + constructionTime * 1000);
 
-    user.constructionProgress = {
+    const progress = {
       type: isMine ? 'mine' : 'facility',
       name: buildingType,
       startTime,
       finishTime,
     };
 
-    await user.save();
+    if (isHome) {
+      user.constructionProgress = progress;
+      await user.save();
+    } else if (planet) {
+      planet.constructionProgress = progress;
+      await planet.save();
+    }
 
     return {
       message: `${NAME_MAPPING[buildingType]} 업그레이드가 시작되었습니다.`,
@@ -377,72 +503,113 @@ export class BuildingsService {
     };
   }
 
-  // 건설 완료 처리
+  // 건설 완료 처리 (활성 행성 기준)
   async completeConstruction(userId: string): Promise<{ completed: boolean; building?: string; newLevel?: number }> {
     const user = await this.userModel.findById(userId).exec();
-    if (!user || !user.constructionProgress) {
-      return { completed: false };
-    }
+    if (!user) return { completed: false };
 
-    // 완료 시간 확인
-    if (user.constructionProgress.finishTime.getTime() > Date.now()) {
-      return { completed: false };
-    }
+    const isHome = this.isHomePlanet(user.activePlanetId, userId);
 
-    const buildingType = user.constructionProgress.name;
-    const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+    if (isHome) {
+      // 모행성 건설 완료
+      if (!user.constructionProgress) return { completed: false };
+      if (user.constructionProgress.finishTime.getTime() > Date.now()) return { completed: false };
 
-    // 레벨 업
-    if (isMine) {
-      (user.mines as any)[buildingType] = ((user.mines as any)[buildingType] || 0) + 1;
+      const buildingType = user.constructionProgress.name;
+      const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+
+      if (isMine) {
+        (user.mines as any)[buildingType] = ((user.mines as any)[buildingType] || 0) + 1;
+      } else {
+        (user.facilities as any)[buildingType] = ((user.facilities as any)[buildingType] || 0) + 1;
+      }
+
+      const newLevel = isMine ? (user.mines as any)[buildingType] : (user.facilities as any)[buildingType];
+      user.constructionProgress = null;
+      await user.save();
+
+      return { completed: true, building: buildingType, newLevel };
     } else {
-      (user.facilities as any)[buildingType] = ((user.facilities as any)[buildingType] || 0) + 1;
+      // 식민지 건설 완료
+      const planet = await this.planetModel.findById(user.activePlanetId).exec();
+      if (!planet || !planet.constructionProgress) return { completed: false };
+      if (planet.constructionProgress.finishTime.getTime() > Date.now()) return { completed: false };
+
+      const buildingType = planet.constructionProgress.name;
+      const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+
+      if (isMine) {
+        if (!planet.mines) planet.mines = {} as any;
+        (planet.mines as any)[buildingType] = ((planet.mines as any)[buildingType] || 0) + 1;
+      } else {
+        if (!planet.facilities) planet.facilities = {} as any;
+        (planet.facilities as any)[buildingType] = ((planet.facilities as any)[buildingType] || 0) + 1;
+      }
+
+      const newLevel = isMine ? (planet.mines as any)[buildingType] : (planet.facilities as any)[buildingType];
+      planet.constructionProgress = null;
+      await planet.save();
+
+      return { completed: true, building: buildingType, newLevel };
     }
-
-    const newLevel = isMine ? (user.mines as any)[buildingType] : (user.facilities as any)[buildingType];
-
-    // 건설 진행 정보 삭제
-    user.constructionProgress = null;
-
-    await user.save();
-
-    return {
-      completed: true,
-      building: buildingType,
-      newLevel,
-    };
   }
 
-  // 건설 취소
+  // 건설 취소 (활성 행성 기준)
   async cancelConstruction(userId: string) {
     const user = await this.userModel.findById(userId).exec();
-    if (!user || !user.constructionProgress) {
-      throw new BadRequestException('진행 중인 건설이 없습니다.');
+    if (!user) throw new BadRequestException('사용자를 찾을 수 없습니다.');
+
+    const isHome = this.isHomePlanet(user.activePlanetId, userId);
+
+    if (isHome) {
+      // 모행성 건설 취소
+      if (!user.constructionProgress) {
+        throw new BadRequestException('진행 중인 건설이 없습니다.');
+      }
+
+      const buildingType = user.constructionProgress.name;
+      const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+      const currentLevel = isMine 
+        ? ((user.mines as any)[buildingType] || 0)
+        : ((user.facilities as any)[buildingType] || 0);
+
+      const cost = this.getUpgradeCost(buildingType, currentLevel);
+      const refund = {
+        metal: Math.floor((cost?.metal || 0) * 0.5),
+        crystal: Math.floor((cost?.crystal || 0) * 0.5),
+        deuterium: Math.floor((cost?.deuterium || 0) * 0.5),
+      };
+
+      await this.resourcesService.addResources(userId, refund);
+      user.constructionProgress = null;
+      await user.save();
+
+      return { message: '건설이 취소되었습니다.', refund };
+    } else {
+      // 식민지 건설 취소
+      const planet = await this.planetModel.findById(user.activePlanetId).exec();
+      if (!planet || !planet.constructionProgress) {
+        throw new BadRequestException('진행 중인 건설이 없습니다.');
+      }
+
+      const buildingType = planet.constructionProgress.name;
+      const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+      const currentLevel = isMine 
+        ? ((planet.mines as any)?.[buildingType] || 0)
+        : ((planet.facilities as any)?.[buildingType] || 0);
+
+      const cost = this.getUpgradeCost(buildingType, currentLevel);
+      const refund = {
+        metal: Math.floor((cost?.metal || 0) * 0.5),
+        crystal: Math.floor((cost?.crystal || 0) * 0.5),
+        deuterium: Math.floor((cost?.deuterium || 0) * 0.5),
+      };
+
+      await this.resourcesService.addResources(userId, refund);
+      planet.constructionProgress = null;
+      await planet.save();
+
+      return { message: '건설이 취소되었습니다.', refund };
     }
-
-    const buildingType = user.constructionProgress.name;
-    const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
-    const currentLevel = isMine 
-      ? ((user.mines as any)[buildingType] || 0)
-      : ((user.facilities as any)[buildingType] || 0);
-
-    // 자원 환불 (50%)
-    const cost = this.getUpgradeCost(buildingType, currentLevel);
-    const refund = {
-      metal: Math.floor((cost?.metal || 0) * 0.5),
-      crystal: Math.floor((cost?.crystal || 0) * 0.5),
-      deuterium: Math.floor((cost?.deuterium || 0) * 0.5),
-    };
-
-    await this.resourcesService.addResources(userId, refund);
-
-    // 건설 진행 정보 삭제
-    user.constructionProgress = null;
-    await user.save();
-
-    return {
-      message: '건설이 취소되었습니다.',
-      refund,
-    };
   }
 }

@@ -1,5 +1,6 @@
 import { Model } from 'mongoose';
 import { UserDocument } from '../../user/schemas/user.schema';
+import { PlanetDocument } from '../../planet/schemas/planet.schema';
 import { ResourcesService } from './resources.service';
 export interface FleetInfo {
     type: string;
@@ -17,9 +18,11 @@ export interface FleetInfo {
 }
 export declare class FleetService {
     private userModel;
+    private planetModel;
     private resourcesService;
-    constructor(userModel: Model<UserDocument>, resourcesService: ResourcesService);
-    checkRequirements(user: UserDocument, fleetType: string): {
+    constructor(userModel: Model<UserDocument>, planetModel: Model<PlanetDocument>, resourcesService: ResourcesService);
+    isHomePlanet(activePlanetId: string | null, userId: string): boolean;
+    checkRequirements(facilities: any, researchLevels: any, fleetType: string): {
         met: boolean;
         missing: string[];
     };
@@ -27,8 +30,9 @@ export declare class FleetService {
     getBuildTime(fleetType: string, quantity: number, shipyardLevel: number, nanoFactoryLevel: number): number;
     getFleet(userId: string): Promise<{
         fleet: FleetInfo[];
-        fleetProgress: import("../../user/schemas/user.schema").ProgressInfo | null;
-        shipyardLevel: number;
+        fleetProgress: any;
+        shipyardLevel: any;
+        isHomePlanet: boolean;
     } | null>;
     startBuild(userId: string, fleetType: string, quantity: number): Promise<{
         message: string;

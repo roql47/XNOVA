@@ -226,16 +226,17 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
   }
 
   // 행성 선택 바텀시트
-  void _showPlanetSelector(BuildContext context) {
+  void _showPlanetSelector(BuildContext parentContext) {
     final gameState = ref.read(gameProvider);
+    final scaffoldMessenger = ScaffoldMessenger.of(parentContext); // 미리 저장
     
     showModalBottomSheet(
-      context: context,
+      context: parentContext,
       backgroundColor: AppColors.panelBackground,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (context) => Container(
+      builder: (sheetContext) => Container(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -255,8 +256,8 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                 IconButton(
                   icon: const Icon(Icons.settings, color: AppColors.textMuted, size: 20),
                   onPressed: () {
-                    Navigator.pop(context);
-                    _showPlanetManagement(context);
+                    Navigator.pop(sheetContext);
+                    _showPlanetManagement(parentContext);
                   },
                 ),
               ],
@@ -277,11 +278,11 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                 planet: planet,
                 isActive: planet.id == gameState.activePlanetId,
                 onTap: () async {
-                  Navigator.pop(context);
+                  Navigator.pop(sheetContext);
                   if (planet.id != gameState.activePlanetId) {
                     final success = await ref.read(gameProvider.notifier).switchPlanet(planet.id);
                     if (success && mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      scaffoldMessenger.showSnackBar(
                         SnackBar(
                           content: Text('${planet.name}으로 전환했습니다.'),
                           backgroundColor: AppColors.positive,
@@ -291,7 +292,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                   }
                 },
               )),
-            SizedBox(height: MediaQuery.of(context).padding.bottom),
+            SizedBox(height: MediaQuery.of(sheetContext).padding.bottom),
           ],
         ),
       ),
@@ -299,22 +300,22 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
   }
 
   // 행성 관리 다이얼로그
-  void _showPlanetManagement(BuildContext context) {
+  void _showPlanetManagement(BuildContext parentContext) {
     final gameState = ref.read(gameProvider);
     
     showModalBottomSheet(
-      context: context,
+      context: parentContext,
       backgroundColor: AppColors.panelBackground,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (context) => DraggableScrollableSheet(
+      builder: (sheetContext) => DraggableScrollableSheet(
         initialChildSize: 0.6,
         minChildSize: 0.4,
         maxChildSize: 0.9,
         expand: false,
-        builder: (context, scrollController) => Container(
+        builder: (innerContext, scrollController) => Container(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -337,12 +338,12 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                 child: ListView.builder(
                   controller: scrollController,
                   itemCount: gameState.myPlanets.length,
-                  itemBuilder: (context, index) {
+                  itemBuilder: (itemContext, index) {
                     final planet = gameState.myPlanets[index];
                     return _PlanetManageItem(
                       planet: planet,
-                      onRename: () => _showRenameDialog(context, planet),
-                      onAbandon: planet.isHomePlanet ? null : () => _showAbandonDialog(context, planet),
+                      onRename: () => _showRenameDialog(sheetContext, planet),
+                      onAbandon: planet.isHomePlanet ? null : () => _showAbandonDialog(sheetContext, planet),
                     );
                   },
                 ),

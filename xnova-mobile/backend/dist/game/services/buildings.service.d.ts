@@ -1,5 +1,6 @@
 import { Model } from 'mongoose';
 import { UserDocument } from '../../user/schemas/user.schema';
+import { PlanetDocument } from '../../planet/schemas/planet.schema';
 import { ResourcesService } from './resources.service';
 export interface BuildingInfo {
     type: string;
@@ -19,8 +20,10 @@ export interface BuildingInfo {
 }
 export declare class BuildingsService {
     private userModel;
+    private planetModel;
     private resourcesService;
-    constructor(userModel: Model<UserDocument>, resourcesService: ResourcesService);
+    constructor(userModel: Model<UserDocument>, planetModel: Model<PlanetDocument>, resourcesService: ResourcesService);
+    isHomePlanet(activePlanetId: string | null, userId: string): boolean;
     extractPlanetPosition(coordinate: string): number;
     generatePlanetFields(position: number, isHomeWorld?: boolean): {
         maxFields: number;
@@ -43,21 +46,25 @@ export declare class BuildingsService {
         deuterium?: number;
     } | null;
     getConstructionTime(buildingType: string, currentLevel: number, robotFactoryLevel: number, nanoFactoryLevel?: number): number;
+    calculateColonyUsedFields(planet: PlanetDocument): number;
+    getColonyMaxFields(planet: PlanetDocument): number;
+    getColonyFieldInfo(planet: PlanetDocument): {
+        used: number;
+        max: number;
+        remaining: number;
+        percentage: number;
+    };
     getBuildings(userId: string): Promise<{
         buildings: BuildingInfo[];
-        constructionProgress: import("../../user/schemas/user.schema").ProgressInfo | null;
+        constructionProgress: any;
         fieldInfo: {
-            used: number;
-            max: number;
-            remaining: number;
-            percentage: number;
+            used: any;
+            max: any;
+            remaining: any;
+            percentage: any;
         };
-        planetInfo: {
-            temperature: number;
-            planetType: string;
-            planetName: string;
-            diameter: number;
-        };
+        planetInfo: any;
+        isHomePlanet: boolean;
     } | null>;
     startUpgrade(userId: string, buildingType: string): Promise<{
         message: string;

@@ -1,8 +1,11 @@
 import { Model } from 'mongoose';
 import { UserDocument } from '../../user/schemas/user.schema';
+import { PlanetDocument } from '../../planet/schemas/planet.schema';
 export declare class ResourcesService {
     private userModel;
-    constructor(userModel: Model<UserDocument>);
+    private planetModel;
+    constructor(userModel: Model<UserDocument>, planetModel: Model<PlanetDocument>);
+    isHomePlanet(activePlanetId: string | null, userId: string): boolean;
     getSatelliteEnergy(satelliteCount: number, temperature: number): number;
     getResourceProduction(level: number, type: 'metal' | 'crystal' | 'deuterium'): number;
     getEnergyProduction(solarPlantLevel: number): number;
@@ -10,6 +13,12 @@ export declare class ResourcesService {
     getEnergyConsumption(level: number, type: 'metal' | 'crystal' | 'deuterium'): number;
     getFusionDeuteriumConsumption(fusionLevel: number): number;
     updateResources(userId: string): Promise<UserDocument | null>;
+    updateResourcesWithPlanet(userId: string): Promise<{
+        user: UserDocument;
+        planet?: PlanetDocument;
+    } | null>;
+    private updateHomePlanetResources;
+    private updateColonyResources;
     getResources(userId: string): Promise<{
         resources: {
             metal: number;
@@ -25,6 +34,8 @@ export declare class ResourcesService {
             energyConsumption: number;
         };
         energyRatio: number;
+        activePlanetId: string | null;
+        isHomePlanet: boolean;
     } | null>;
     deductResources(userId: string, cost: {
         metal?: number;
@@ -32,6 +43,11 @@ export declare class ResourcesService {
         deuterium?: number;
     }): Promise<boolean>;
     addResources(userId: string, resources: {
+        metal?: number;
+        crystal?: number;
+        deuterium?: number;
+    }): Promise<boolean>;
+    addResourcesToHomePlanet(userId: string, resources: {
         metal?: number;
         crystal?: number;
         deuterium?: number;

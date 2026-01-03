@@ -17,16 +17,24 @@ const common_1 = require("@nestjs/common");
 const mongoose_1 = require("@nestjs/mongoose");
 const mongoose_2 = require("mongoose");
 const user_schema_1 = require("../../user/schemas/user.schema");
+const planet_schema_1 = require("../../planet/schemas/planet.schema");
 const resources_service_1 = require("./resources.service");
 const game_data_1 = require("../constants/game-data");
 let DefenseService = class DefenseService {
     userModel;
+    planetModel;
     resourcesService;
-    constructor(userModel, resourcesService) {
+    constructor(userModel, planetModel, resourcesService) {
         this.userModel = userModel;
+        this.planetModel = planetModel;
         this.resourcesService = resourcesService;
     }
-    checkRequirements(user, defenseType) {
+    isHomePlanet(activePlanetId, userId) {
+        if (!activePlanetId)
+            return true;
+        return activePlanetId.startsWith('home_') || activePlanetId === `home_${userId}`;
+    }
+    checkRequirements(facilities, researchLevels, defenseType) {
         const defenseData = game_data_1.DEFENSE_DATA[defenseType];
         if (!defenseData || !defenseData.requirements) {
             return { met: true, missing: [] };
@@ -35,11 +43,11 @@ let DefenseService = class DefenseService {
         for (const req in defenseData.requirements) {
             const requiredLevel = defenseData.requirements[req];
             let currentLevel = 0;
-            if (user.facilities[req] !== undefined) {
-                currentLevel = user.facilities[req];
+            if (facilities && facilities[req] !== undefined) {
+                currentLevel = facilities[req];
             }
-            else if (user.researchLevels[req] !== undefined) {
-                currentLevel = user.researchLevels[req];
+            else if (researchLevels && researchLevels[req] !== undefined) {
+                currentLevel = researchLevels[req];
             }
             if (currentLevel < requiredLevel) {
                 missing.push(`${game_data_1.NAME_MAPPING[req] || req} Lv.${requiredLevel}`);
@@ -62,13 +70,35 @@ let DefenseService = class DefenseService {
         const user = await this.userModel.findById(userId).exec();
         if (!user)
             return null;
+        const isHome = this.isHomePlanet(user.activePlanetId, userId);
+        let defense;
+        let facilities;
+        let defenseProgress;
+        if (isHome) {
+            defense = user.defense || {};
+            facilities = user.facilities || {};
+            defenseProgress = user.defenseProgress;
+        }
+        else {
+            const planet = await this.planetModel.findById(user.activePlanetId).exec();
+            if (!planet) {
+                defense = user.defense || {};
+                facilities = user.facilities || {};
+                defenseProgress = user.defenseProgress;
+            }
+            else {
+                defense = planet.defense || {};
+                facilities = planet.facilities || {};
+                defenseProgress = planet.defenseProgress;
+            }
+        }
         const defenseInfo = [];
-        const robotFactoryLevel = user.facilities.robotFactory || 0;
-        const nanoFactoryLevel = user.facilities.nanoFactory || 0;
+        const robotFactoryLevel = facilities.robotFactory || 0;
+        const nanoFactoryLevel = facilities.nanoFactory || 0;
         for (const key in game_data_1.DEFENSE_DATA) {
-            const count = user.defense[key] || 0;
+            const count = defense[key] || 0;
             const defenseData = game_data_1.DEFENSE_DATA[key];
-            const requirements = this.checkRequirements(user, key);
+            const requirements = this.checkRequirements(facilities, user.researchLevels, key);
             const buildTime = this.getBuildTime(key, 1, robotFactoryLevel, nanoFactoryLevel);
             defenseInfo.push({
                 type: key,
@@ -84,21 +114,40 @@ let DefenseService = class DefenseService {
         }
         return {
             defense: defenseInfo,
-            defenseProgress: user.defenseProgress,
+            defenseProgress,
             robotFactoryLevel,
+            isHomePlanet: isHome,
         };
     }
     async startBuild(userId, defenseType, quantity) {
         if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100000) {
             throw new common_1.BadRequestException('수량은 1 ~ 100,000 사이의 정수여야 합니다.');
         }
-        const user = await this.resourcesService.updateResources(userId);
-        if (!user) {
+        const result = await this.resourcesService.updateResourcesWithPlanet(userId);
+        if (!result) {
             throw new common_1.BadRequestException('사용자를 찾을 수 없습니다.');
         }
-        if (user.defenseProgress) {
-            const remainingTime = Math.max(0, (user.defenseProgress.finishTime.getTime() - Date.now()) / 1000);
-            throw new common_1.BadRequestException(`이미 ${game_data_1.NAME_MAPPING[user.defenseProgress.name] || user.defenseProgress.name} 건조가 진행 중입니다. 완료까지 ${Math.ceil(remainingTime)}초 남았습니다.`);
+        const { user, planet } = result;
+        const isHome = this.isHomePlanet(user.activePlanetId, userId);
+        let defense;
+        let facilities;
+        let defenseProgress;
+        if (isHome) {
+            defense = user.defense || {};
+            facilities = user.facilities || {};
+            defenseProgress = user.defenseProgress;
+        }
+        else if (planet) {
+            defense = planet.defense || {};
+            facilities = planet.facilities || {};
+            defenseProgress = planet.defenseProgress;
+        }
+        else {
+            throw new common_1.BadRequestException('행성을 찾을 수 없습니다.');
+        }
+        if (defenseProgress) {
+            const remainingTime = Math.max(0, (defenseProgress.finishTime.getTime() - Date.now()) / 1000);
+            throw new common_1.BadRequestException(`이미 ${game_data_1.NAME_MAPPING[defenseProgress.name] || defenseProgress.name} 건조가 진행 중입니다. 완료까지 ${Math.ceil(remainingTime)}초 남았습니다.`);
         }
         const defenseData = game_data_1.DEFENSE_DATA[defenseType];
         if (!defenseData) {
@@ -106,12 +155,12 @@ let DefenseService = class DefenseService {
         }
         const maxCount = defenseData.maxCount;
         if (maxCount) {
-            const currentCount = user.defense[defenseType] || 0;
+            const currentCount = defense[defenseType] || 0;
             if (currentCount + quantity > maxCount) {
                 throw new common_1.BadRequestException(`${game_data_1.NAME_MAPPING[defenseType]}은(는) 최대 ${maxCount}개까지 건조할 수 있습니다. 현재 ${currentCount}개 보유 중.`);
             }
         }
-        const requirements = this.checkRequirements(user, defenseType);
+        const requirements = this.checkRequirements(facilities, user.researchLevels, defenseType);
         if (!requirements.met) {
             throw new common_1.BadRequestException(`요구사항이 충족되지 않았습니다: ${requirements.missing.join(', ')}`);
         }
@@ -124,19 +173,26 @@ let DefenseService = class DefenseService {
         if (!hasResources) {
             throw new common_1.BadRequestException('자원이 부족합니다.');
         }
-        const robotFactoryLevel = user.facilities.robotFactory || 0;
-        const nanoFactoryLevel = user.facilities.nanoFactory || 0;
+        const robotFactoryLevel = facilities.robotFactory || 0;
+        const nanoFactoryLevel = facilities.nanoFactory || 0;
         const singleBuildTime = this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel);
         const startTime = new Date();
         const finishTime = new Date(startTime.getTime() + singleBuildTime * 1000);
-        user.defenseProgress = {
+        const progress = {
             type: 'defense',
             name: defenseType,
             quantity,
             startTime,
             finishTime,
         };
-        await user.save();
+        if (isHome) {
+            user.defenseProgress = progress;
+            await user.save();
+        }
+        else if (planet) {
+            planet.defenseProgress = progress;
+            await planet.save();
+        }
         return {
             message: `${game_data_1.NAME_MAPPING[defenseType]} ${quantity}대 건조가 시작되었습니다.`,
             defense: defenseType,
@@ -149,49 +205,79 @@ let DefenseService = class DefenseService {
     }
     async completeBuild(userId) {
         const user = await this.userModel.findById(userId).exec();
-        if (!user || !user.defenseProgress) {
+        if (!user)
             return { completed: false };
-        }
-        if (user.defenseProgress.finishTime.getTime() > Date.now()) {
-            return { completed: false };
-        }
-        const defenseType = user.defenseProgress.name;
-        const remainingQuantity = user.defenseProgress.quantity || 1;
-        user.defense[defenseType] = (user.defense[defenseType] || 0) + 1;
-        user.markModified('defense');
-        const newRemaining = remainingQuantity - 1;
-        if (newRemaining > 0) {
-            const robotFactoryLevel = user.facilities.robotFactory || 0;
-            const nanoFactoryLevel = user.facilities.nanoFactory || 0;
-            const singleBuildTime = this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel);
-            const newStartTime = new Date();
-            const newFinishTime = new Date(newStartTime.getTime() + singleBuildTime * 1000);
-            user.defenseProgress = {
-                type: 'defense',
-                name: defenseType,
-                quantity: newRemaining,
-                startTime: newStartTime,
-                finishTime: newFinishTime,
-            };
+        const isHome = this.isHomePlanet(user.activePlanetId, userId);
+        if (isHome) {
+            if (!user.defenseProgress)
+                return { completed: false };
+            if (user.defenseProgress.finishTime.getTime() > Date.now())
+                return { completed: false };
+            const defenseType = user.defenseProgress.name;
+            const remainingQuantity = user.defenseProgress.quantity || 1;
+            user.defense[defenseType] = (user.defense[defenseType] || 0) + 1;
+            user.markModified('defense');
+            const newRemaining = remainingQuantity - 1;
+            if (newRemaining > 0) {
+                const robotFactoryLevel = user.facilities?.robotFactory || 0;
+                const nanoFactoryLevel = user.facilities?.nanoFactory || 0;
+                const singleBuildTime = this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel);
+                user.defenseProgress = {
+                    type: 'defense',
+                    name: defenseType,
+                    quantity: newRemaining,
+                    startTime: new Date(),
+                    finishTime: new Date(Date.now() + singleBuildTime * 1000),
+                };
+            }
+            else {
+                user.defenseProgress = null;
+            }
+            user.markModified('defenseProgress');
+            await user.save();
+            return { completed: true, defense: defenseType, quantity: 1, remaining: newRemaining };
         }
         else {
-            user.defenseProgress = null;
+            const planet = await this.planetModel.findById(user.activePlanetId).exec();
+            if (!planet || !planet.defenseProgress)
+                return { completed: false };
+            if (planet.defenseProgress.finishTime.getTime() > Date.now())
+                return { completed: false };
+            const defenseType = planet.defenseProgress.name;
+            const remainingQuantity = planet.defenseProgress.quantity || 1;
+            if (!planet.defense)
+                planet.defense = {};
+            planet.defense[defenseType] = (planet.defense[defenseType] || 0) + 1;
+            planet.markModified('defense');
+            const newRemaining = remainingQuantity - 1;
+            if (newRemaining > 0) {
+                const robotFactoryLevel = planet.facilities?.robotFactory || 0;
+                const nanoFactoryLevel = planet.facilities?.nanoFactory || 0;
+                const singleBuildTime = this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel);
+                planet.defenseProgress = {
+                    type: 'defense',
+                    name: defenseType,
+                    quantity: newRemaining,
+                    startTime: new Date(),
+                    finishTime: new Date(Date.now() + singleBuildTime * 1000),
+                };
+            }
+            else {
+                planet.defenseProgress = null;
+            }
+            planet.markModified('defenseProgress');
+            await planet.save();
+            return { completed: true, defense: defenseType, quantity: 1, remaining: newRemaining };
         }
-        user.markModified('defenseProgress');
-        await user.save();
-        return {
-            completed: true,
-            defense: defenseType,
-            quantity: 1,
-            remaining: newRemaining,
-        };
     }
 };
 exports.DefenseService = DefenseService;
 exports.DefenseService = DefenseService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(user_schema_1.User.name)),
+    __param(1, (0, mongoose_1.InjectModel)(planet_schema_1.Planet.name)),
     __metadata("design:paramtypes", [mongoose_2.Model,
+        mongoose_2.Model,
         resources_service_1.ResourcesService])
 ], DefenseService);
 //# sourceMappingURL=defense.service.js.map

@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../../user/schemas/user.schema';
+import { Planet, PlanetDocument } from '../../planet/schemas/planet.schema';
 import { ResourcesService } from './resources.service';
 import { FLEET_DATA, NAME_MAPPING } from '../constants/game-data';
 
@@ -20,11 +21,18 @@ export interface FleetInfo {
 export class FleetService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Planet.name) private planetModel: Model<PlanetDocument>,
     private resourcesService: ResourcesService,
   ) {}
 
-  // 요구사항 확인
-  checkRequirements(user: UserDocument, fleetType: string): { met: boolean; missing: string[] } {
+  // 활성 행성이 모행성인지 확인
+  isHomePlanet(activePlanetId: string | null, userId: string): boolean {
+    if (!activePlanetId) return true;
+    return activePlanetId.startsWith('home_') || activePlanetId === `home_${userId}`;
+  }
+
+  // 요구사항 확인 (시설은 행성별, 연구는 유저 전역)
+  checkRequirements(facilities: any, researchLevels: any, fleetType: string): { met: boolean; missing: string[] } {
     const fleetData = FLEET_DATA[fleetType];
     if (!fleetData || !fleetData.requirements) {
       return { met: true, missing: [] };
@@ -36,13 +44,13 @@ export class FleetService {
       const requiredLevel = fleetData.requirements[req];
       let currentLevel = 0;
 
-      // 시설 요구사항 확인
-      if ((user.facilities as any)[req] !== undefined) {
-        currentLevel = (user.facilities as any)[req];
+      // 시설 요구사항 확인 (행성별)
+      if (facilities && facilities[req] !== undefined) {
+        currentLevel = facilities[req];
       }
-      // 연구 요구사항 확인
-      else if ((user.researchLevels as any)[req] !== undefined) {
-        currentLevel = (user.researchLevels as any)[req];
+      // 연구 요구사항 확인 (유저 전역)
+      else if (researchLevels && researchLevels[req] !== undefined) {
+        currentLevel = researchLevels[req];
       }
 
       if (currentLevel < requiredLevel) {
@@ -70,19 +78,42 @@ export class FleetService {
     return this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel) * quantity;
   }
 
-  // 함대 현황 조회
+  // 함대 현황 조회 (활성 행성 기준)
   async getFleet(userId: string) {
     const user = await this.userModel.findById(userId).exec();
     if (!user) return null;
 
+    const isHome = this.isHomePlanet(user.activePlanetId, userId);
+    let fleet: any;
+    let facilities: any;
+    let fleetProgress: any;
+
+    if (isHome) {
+      fleet = user.fleet || {};
+      facilities = user.facilities || {};
+      fleetProgress = user.fleetProgress;
+    } else {
+      const planet = await this.planetModel.findById(user.activePlanetId).exec();
+      if (!planet) {
+        // 폴백
+        fleet = user.fleet || {};
+        facilities = user.facilities || {};
+        fleetProgress = user.fleetProgress;
+      } else {
+        fleet = planet.fleet || {};
+        facilities = planet.facilities || {};
+        fleetProgress = planet.fleetProgress;
+      }
+    }
+
     const fleetInfo: FleetInfo[] = [];
-    const shipyardLevel = user.facilities.shipyard || 0;
-    const nanoFactoryLevel = user.facilities.nanoFactory || 0;
+    const shipyardLevel = facilities.shipyard || 0;
+    const nanoFactoryLevel = facilities.nanoFactory || 0;
 
     for (const key in FLEET_DATA) {
-      const count = (user.fleet as any)[key] || 0;
+      const count = fleet[key] || 0;
       const fleetData = FLEET_DATA[key];
-      const requirements = this.checkRequirements(user, key);
+      const requirements = this.checkRequirements(facilities, user.researchLevels, key);
       const buildTime = this.getBuildTime(key, 1, shipyardLevel, nanoFactoryLevel);
 
       fleetInfo.push({
@@ -99,136 +130,177 @@ export class FleetService {
 
     return {
       fleet: fleetInfo,
-      fleetProgress: user.fleetProgress,
+      fleetProgress,
       shipyardLevel,
+      isHomePlanet: isHome,
     };
   }
 
-  // 함대 건조 시작
+  // 함대 건조 시작 (활성 행성 기준)
   async startBuild(userId: string, fleetType: string, quantity: number) {
-    // 수량 검증 (정수, 양수, 합리적인 범위)
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100000) {
       throw new BadRequestException('수량은 1 ~ 100,000 사이의 정수여야 합니다.');
     }
 
-    const user = await this.resourcesService.updateResources(userId);
-    if (!user) {
+    const result = await this.resourcesService.updateResourcesWithPlanet(userId);
+    if (!result) {
       throw new BadRequestException('사용자를 찾을 수 없습니다.');
     }
 
-    // 이미 건조 진행 중인지 확인
-    if (user.fleetProgress) {
-      const remainingTime = Math.max(0, (user.fleetProgress.finishTime.getTime() - Date.now()) / 1000);
-      throw new BadRequestException(`이미 ${NAME_MAPPING[user.fleetProgress.name] || user.fleetProgress.name} 건조가 진행 중입니다. 완료까지 ${Math.ceil(remainingTime)}초 남았습니다.`);
+    const { user, planet } = result;
+    const isHome = this.isHomePlanet(user.activePlanetId, userId);
+
+    let facilities: any;
+    let fleetProgress: any;
+
+    if (isHome) {
+      facilities = user.facilities || {};
+      fleetProgress = user.fleetProgress;
+    } else if (planet) {
+      facilities = planet.facilities || {};
+      fleetProgress = planet.fleetProgress;
+    } else {
+      throw new BadRequestException('행성을 찾을 수 없습니다.');
     }
 
-    // 함대 존재 여부 확인
+    // 이미 건조 진행 중인지 확인
+    if (fleetProgress) {
+      const remainingTime = Math.max(0, (fleetProgress.finishTime.getTime() - Date.now()) / 1000);
+      throw new BadRequestException(`이미 ${NAME_MAPPING[fleetProgress.name] || fleetProgress.name} 건조가 진행 중입니다. 완료까지 ${Math.ceil(remainingTime)}초 남았습니다.`);
+    }
+
     const fleetData = FLEET_DATA[fleetType];
     if (!fleetData) {
       throw new BadRequestException('알 수 없는 함대입니다.');
     }
 
-    // 요구사항 확인
-    const requirements = this.checkRequirements(user, fleetType);
+    // 요구사항 확인 (시설: 행성별, 연구: 유저 전역)
+    const requirements = this.checkRequirements(facilities, user.researchLevels, fleetType);
     if (!requirements.met) {
       throw new BadRequestException(`요구사항이 충족되지 않았습니다: ${requirements.missing.join(', ')}`);
     }
 
-    // 총 비용 계산 (전체 수량에 대해 한 번에 차감)
     const totalCost = {
       metal: (fleetData.cost.metal || 0) * quantity,
       crystal: (fleetData.cost.crystal || 0) * quantity,
       deuterium: (fleetData.cost.deuterium || 0) * quantity,
     };
 
-    // 자원 차감
     const hasResources = await this.resourcesService.deductResources(userId, totalCost);
     if (!hasResources) {
       throw new BadRequestException('자원이 부족합니다.');
     }
 
-    // 1대당 건조 시간 계산 (1대씩 완료되는 큐 시스템)
-    const shipyardLevel = user.facilities.shipyard || 0;
-    const nanoFactoryLevel = user.facilities.nanoFactory || 0;
+    const shipyardLevel = facilities.shipyard || 0;
+    const nanoFactoryLevel = facilities.nanoFactory || 0;
     const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
 
-    // 건조 진행 정보 저장 (1대 건조 시간만 설정, 남은 수량 저장)
     const startTime = new Date();
     const finishTime = new Date(startTime.getTime() + singleBuildTime * 1000);
 
-    user.fleetProgress = {
+    const progress = {
       type: 'fleet',
       name: fleetType,
-      quantity,  // 남은 수량
+      quantity,
       startTime,
       finishTime,
     };
 
-    await user.save();
+    if (isHome) {
+      user.fleetProgress = progress;
+      await user.save();
+    } else if (planet) {
+      planet.fleetProgress = progress;
+      await planet.save();
+    }
 
     return {
       message: `${NAME_MAPPING[fleetType]} ${quantity}대 건조가 시작되었습니다.`,
       fleet: fleetType,
       quantity,
       totalCost,
-      buildTime: singleBuildTime,  // 1대당 건조 시간
-      totalBuildTime: singleBuildTime * quantity,  // 총 건조 시간
+      buildTime: singleBuildTime,
+      totalBuildTime: singleBuildTime * quantity,
       finishTime,
     };
   }
 
-  // 함대 건조 완료 처리 (1대씩 완료되는 큐 시스템)
+  // 함대 건조 완료 처리 (활성 행성 기준, 1대씩 완료되는 큐 시스템)
   async completeBuild(userId: string): Promise<{ completed: boolean; fleet?: string; quantity?: number; remaining?: number }> {
     const user = await this.userModel.findById(userId).exec();
-    if (!user || !user.fleetProgress) {
-      return { completed: false };
-    }
+    if (!user) return { completed: false };
 
-    // 완료 시간 확인
-    if (user.fleetProgress.finishTime.getTime() > Date.now()) {
-      return { completed: false };
-    }
+    const isHome = this.isHomePlanet(user.activePlanetId, userId);
 
-    const fleetType = user.fleetProgress.name;
-    const remainingQuantity = user.fleetProgress.quantity || 1;
+    if (isHome) {
+      // 모행성 함대 건조 완료
+      if (!user.fleetProgress) return { completed: false };
+      if (user.fleetProgress.finishTime.getTime() > Date.now()) return { completed: false };
 
-    // 함대 1대 추가
-    (user.fleet as any)[fleetType] = ((user.fleet as any)[fleetType] || 0) + 1;
-    user.markModified('fleet');
+      const fleetType = user.fleetProgress.name;
+      const remainingQuantity = user.fleetProgress.quantity || 1;
 
-    // 남은 수량 계산
-    const newRemaining = remainingQuantity - 1;
+      (user.fleet as any)[fleetType] = ((user.fleet as any)[fleetType] || 0) + 1;
+      user.markModified('fleet');
 
-    if (newRemaining > 0) {
-      // 다음 건조 시작 (1대당 건조 시간으로 갱신)
-      const shipyardLevel = user.facilities.shipyard || 0;
-      const nanoFactoryLevel = user.facilities.nanoFactory || 0;
-      const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
+      const newRemaining = remainingQuantity - 1;
 
-      const newStartTime = new Date();
-      const newFinishTime = new Date(newStartTime.getTime() + singleBuildTime * 1000);
+      if (newRemaining > 0) {
+        const shipyardLevel = user.facilities?.shipyard || 0;
+        const nanoFactoryLevel = user.facilities?.nanoFactory || 0;
+        const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
 
-      user.fleetProgress = {
-        type: 'fleet',
-        name: fleetType,
-        quantity: newRemaining,
-        startTime: newStartTime,
-        finishTime: newFinishTime,
-      };
+        user.fleetProgress = {
+          type: 'fleet',
+          name: fleetType,
+          quantity: newRemaining,
+          startTime: new Date(),
+          finishTime: new Date(Date.now() + singleBuildTime * 1000),
+        };
+      } else {
+        user.fleetProgress = null;
+      }
+
+      user.markModified('fleetProgress');
+      await user.save();
+
+      return { completed: true, fleet: fleetType, quantity: 1, remaining: newRemaining };
     } else {
-      // 모든 건조 완료
-      user.fleetProgress = null;
+      // 식민지 함대 건조 완료
+      const planet = await this.planetModel.findById(user.activePlanetId).exec();
+      if (!planet || !planet.fleetProgress) return { completed: false };
+      if (planet.fleetProgress.finishTime.getTime() > Date.now()) return { completed: false };
+
+      const fleetType = planet.fleetProgress.name;
+      const remainingQuantity = planet.fleetProgress.quantity || 1;
+
+      if (!planet.fleet) planet.fleet = {} as any;
+      (planet.fleet as any)[fleetType] = ((planet.fleet as any)[fleetType] || 0) + 1;
+      planet.markModified('fleet');
+
+      const newRemaining = remainingQuantity - 1;
+
+      if (newRemaining > 0) {
+        const shipyardLevel = planet.facilities?.shipyard || 0;
+        const nanoFactoryLevel = planet.facilities?.nanoFactory || 0;
+        const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
+
+        planet.fleetProgress = {
+          type: 'fleet',
+          name: fleetType,
+          quantity: newRemaining,
+          startTime: new Date(),
+          finishTime: new Date(Date.now() + singleBuildTime * 1000),
+        };
+      } else {
+        planet.fleetProgress = null;
+      }
+
+      planet.markModified('fleetProgress');
+      await planet.save();
+
+      return { completed: true, fleet: fleetType, quantity: 1, remaining: newRemaining };
     }
-
-    user.markModified('fleetProgress');
-    await user.save();
-
-    return {
-      completed: true,
-      fleet: fleetType,
-      quantity: 1,
-      remaining: newRemaining,
-    };
   }
 
   // 함대의 총 선적량 계산 - XNOVA.js calculateTotalCapacity 마이그레이션

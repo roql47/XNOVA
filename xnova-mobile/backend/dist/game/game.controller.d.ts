@@ -33,22 +33,20 @@ export declare class GameController {
             energyConsumption: number;
         };
         energyRatio: number;
+        activePlanetId: string | null;
+        isHomePlanet: boolean;
     } | null>;
     getBuildings(req: any): Promise<{
         buildings: import("./services/buildings.service").BuildingInfo[];
-        constructionProgress: import("../user/schemas/user.schema").ProgressInfo | null;
+        constructionProgress: any;
         fieldInfo: {
-            used: number;
-            max: number;
-            remaining: number;
-            percentage: number;
+            used: any;
+            max: any;
+            remaining: any;
+            percentage: any;
         };
-        planetInfo: {
-            temperature: number;
-            planetType: string;
-            planetName: string;
-            diameter: number;
-        };
+        planetInfo: any;
+        isHomePlanet: boolean;
     } | null>;
     upgradeBuilding(req: any, body: {
         buildingType: string;
@@ -113,8 +111,9 @@ export declare class GameController {
     }>;
     getFleet(req: any): Promise<{
         fleet: import("./services/fleet.service").FleetInfo[];
-        fleetProgress: import("../user/schemas/user.schema").ProgressInfo | null;
-        shipyardLevel: number;
+        fleetProgress: any;
+        shipyardLevel: any;
+        isHomePlanet: boolean;
     } | null>;
     buildFleet(req: any, body: {
         fleetType: string;
@@ -140,8 +139,9 @@ export declare class GameController {
     }>;
     getDefense(req: any): Promise<{
         defense: import("./services/defense.service").DefenseInfo[];
-        defenseProgress: import("../user/schemas/user.schema").ProgressInfo | null;
-        robotFactoryLevel: number;
+        defenseProgress: any;
+        robotFactoryLevel: any;
+        isHomePlanet: boolean;
     } | null>;
     buildDefense(req: any, body: {
         defenseType: string;

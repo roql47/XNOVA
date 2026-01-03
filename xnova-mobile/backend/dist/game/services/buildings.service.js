@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const mongoose_1 = require("@nestjs/mongoose");
 const mongoose_2 = require("mongoose");
 const user_schema_1 = require("../../user/schemas/user.schema");
+const planet_schema_1 = require("../../planet/schemas/planet.schema");
 const resources_service_1 = require("./resources.service");
 const game_data_1 = require("../constants/game-data");
 const FIELD_CONSUMING_BUILDINGS = [
@@ -42,10 +43,17 @@ const PLANET_TYPES = [
 ];
 let BuildingsService = class BuildingsService {
     userModel;
+    planetModel;
     resourcesService;
-    constructor(userModel, resourcesService) {
+    constructor(userModel, planetModel, resourcesService) {
         this.userModel = userModel;
+        this.planetModel = planetModel;
         this.resourcesService = resourcesService;
+    }
+    isHomePlanet(activePlanetId, userId) {
+        if (!activePlanetId)
+            return true;
+        return activePlanetId.startsWith('home_') || activePlanetId === `home_${userId}`;
     }
     extractPlanetPosition(coordinate) {
         const parts = coordinate.split(':');
@@ -151,12 +159,93 @@ let BuildingsService = class BuildingsService {
         const facilityBonus = 1 + robotFactoryLevel;
         return Math.ceil((totalCost / (25 * facilityBonus * nanoBonus)) * 4 / 10);
     }
+    calculateColonyUsedFields(planet) {
+        let usedFields = 0;
+        if (planet.mines) {
+            usedFields += planet.mines.metalMine || 0;
+            usedFields += planet.mines.crystalMine || 0;
+            usedFields += planet.mines.deuteriumMine || 0;
+            usedFields += planet.mines.solarPlant || 0;
+            usedFields += planet.mines.fusionReactor || 0;
+        }
+        if (planet.facilities) {
+            usedFields += planet.facilities.robotFactory || 0;
+            usedFields += planet.facilities.nanoFactory || 0;
+            usedFields += planet.facilities.shipyard || 0;
+            usedFields += planet.facilities.researchLab || 0;
+            usedFields += planet.facilities.terraformer || 0;
+            usedFields += planet.facilities.allianceDepot || 0;
+            usedFields += planet.facilities.missileSilo || 0;
+            usedFields += planet.facilities.metalStorage || 0;
+            usedFields += planet.facilities.crystalStorage || 0;
+            usedFields += planet.facilities.deuteriumTank || 0;
+        }
+        return usedFields;
+    }
+    getColonyMaxFields(planet) {
+        const baseFields = planet.planetInfo?.maxFields || 163;
+        const terraformerLevel = planet.facilities?.terraformer || 0;
+        return baseFields + this.getTerraformerBonus(terraformerLevel);
+    }
+    getColonyFieldInfo(planet) {
+        const usedFields = this.calculateColonyUsedFields(planet);
+        const maxFields = this.getColonyMaxFields(planet);
+        return {
+            used: usedFields,
+            max: maxFields,
+            remaining: maxFields - usedFields,
+            percentage: Math.round((usedFields / maxFields) * 100)
+        };
+    }
     async getBuildings(userId) {
         const user = await this.userModel.findById(userId).exec();
         if (!user)
             return null;
-        const mines = user.mines;
-        const facilities = user.facilities;
+        const isHome = this.isHomePlanet(user.activePlanetId, userId);
+        let mines;
+        let facilities;
+        let constructionProgress;
+        let fieldInfo;
+        let planetInfo;
+        if (isHome) {
+            mines = user.mines || {};
+            facilities = user.facilities || {};
+            constructionProgress = user.constructionProgress;
+            fieldInfo = this.getFieldInfo(user);
+            planetInfo = {
+                temperature: user.planetInfo?.temperature ?? 50,
+                planetType: user.planetInfo?.planetType ?? 'normaltemp',
+                planetName: user.planetInfo?.planetName ?? user.playerName,
+                diameter: user.planetInfo?.diameter ?? 12800,
+            };
+        }
+        else {
+            const planet = await this.planetModel.findById(user.activePlanetId).exec();
+            if (!planet) {
+                mines = user.mines || {};
+                facilities = user.facilities || {};
+                constructionProgress = user.constructionProgress;
+                fieldInfo = this.getFieldInfo(user);
+                planetInfo = {
+                    temperature: user.planetInfo?.temperature ?? 50,
+                    planetType: user.planetInfo?.planetType ?? 'normaltemp',
+                    planetName: user.planetInfo?.planetName ?? user.playerName,
+                    diameter: user.planetInfo?.diameter ?? 12800,
+                };
+            }
+            else {
+                mines = planet.mines || {};
+                facilities = planet.facilities || {};
+                constructionProgress = planet.constructionProgress;
+                fieldInfo = this.getColonyFieldInfo(planet);
+                planetInfo = {
+                    temperature: planet.planetInfo?.tempMax ?? 50,
+                    planetType: planet.planetInfo?.planetType ?? 'normaltemp',
+                    planetName: planet.name || '식민지',
+                    diameter: planet.planetInfo?.diameter ?? 12800,
+                };
+            }
+        }
         const buildingsInfo = [];
         const mineTypes = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'];
         for (const key of mineTypes) {
@@ -222,32 +311,45 @@ let BuildingsService = class BuildingsService {
                 upgradeTime: time,
             });
         }
-        const fieldInfo = this.getFieldInfo(user);
         return {
             buildings: buildingsInfo,
-            constructionProgress: user.constructionProgress,
+            constructionProgress,
             fieldInfo: {
                 used: fieldInfo.used,
                 max: fieldInfo.max,
                 remaining: fieldInfo.remaining,
                 percentage: fieldInfo.percentage,
             },
-            planetInfo: {
-                temperature: user.planetInfo?.temperature ?? 50,
-                planetType: user.planetInfo?.planetType ?? 'normaltemp',
-                planetName: user.planetInfo?.planetName ?? user.playerName,
-                diameter: user.planetInfo?.diameter ?? 12800,
-            },
+            planetInfo,
+            isHomePlanet: isHome,
         };
     }
     async startUpgrade(userId, buildingType) {
-        const user = await this.resourcesService.updateResources(userId);
-        if (!user) {
+        const result = await this.resourcesService.updateResourcesWithPlanet(userId);
+        if (!result) {
             throw new common_1.BadRequestException('사용자를 찾을 수 없습니다.');
         }
-        if (user.constructionProgress) {
-            const remainingTime = Math.max(0, (user.constructionProgress.finishTime.getTime() - Date.now()) / 1000);
-            throw new common_1.BadRequestException(`이미 ${game_data_1.NAME_MAPPING[user.constructionProgress.name] || user.constructionProgress.name} 건설이 진행 중입니다. 완료까지 ${Math.ceil(remainingTime)}초 남았습니다.`);
+        const { user, planet } = result;
+        const isHome = this.isHomePlanet(user.activePlanetId, userId);
+        let mines;
+        let facilities;
+        let constructionProgress;
+        if (isHome) {
+            mines = user.mines || {};
+            facilities = user.facilities || {};
+            constructionProgress = user.constructionProgress;
+        }
+        else if (planet) {
+            mines = planet.mines || {};
+            facilities = planet.facilities || {};
+            constructionProgress = planet.constructionProgress;
+        }
+        else {
+            throw new common_1.BadRequestException('행성을 찾을 수 없습니다.');
+        }
+        if (constructionProgress) {
+            const remainingTime = Math.max(0, (constructionProgress.finishTime.getTime() - Date.now()) / 1000);
+            throw new common_1.BadRequestException(`이미 ${game_data_1.NAME_MAPPING[constructionProgress.name] || constructionProgress.name} 건설이 진행 중입니다. 완료까지 ${Math.ceil(remainingTime)}초 남았습니다.`);
         }
         const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
         const isFacility = ['robotFactory', 'shipyard', 'researchLab', 'nanoFactory', 'terraformer',
@@ -257,14 +359,22 @@ let BuildingsService = class BuildingsService {
             throw new common_1.BadRequestException('알 수 없는 건물 유형입니다.');
         }
         if (FIELD_CONSUMING_BUILDINGS.includes(buildingType) && buildingType !== 'terraformer') {
-            if (this.isFieldsFull(user)) {
-                const fieldInfo = this.getFieldInfo(user);
-                throw new common_1.BadRequestException(`필드가 가득 찼습니다. (${fieldInfo.used}/${fieldInfo.max}) 테라포머를 건설하여 필드를 확장하세요.`);
+            if (isHome) {
+                if (this.isFieldsFull(user)) {
+                    const fieldInfo = this.getFieldInfo(user);
+                    throw new common_1.BadRequestException(`필드가 가득 찼습니다. (${fieldInfo.used}/${fieldInfo.max}) 테라포머를 건설하여 필드를 확장하세요.`);
+                }
+            }
+            else if (planet) {
+                const fieldInfo = this.getColonyFieldInfo(planet);
+                if (fieldInfo.remaining <= 0) {
+                    throw new common_1.BadRequestException(`필드가 가득 찼습니다. (${fieldInfo.used}/${fieldInfo.max}) 테라포머를 건설하여 필드를 확장하세요.`);
+                }
             }
         }
         const currentLevel = isMine
-            ? (user.mines[buildingType] || 0)
-            : (user.facilities[buildingType] || 0);
+            ? (mines[buildingType] || 0)
+            : (facilities[buildingType] || 0);
         const cost = this.getUpgradeCost(buildingType, currentLevel);
         if (!cost) {
             throw new common_1.BadRequestException('건물 비용을 계산할 수 없습니다.');
@@ -273,16 +383,23 @@ let BuildingsService = class BuildingsService {
         if (!hasResources) {
             throw new common_1.BadRequestException('자원이 부족합니다.');
         }
-        const constructionTime = this.getConstructionTime(buildingType, currentLevel, user.facilities.robotFactory || 0, user.facilities.nanoFactory || 0);
+        const constructionTime = this.getConstructionTime(buildingType, currentLevel, facilities.robotFactory || 0, facilities.nanoFactory || 0);
         const startTime = new Date();
         const finishTime = new Date(startTime.getTime() + constructionTime * 1000);
-        user.constructionProgress = {
+        const progress = {
             type: isMine ? 'mine' : 'facility',
             name: buildingType,
             startTime,
             finishTime,
         };
-        await user.save();
+        if (isHome) {
+            user.constructionProgress = progress;
+            await user.save();
+        }
+        else if (planet) {
+            planet.constructionProgress = progress;
+            await planet.save();
+        }
         return {
             message: `${game_data_1.NAME_MAPPING[buildingType]} 업그레이드가 시작되었습니다.`,
             building: buildingType,
@@ -295,59 +412,106 @@ let BuildingsService = class BuildingsService {
     }
     async completeConstruction(userId) {
         const user = await this.userModel.findById(userId).exec();
-        if (!user || !user.constructionProgress) {
+        if (!user)
             return { completed: false };
-        }
-        if (user.constructionProgress.finishTime.getTime() > Date.now()) {
-            return { completed: false };
-        }
-        const buildingType = user.constructionProgress.name;
-        const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
-        if (isMine) {
-            user.mines[buildingType] = (user.mines[buildingType] || 0) + 1;
+        const isHome = this.isHomePlanet(user.activePlanetId, userId);
+        if (isHome) {
+            if (!user.constructionProgress)
+                return { completed: false };
+            if (user.constructionProgress.finishTime.getTime() > Date.now())
+                return { completed: false };
+            const buildingType = user.constructionProgress.name;
+            const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+            if (isMine) {
+                user.mines[buildingType] = (user.mines[buildingType] || 0) + 1;
+            }
+            else {
+                user.facilities[buildingType] = (user.facilities[buildingType] || 0) + 1;
+            }
+            const newLevel = isMine ? user.mines[buildingType] : user.facilities[buildingType];
+            user.constructionProgress = null;
+            await user.save();
+            return { completed: true, building: buildingType, newLevel };
         }
         else {
-            user.facilities[buildingType] = (user.facilities[buildingType] || 0) + 1;
+            const planet = await this.planetModel.findById(user.activePlanetId).exec();
+            if (!planet || !planet.constructionProgress)
+                return { completed: false };
+            if (planet.constructionProgress.finishTime.getTime() > Date.now())
+                return { completed: false };
+            const buildingType = planet.constructionProgress.name;
+            const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+            if (isMine) {
+                if (!planet.mines)
+                    planet.mines = {};
+                planet.mines[buildingType] = (planet.mines[buildingType] || 0) + 1;
+            }
+            else {
+                if (!planet.facilities)
+                    planet.facilities = {};
+                planet.facilities[buildingType] = (planet.facilities[buildingType] || 0) + 1;
+            }
+            const newLevel = isMine ? planet.mines[buildingType] : planet.facilities[buildingType];
+            planet.constructionProgress = null;
+            await planet.save();
+            return { completed: true, building: buildingType, newLevel };
         }
-        const newLevel = isMine ? user.mines[buildingType] : user.facilities[buildingType];
-        user.constructionProgress = null;
-        await user.save();
-        return {
-            completed: true,
-            building: buildingType,
-            newLevel,
-        };
     }
     async cancelConstruction(userId) {
         const user = await this.userModel.findById(userId).exec();
-        if (!user || !user.constructionProgress) {
-            throw new common_1.BadRequestException('진행 중인 건설이 없습니다.');
+        if (!user)
+            throw new common_1.BadRequestException('사용자를 찾을 수 없습니다.');
+        const isHome = this.isHomePlanet(user.activePlanetId, userId);
+        if (isHome) {
+            if (!user.constructionProgress) {
+                throw new common_1.BadRequestException('진행 중인 건설이 없습니다.');
+            }
+            const buildingType = user.constructionProgress.name;
+            const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+            const currentLevel = isMine
+                ? (user.mines[buildingType] || 0)
+                : (user.facilities[buildingType] || 0);
+            const cost = this.getUpgradeCost(buildingType, currentLevel);
+            const refund = {
+                metal: Math.floor((cost?.metal || 0) * 0.5),
+                crystal: Math.floor((cost?.crystal || 0) * 0.5),
+                deuterium: Math.floor((cost?.deuterium || 0) * 0.5),
+            };
+            await this.resourcesService.addResources(userId, refund);
+            user.constructionProgress = null;
+            await user.save();
+            return { message: '건설이 취소되었습니다.', refund };
         }
-        const buildingType = user.constructionProgress.name;
-        const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
-        const currentLevel = isMine
-            ? (user.mines[buildingType] || 0)
-            : (user.facilities[buildingType] || 0);
-        const cost = this.getUpgradeCost(buildingType, currentLevel);
-        const refund = {
-            metal: Math.floor((cost?.metal || 0) * 0.5),
-            crystal: Math.floor((cost?.crystal || 0) * 0.5),
-            deuterium: Math.floor((cost?.deuterium || 0) * 0.5),
-        };
-        await this.resourcesService.addResources(userId, refund);
-        user.constructionProgress = null;
-        await user.save();
-        return {
-            message: '건설이 취소되었습니다.',
-            refund,
-        };
+        else {
+            const planet = await this.planetModel.findById(user.activePlanetId).exec();
+            if (!planet || !planet.constructionProgress) {
+                throw new common_1.BadRequestException('진행 중인 건설이 없습니다.');
+            }
+            const buildingType = planet.constructionProgress.name;
+            const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+            const currentLevel = isMine
+                ? (planet.mines?.[buildingType] || 0)
+                : (planet.facilities?.[buildingType] || 0);
+            const cost = this.getUpgradeCost(buildingType, currentLevel);
+            const refund = {
+                metal: Math.floor((cost?.metal || 0) * 0.5),
+                crystal: Math.floor((cost?.crystal || 0) * 0.5),
+                deuterium: Math.floor((cost?.deuterium || 0) * 0.5),
+            };
+            await this.resourcesService.addResources(userId, refund);
+            planet.constructionProgress = null;
+            await planet.save();
+            return { message: '건설이 취소되었습니다.', refund };
+        }
     }
 };
 exports.BuildingsService = BuildingsService;
 exports.BuildingsService = BuildingsService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(user_schema_1.User.name)),
+    __param(1, (0, mongoose_1.InjectModel)(planet_schema_1.Planet.name)),
     __metadata("design:paramtypes", [mongoose_2.Model,
+        mongoose_2.Model,
         resources_service_1.ResourcesService])
 ], BuildingsService);
 //# sourceMappingURL=buildings.service.js.map

@@ -17,16 +17,24 @@ const common_1 = require("@nestjs/common");
 const mongoose_1 = require("@nestjs/mongoose");
 const mongoose_2 = require("mongoose");
 const user_schema_1 = require("../../user/schemas/user.schema");
+const planet_schema_1 = require("../../planet/schemas/planet.schema");
 const resources_service_1 = require("./resources.service");
 const game_data_1 = require("../constants/game-data");
 let FleetService = class FleetService {
     userModel;
+    planetModel;
     resourcesService;
-    constructor(userModel, resourcesService) {
+    constructor(userModel, planetModel, resourcesService) {
         this.userModel = userModel;
+        this.planetModel = planetModel;
         this.resourcesService = resourcesService;
     }
-    checkRequirements(user, fleetType) {
+    isHomePlanet(activePlanetId, userId) {
+        if (!activePlanetId)
+            return true;
+        return activePlanetId.startsWith('home_') || activePlanetId === `home_${userId}`;
+    }
+    checkRequirements(facilities, researchLevels, fleetType) {
         const fleetData = game_data_1.FLEET_DATA[fleetType];
         if (!fleetData || !fleetData.requirements) {
             return { met: true, missing: [] };
@@ -35,11 +43,11 @@ let FleetService = class FleetService {
         for (const req in fleetData.requirements) {
             const requiredLevel = fleetData.requirements[req];
             let currentLevel = 0;
-            if (user.facilities[req] !== undefined) {
-                currentLevel = user.facilities[req];
+            if (facilities && facilities[req] !== undefined) {
+                currentLevel = facilities[req];
             }
-            else if (user.researchLevels[req] !== undefined) {
-                currentLevel = user.researchLevels[req];
+            else if (researchLevels && researchLevels[req] !== undefined) {
+                currentLevel = researchLevels[req];
             }
             if (currentLevel < requiredLevel) {
                 missing.push(`${game_data_1.NAME_MAPPING[req] || req} Lv.${requiredLevel}`);
@@ -62,13 +70,35 @@ let FleetService = class FleetService {
         const user = await this.userModel.findById(userId).exec();
         if (!user)
             return null;
+        const isHome = this.isHomePlanet(user.activePlanetId, userId);
+        let fleet;
+        let facilities;
+        let fleetProgress;
+        if (isHome) {
+            fleet = user.fleet || {};
+            facilities = user.facilities || {};
+            fleetProgress = user.fleetProgress;
+        }
+        else {
+            const planet = await this.planetModel.findById(user.activePlanetId).exec();
+            if (!planet) {
+                fleet = user.fleet || {};
+                facilities = user.facilities || {};
+                fleetProgress = user.fleetProgress;
+            }
+            else {
+                fleet = planet.fleet || {};
+                facilities = planet.facilities || {};
+                fleetProgress = planet.fleetProgress;
+            }
+        }
         const fleetInfo = [];
-        const shipyardLevel = user.facilities.shipyard || 0;
-        const nanoFactoryLevel = user.facilities.nanoFactory || 0;
+        const shipyardLevel = facilities.shipyard || 0;
+        const nanoFactoryLevel = facilities.nanoFactory || 0;
         for (const key in game_data_1.FLEET_DATA) {
-            const count = user.fleet[key] || 0;
+            const count = fleet[key] || 0;
             const fleetData = game_data_1.FLEET_DATA[key];
-            const requirements = this.checkRequirements(user, key);
+            const requirements = this.checkRequirements(facilities, user.researchLevels, key);
             const buildTime = this.getBuildTime(key, 1, shipyardLevel, nanoFactoryLevel);
             fleetInfo.push({
                 type: key,
@@ -83,27 +113,43 @@ let FleetService = class FleetService {
         }
         return {
             fleet: fleetInfo,
-            fleetProgress: user.fleetProgress,
+            fleetProgress,
             shipyardLevel,
+            isHomePlanet: isHome,
         };
     }
     async startBuild(userId, fleetType, quantity) {
         if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100000) {
             throw new common_1.BadRequestException('수량은 1 ~ 100,000 사이의 정수여야 합니다.');
         }
-        const user = await this.resourcesService.updateResources(userId);
-        if (!user) {
+        const result = await this.resourcesService.updateResourcesWithPlanet(userId);
+        if (!result) {
             throw new common_1.BadRequestException('사용자를 찾을 수 없습니다.');
         }
-        if (user.fleetProgress) {
-            const remainingTime = Math.max(0, (user.fleetProgress.finishTime.getTime() - Date.now()) / 1000);
-            throw new common_1.BadRequestException(`이미 ${game_data_1.NAME_MAPPING[user.fleetProgress.name] || user.fleetProgress.name} 건조가 진행 중입니다. 완료까지 ${Math.ceil(remainingTime)}초 남았습니다.`);
+        const { user, planet } = result;
+        const isHome = this.isHomePlanet(user.activePlanetId, userId);
+        let facilities;
+        let fleetProgress;
+        if (isHome) {
+            facilities = user.facilities || {};
+            fleetProgress = user.fleetProgress;
+        }
+        else if (planet) {
+            facilities = planet.facilities || {};
+            fleetProgress = planet.fleetProgress;
+        }
+        else {
+            throw new common_1.BadRequestException('행성을 찾을 수 없습니다.');
+        }
+        if (fleetProgress) {
+            const remainingTime = Math.max(0, (fleetProgress.finishTime.getTime() - Date.now()) / 1000);
+            throw new common_1.BadRequestException(`이미 ${game_data_1.NAME_MAPPING[fleetProgress.name] || fleetProgress.name} 건조가 진행 중입니다. 완료까지 ${Math.ceil(remainingTime)}초 남았습니다.`);
         }
         const fleetData = game_data_1.FLEET_DATA[fleetType];
         if (!fleetData) {
             throw new common_1.BadRequestException('알 수 없는 함대입니다.');
         }
-        const requirements = this.checkRequirements(user, fleetType);
+        const requirements = this.checkRequirements(facilities, user.researchLevels, fleetType);
         if (!requirements.met) {
             throw new common_1.BadRequestException(`요구사항이 충족되지 않았습니다: ${requirements.missing.join(', ')}`);
         }
@@ -116,19 +162,26 @@ let FleetService = class FleetService {
         if (!hasResources) {
             throw new common_1.BadRequestException('자원이 부족합니다.');
         }
-        const shipyardLevel = user.facilities.shipyard || 0;
-        const nanoFactoryLevel = user.facilities.nanoFactory || 0;
+        const shipyardLevel = facilities.shipyard || 0;
+        const nanoFactoryLevel = facilities.nanoFactory || 0;
         const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
         const startTime = new Date();
         const finishTime = new Date(startTime.getTime() + singleBuildTime * 1000);
-        user.fleetProgress = {
+        const progress = {
             type: 'fleet',
             name: fleetType,
             quantity,
             startTime,
             finishTime,
         };
-        await user.save();
+        if (isHome) {
+            user.fleetProgress = progress;
+            await user.save();
+        }
+        else if (planet) {
+            planet.fleetProgress = progress;
+            await planet.save();
+        }
         return {
             message: `${game_data_1.NAME_MAPPING[fleetType]} ${quantity}대 건조가 시작되었습니다.`,
             fleet: fleetType,
@@ -141,42 +194,70 @@ let FleetService = class FleetService {
     }
     async completeBuild(userId) {
         const user = await this.userModel.findById(userId).exec();
-        if (!user || !user.fleetProgress) {
+        if (!user)
             return { completed: false };
-        }
-        if (user.fleetProgress.finishTime.getTime() > Date.now()) {
-            return { completed: false };
-        }
-        const fleetType = user.fleetProgress.name;
-        const remainingQuantity = user.fleetProgress.quantity || 1;
-        user.fleet[fleetType] = (user.fleet[fleetType] || 0) + 1;
-        user.markModified('fleet');
-        const newRemaining = remainingQuantity - 1;
-        if (newRemaining > 0) {
-            const shipyardLevel = user.facilities.shipyard || 0;
-            const nanoFactoryLevel = user.facilities.nanoFactory || 0;
-            const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
-            const newStartTime = new Date();
-            const newFinishTime = new Date(newStartTime.getTime() + singleBuildTime * 1000);
-            user.fleetProgress = {
-                type: 'fleet',
-                name: fleetType,
-                quantity: newRemaining,
-                startTime: newStartTime,
-                finishTime: newFinishTime,
-            };
+        const isHome = this.isHomePlanet(user.activePlanetId, userId);
+        if (isHome) {
+            if (!user.fleetProgress)
+                return { completed: false };
+            if (user.fleetProgress.finishTime.getTime() > Date.now())
+                return { completed: false };
+            const fleetType = user.fleetProgress.name;
+            const remainingQuantity = user.fleetProgress.quantity || 1;
+            user.fleet[fleetType] = (user.fleet[fleetType] || 0) + 1;
+            user.markModified('fleet');
+            const newRemaining = remainingQuantity - 1;
+            if (newRemaining > 0) {
+                const shipyardLevel = user.facilities?.shipyard || 0;
+                const nanoFactoryLevel = user.facilities?.nanoFactory || 0;
+                const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
+                user.fleetProgress = {
+                    type: 'fleet',
+                    name: fleetType,
+                    quantity: newRemaining,
+                    startTime: new Date(),
+                    finishTime: new Date(Date.now() + singleBuildTime * 1000),
+                };
+            }
+            else {
+                user.fleetProgress = null;
+            }
+            user.markModified('fleetProgress');
+            await user.save();
+            return { completed: true, fleet: fleetType, quantity: 1, remaining: newRemaining };
         }
         else {
-            user.fleetProgress = null;
+            const planet = await this.planetModel.findById(user.activePlanetId).exec();
+            if (!planet || !planet.fleetProgress)
+                return { completed: false };
+            if (planet.fleetProgress.finishTime.getTime() > Date.now())
+                return { completed: false };
+            const fleetType = planet.fleetProgress.name;
+            const remainingQuantity = planet.fleetProgress.quantity || 1;
+            if (!planet.fleet)
+                planet.fleet = {};
+            planet.fleet[fleetType] = (planet.fleet[fleetType] || 0) + 1;
+            planet.markModified('fleet');
+            const newRemaining = remainingQuantity - 1;
+            if (newRemaining > 0) {
+                const shipyardLevel = planet.facilities?.shipyard || 0;
+                const nanoFactoryLevel = planet.facilities?.nanoFactory || 0;
+                const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
+                planet.fleetProgress = {
+                    type: 'fleet',
+                    name: fleetType,
+                    quantity: newRemaining,
+                    startTime: new Date(),
+                    finishTime: new Date(Date.now() + singleBuildTime * 1000),
+                };
+            }
+            else {
+                planet.fleetProgress = null;
+            }
+            planet.markModified('fleetProgress');
+            await planet.save();
+            return { completed: true, fleet: fleetType, quantity: 1, remaining: newRemaining };
         }
-        user.markModified('fleetProgress');
-        await user.save();
-        return {
-            completed: true,
-            fleet: fleetType,
-            quantity: 1,
-            remaining: newRemaining,
-        };
     }
     calculateTotalCapacity(fleet) {
         let totalCapacity = 0;
@@ -226,7 +307,9 @@ exports.FleetService = FleetService;
 exports.FleetService = FleetService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(user_schema_1.User.name)),
+    __param(1, (0, mongoose_1.InjectModel)(planet_schema_1.Planet.name)),
     __metadata("design:paramtypes", [mongoose_2.Model,
+        mongoose_2.Model,
         resources_service_1.ResourcesService])
 ], FleetService);
 //# sourceMappingURL=fleet.service.js.map
