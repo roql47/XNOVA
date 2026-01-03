@@ -1227,6 +1227,7 @@ class _ResourceLoadingPanel extends StatelessWidget {
             color: AppColors.metalColor,
             controller: metalController,
             available: currentMetal,
+            remainingCapacity: remainingCapacity,
             onChanged: onChanged,
           ),
           const SizedBox(height: 8),
@@ -1237,6 +1238,7 @@ class _ResourceLoadingPanel extends StatelessWidget {
             color: AppColors.crystalColor,
             controller: crystalController,
             available: currentCrystal,
+            remainingCapacity: remainingCapacity,
             onChanged: onChanged,
           ),
           const SizedBox(height: 8),
@@ -1247,6 +1249,7 @@ class _ResourceLoadingPanel extends StatelessWidget {
             color: AppColors.deuteriumColor,
             controller: deuteriumController,
             available: currentDeuterium,
+            remainingCapacity: remainingCapacity,
             onChanged: onChanged,
           ),
           
@@ -1287,6 +1290,7 @@ class _ResourceInputRow extends StatelessWidget {
   final Color color;
   final TextEditingController controller;
   final int available;
+  final int remainingCapacity; // 남은 적재 용량
   final VoidCallback onChanged;
 
   const _ResourceInputRow({
@@ -1294,6 +1298,7 @@ class _ResourceInputRow extends StatelessWidget {
     required this.color,
     required this.controller,
     required this.available,
+    required this.remainingCapacity,
     required this.onChanged,
   });
 
@@ -1355,7 +1360,13 @@ class _ResourceInputRow extends StatelessWidget {
         const SizedBox(width: 8),
         GestureDetector(
           onTap: () {
-            controller.text = available.toString();
+            // 현재 입력된 값
+            final currentValue = int.tryParse(controller.text) ?? 0;
+            // 이 자원을 제외한 남은 용량 + 현재 입력값
+            final maxLoadable = remainingCapacity + currentValue;
+            // 보유량과 적재 가능량 중 작은 값
+            final toLoad = available < maxLoadable ? available : maxLoadable;
+            controller.text = toLoad > 0 ? toLoad.toString() : '0';
             onChanged();
           },
           child: Container(
