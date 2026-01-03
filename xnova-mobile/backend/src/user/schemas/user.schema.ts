@@ -300,6 +300,9 @@ export class ReturnProgress {
 
   @Prop()
   startTime: Date;
+
+  @Prop({ default: 'attack' })
+  missionType: string; // 'attack', 'transport', 'recycle'
 }
 
 // 휴가 모드 스키마

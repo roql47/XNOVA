@@ -109,6 +109,7 @@ export declare class ReturnProgress {
     loot: Record<string, number>;
     returnTime: Date;
     startTime: Date;
+    missionType: string;
 }
 export declare class VacationMode {
     isActive: boolean;
