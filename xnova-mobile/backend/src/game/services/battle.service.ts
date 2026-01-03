@@ -1213,6 +1213,11 @@ export class BattleService {
       return null;
     }
 
+    // 식민 미션은 여기서 처리하지 않음 (ColonyService에서 처리)
+    if (attacker.pendingAttack.missionType === 'colony') {
+      return null;
+    }
+
     // 데이터 보정 (일부 데이터가 fleet 객체 안에 잘못 들어가 있는 경우 처리)
     const pa = attacker.pendingAttack;
     if (pa.fleet && (pa.fleet as any).capacity !== undefined) {

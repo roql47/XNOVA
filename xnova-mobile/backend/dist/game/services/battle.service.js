@@ -842,6 +842,9 @@ let BattleService = class BattleService {
         if (!attacker || !attacker.pendingAttack || attacker.pendingAttack.battleCompleted) {
             return null;
         }
+        if (attacker.pendingAttack.missionType === 'colony') {
+            return null;
+        }
         const pa = attacker.pendingAttack;
         if (pa.fleet && pa.fleet.capacity !== undefined) {
             const fleetObj = pa.fleet;
