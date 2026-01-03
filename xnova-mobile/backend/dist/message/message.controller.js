@@ -14,6 +14,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MessageController = void 0;
 const common_1 = require("@nestjs/common");
+const class_validator_1 = require("class-validator");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const message_service_1 = require("./message.service");
 const user_service_1 = require("../user/user.service");
@@ -22,10 +23,39 @@ class SendMessageDto {
     title;
     content;
 }
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], SendMessageDto.prototype, "receiverCoordinate", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.MaxLength)(100),
+    __metadata("design:type", String)
+], SendMessageDto.prototype, "title", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.MaxLength)(2000),
+    __metadata("design:type", String)
+], SendMessageDto.prototype, "content", void 0);
 class BroadcastMessageDto {
     title;
     content;
 }
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.MaxLength)(100),
+    __metadata("design:type", String)
+], BroadcastMessageDto.prototype, "title", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    (0, class_validator_1.MaxLength)(2000),
+    __metadata("design:type", String)
+], BroadcastMessageDto.prototype, "content", void 0);
 let MessageController = class MessageController {
     messageService;
     userService;

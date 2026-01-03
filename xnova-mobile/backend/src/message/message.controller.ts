@@ -1,17 +1,35 @@
 import { Controller, Get, Post, Delete, Param, UseGuards, Request, Query, Body } from '@nestjs/common';
+import { IsString, IsNotEmpty, MaxLength } from 'class-validator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { MessageService } from './message.service';
 import { UserService } from '../user/user.service';
 
 // DTO
 class SendMessageDto {
+  @IsString()
+  @IsNotEmpty()
   receiverCoordinate: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
   title: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000)
   content: string;
 }
 
 class BroadcastMessageDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(100)
   title: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(2000)
   content: string;
 }
 
