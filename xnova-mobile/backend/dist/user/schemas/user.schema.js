@@ -581,11 +581,11 @@ __decorate([
     __metadata("design:type", String)
 ], User.prototype, "coordinate", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ default: null }),
+    (0, mongoose_1.Prop)({ type: String, default: null }),
     __metadata("design:type", Object)
 ], User.prototype, "homePlanetId", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ default: null }),
+    (0, mongoose_1.Prop)({ type: String, default: null }),
     __metadata("design:type", Object)
 ], User.prototype, "activePlanetId", void 0);
 __decorate([

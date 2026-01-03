@@ -339,10 +339,10 @@ export class User {
   coordinate: string;  // 현재 활성 행성 좌표 (호환성)
 
   // 다중 행성 지원
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   homePlanetId: string | null;  // 모행성 Planet ObjectId
 
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   activePlanetId: string | null;  // 현재 활성 행성 Planet ObjectId
 
   @Prop({ default: false })
