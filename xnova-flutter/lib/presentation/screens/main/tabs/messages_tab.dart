@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/date_utils.dart';
 import '../../../../providers/providers.dart';
 import '../../../../data/models/models.dart';
 import '../../../../core/constants/game_constants.dart';
@@ -353,7 +353,7 @@ class _MessageCard extends ConsumerWidget {
                           ],
                         ),
                         Text(
-                          DateFormat('MM-dd HH:mm').format(message.createdAt),
+                          formatKSTDateTime(message.createdAt),
                           style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
                         ),
                       ],

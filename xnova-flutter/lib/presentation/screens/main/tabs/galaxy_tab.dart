@@ -180,6 +180,7 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
                   ),
                 );
                 final myCoord = gameState.coordinate ?? '';
+                // 내 행성이면서 현재 내가 있는 행성이 아닌 경우 = 내 다른 행성
                 final isMyColony = planet.isOwnPlanet && planet.coordinate != myCoord;
                 
                 return _PlanetRow(
@@ -1096,7 +1097,7 @@ class _PlanetRow extends StatelessWidget {
                     child: InkWell(
                       onTap: onDeploy,
                       child: Icon(
-                        Icons.home_work,
+                        Icons.flight_land,
                         size: 16,
                         color: AppColors.positive,
                       ),
