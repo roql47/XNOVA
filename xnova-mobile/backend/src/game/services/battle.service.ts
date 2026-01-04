@@ -908,14 +908,20 @@ export class BattleService {
       throw new BadRequestException('이미 함대가 출격 중입니다.');
     }
 
-    // 타겟 찾기
-    const target = await this.userModel.findOne({ coordinate: targetCoord }).exec();
-    if (!target) {
+    // 타겟 찾기 (모행성 + 식민지)
+    const targetResult = await this.findPlanetByCoordinate(targetCoord);
+    if (!targetResult.ownerId) {
       throw new BadRequestException('해당 좌표에 행성이 존재하지 않습니다.');
     }
 
-    if (target._id.toString() === attackerId) {
+    // 자신의 행성(모성 또는 식민지) 공격 불가
+    if (targetResult.ownerId === attackerId) {
       throw new BadRequestException('자신의 행성은 공격할 수 없습니다.');
+    }
+
+    const target = targetResult.user;
+    if (!target) {
+      throw new BadRequestException('해당 좌표에 행성이 존재하지 않습니다.');
     }
 
     // 점수 차이 확인 (5배 이상 차이나면 공격 불가)

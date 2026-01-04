@@ -613,12 +613,16 @@ let BattleService = class BattleService {
         if (attacker.pendingAttack) {
             throw new common_1.BadRequestException('이미 함대가 출격 중입니다.');
         }
-        const target = await this.userModel.findOne({ coordinate: targetCoord }).exec();
-        if (!target) {
+        const targetResult = await this.findPlanetByCoordinate(targetCoord);
+        if (!targetResult.ownerId) {
             throw new common_1.BadRequestException('해당 좌표에 행성이 존재하지 않습니다.');
         }
-        if (target._id.toString() === attackerId) {
+        if (targetResult.ownerId === attackerId) {
             throw new common_1.BadRequestException('자신의 행성은 공격할 수 없습니다.');
+        }
+        const target = targetResult.user;
+        if (!target) {
+            throw new common_1.BadRequestException('해당 좌표에 행성이 존재하지 않습니다.');
         }
         const attackerScore = this.rankingService.calculatePlayerScores(attacker).totalScore;
         const defenderScore = this.rankingService.calculatePlayerScores(target).totalScore;
