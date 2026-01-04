@@ -857,7 +857,8 @@ let BattleService = class BattleService {
         if (!attacker || !attacker.pendingAttack || attacker.pendingAttack.battleCompleted) {
             return null;
         }
-        if (attacker.pendingAttack.missionType === 'colony' || !attacker.pendingAttack.targetUserId) {
+        const missionType = attacker.pendingAttack.missionType;
+        if (missionType === 'colony' || missionType === 'transport' || missionType === 'deploy' || !attacker.pendingAttack.targetUserId) {
             return null;
         }
         const pa = attacker.pendingAttack;

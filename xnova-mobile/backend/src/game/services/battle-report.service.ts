@@ -49,6 +49,7 @@ const UNIT_SHORT_NAMES: Record<string, string> = {
   recycler: '수확선',
   espionageProbe: '정찰기',
   solarSatellite: '위성',
+  colonyShip: '식민선',
   rocketLauncher: '미발',
   lightLaser: '경레',
   heavyLaser: '중레',
