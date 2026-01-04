@@ -922,7 +922,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  authState.user?.coordinate ?? gameState.coordinate ?? '',
+                  gameState.coordinate ?? authState.user?.coordinate ?? '',
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textMuted,

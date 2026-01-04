@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, forwardRef, Inject } from '@nestjs/com
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../../user/schemas/user.schema';
+import { Planet, PlanetDocument } from '../../planet/schemas/planet.schema';
 import { ResourcesService } from './resources.service';
 import { FleetService } from './fleet.service';
 import { RankingService } from './ranking.service';
@@ -63,6 +64,7 @@ const DEFENSE_IN_DEBRIS = 0;    // 방어시설 파괴 시 잔해 0%
 export class BattleService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Planet.name) private planetModel: Model<PlanetDocument>,
     private resourcesService: ResourcesService,
     private fleetService: FleetService,
     @Inject(forwardRef(() => RankingService)) private rankingService: RankingService,
@@ -70,6 +72,26 @@ export class BattleService {
     private galaxyService: GalaxyService,
     private battleReportService: BattleReportService,
   ) {}
+
+  /**
+   * 좌표로 행성 찾기 (모행성 + 식민지)
+   */
+  private async findPlanetByCoordinate(coordinate: string): Promise<{ user: UserDocument | null; planet: PlanetDocument | null; ownerId: string | null }> {
+    // 1. User 컬렉션에서 모행성 찾기
+    const user = await this.userModel.findOne({ coordinate }).exec();
+    if (user) {
+      return { user, planet: null, ownerId: user._id.toString() };
+    }
+
+    // 2. Planet 컬렉션에서 식민지 찾기
+    const planet = await this.planetModel.findOne({ coordinate }).exec();
+    if (planet) {
+      const owner = await this.userModel.findById(planet.ownerId).exec();
+      return { user: owner, planet, ownerId: planet.ownerId };
+    }
+
+    return { user: null, planet: null, ownerId: null };
+  }
 
   /**
    * OGame 공식에 따른 공격력 계산
@@ -1708,11 +1730,12 @@ export class BattleService {
       throw new BadRequestException('이미 함대가 활동 중입니다.');
     }
 
-    // 목표 행성 확인 (모든 행성에 수송 가능)
-    const target = await this.userModel.findOne({ coordinate: targetCoord }).exec();
-    if (!target) {
+    // 목표 행성 확인 (모행성 + 식민지 모두 검색)
+    const targetResult = await this.findPlanetByCoordinate(targetCoord);
+    if (!targetResult.ownerId) {
       throw new BadRequestException('해당 좌표에 행성이 존재하지 않습니다.');
     }
+    const targetOwnerId = targetResult.ownerId;
 
     // 함대 보유 확인
     for (const type in fleet) {
@@ -1778,13 +1801,14 @@ export class BattleService {
 
     sender.pendingAttack = {
       targetCoord,
-      targetUserId: 'transport', // 수송 미션 표시
+      targetUserId: targetOwnerId, // 목표 행성 소유자 ID
       fleet,
       capacity: totalCapacity,
       travelTime,
       startTime,
       arrivalTime,
       battleCompleted: false,
+      missionType: 'transport',
       // 수송할 자원 저장
       transportResources: resources,
     };
@@ -1808,9 +1832,11 @@ export class BattleService {
    */
   async processTransportArrival(userId: string) {
     const user = await this.userModel.findById(userId).exec();
-    if (!user || !user.pendingAttack || user.pendingAttack.targetUserId !== 'transport') {
-      return null;
-    }
+    if (!user || !user.pendingAttack) return null;
+    
+    // missionType 또는 targetUserId로 수송 미션 확인
+    const isTransport = user.pendingAttack.missionType === 'transport' || user.pendingAttack.targetUserId === 'transport';
+    if (!isTransport) return null;
 
     if (user.pendingAttack.arrivalTime.getTime() > Date.now()) {
       return null;
@@ -1819,26 +1845,45 @@ export class BattleService {
     const targetCoord = user.pendingAttack.targetCoord;
     const transportResources = (user.pendingAttack as any).transportResources || { metal: 0, crystal: 0, deuterium: 0 };
 
-    // 목표 행성 찾기
-    const target = await this.userModel.findOne({ coordinate: targetCoord }).exec();
+    // 목표 행성 찾기 (모행성 + 식민지)
+    const targetResult = await this.findPlanetByCoordinate(targetCoord);
     
-    if (target) {
-      // 목표 행성에 자원 추가
-      target.resources.metal += transportResources.metal;
-      target.resources.crystal += transportResources.crystal;
-      target.resources.deuterium += transportResources.deuterium;
-      target.markModified('resources');
-      await target.save();
+    if (targetResult.user && !targetResult.planet) {
+      // 모행성에 자원 추가
+      targetResult.user.resources.metal += transportResources.metal;
+      targetResult.user.resources.crystal += transportResources.crystal;
+      targetResult.user.resources.deuterium += transportResources.deuterium;
+      targetResult.user.markModified('resources');
+      await targetResult.user.save();
 
       // 수신자에게 메시지 전송
       await this.messageService.createMessage({
-        receiverId: target._id.toString(),
+        receiverId: targetResult.user._id.toString(),
         senderName: '수송 사령부',
         title: `${user.coordinate}에서 자원 도착`,
         content: `자원이 도착했습니다! 수신된 자원: 메탈 ${transportResources.metal}, 크리스탈 ${transportResources.crystal}, 듀테륨 ${transportResources.deuterium}`,
         type: 'system',
         metadata: { resources: transportResources, from: user.coordinate },
       });
+    } else if (targetResult.planet) {
+      // 식민지에 자원 추가
+      targetResult.planet.resources.metal += transportResources.metal;
+      targetResult.planet.resources.crystal += transportResources.crystal;
+      targetResult.planet.resources.deuterium += transportResources.deuterium;
+      targetResult.planet.markModified('resources');
+      await targetResult.planet.save();
+
+      // 수신자에게 메시지 전송
+      if (targetResult.ownerId) {
+        await this.messageService.createMessage({
+          receiverId: targetResult.ownerId,
+          senderName: '수송 사령부',
+          title: `${user.coordinate}에서 자원 도착 (${targetCoord})`,
+          content: `식민지 ${targetCoord}에 자원이 도착했습니다! 수신된 자원: 메탈 ${transportResources.metal}, 크리스탈 ${transportResources.crystal}, 듀테륨 ${transportResources.deuterium}`,
+          type: 'system',
+          metadata: { resources: transportResources, from: user.coordinate },
+        });
+      }
     }
 
     // 귀환 설정 (자원 없이)
@@ -1891,14 +1936,14 @@ export class BattleService {
       throw new BadRequestException('이미 함대가 활동 중입니다.');
     }
 
-    // 목표 행성 확인 (본인 소유 행성만 가능)
-    const target = await this.userModel.findOne({ coordinate: targetCoord }).exec();
-    if (!target) {
+    // 목표 행성 확인 (모행성 + 식민지 모두 검색)
+    const targetResult = await this.findPlanetByCoordinate(targetCoord);
+    if (!targetResult.ownerId) {
       throw new BadRequestException('해당 좌표에 행성이 존재하지 않습니다.');
     }
 
     // 자기 자신에게만 배치 가능
-    if (target._id.toString() !== userId) {
+    if (targetResult.ownerId !== userId) {
       throw new BadRequestException('배치 미션은 본인 소유의 행성에만 가능합니다.');
     }
 
@@ -1971,13 +2016,14 @@ export class BattleService {
 
     sender.pendingAttack = {
       targetCoord,
-      targetUserId: 'deploy', // 배치 미션 표시
+      targetUserId: targetResult.ownerId, // 목표 행성 소유자 ID (본인)
       fleet,
       capacity: totalCapacity,
       travelTime,
       startTime,
       arrivalTime,
       battleCompleted: false,
+      missionType: 'deploy',
       // 배치할 자원 저장
       transportResources: resources,
     };
@@ -2001,9 +2047,11 @@ export class BattleService {
    */
   async processDeployArrival(userId: string) {
     const user = await this.userModel.findById(userId).exec();
-    if (!user || !user.pendingAttack || user.pendingAttack.targetUserId !== 'deploy') {
-      return null;
-    }
+    if (!user || !user.pendingAttack) return null;
+    
+    // missionType 또는 targetUserId로 배치 미션 확인
+    const isDeploy = user.pendingAttack.missionType === 'deploy' || user.pendingAttack.targetUserId === 'deploy';
+    if (!isDeploy) return null;
 
     if (user.pendingAttack.arrivalTime.getTime() > Date.now()) {
       return null;
@@ -2013,18 +2061,40 @@ export class BattleService {
     const deployFleet = user.pendingAttack.fleet;
     const deployResources = (user.pendingAttack as any).transportResources || { metal: 0, crystal: 0, deuterium: 0 };
 
-    // 목표 행성에 함대 + 자원 추가 (본인 행성이므로 자기 자신에게)
-    // 함대 추가
-    for (const type in deployFleet) {
-      if (deployFleet[type] > 0) {
-        (user.fleet as any)[type] = ((user.fleet as any)[type] || 0) + deployFleet[type];
-      }
-    }
+    // 목표 행성 찾기 (모행성 + 식민지)
+    const targetResult = await this.findPlanetByCoordinate(targetCoord);
 
-    // 자원 추가
-    user.resources.metal += deployResources.metal;
-    user.resources.crystal += deployResources.crystal;
-    user.resources.deuterium += deployResources.deuterium;
+    if (targetResult.user && !targetResult.planet) {
+      // 모행성에 함대 + 자원 추가
+      for (const type in deployFleet) {
+        if (deployFleet[type] > 0) {
+          (targetResult.user.fleet as any)[type] = ((targetResult.user.fleet as any)[type] || 0) + deployFleet[type];
+        }
+      }
+      targetResult.user.resources.metal += deployResources.metal;
+      targetResult.user.resources.crystal += deployResources.crystal;
+      targetResult.user.resources.deuterium += deployResources.deuterium;
+      targetResult.user.markModified('fleet');
+      targetResult.user.markModified('resources');
+      await targetResult.user.save();
+    } else if (targetResult.planet) {
+      // 식민지에 함대 + 자원 추가
+      for (const type in deployFleet) {
+        if (deployFleet[type] > 0) {
+          if (!targetResult.planet.fleet) targetResult.planet.fleet = {} as any;
+          (targetResult.planet.fleet as any)[type] = ((targetResult.planet.fleet as any)[type] || 0) + deployFleet[type];
+        }
+      }
+      if (!targetResult.planet.resources) {
+        targetResult.planet.resources = { metal: 0, crystal: 0, deuterium: 0, energy: 0 } as any;
+      }
+      targetResult.planet.resources.metal += deployResources.metal;
+      targetResult.planet.resources.crystal += deployResources.crystal;
+      targetResult.planet.resources.deuterium += deployResources.deuterium;
+      targetResult.planet.markModified('fleet');
+      targetResult.planet.markModified('resources');
+      await targetResult.planet.save();
+    }
 
     // 미션 완료 (귀환 없음)
     user.pendingAttack = null;
@@ -2032,8 +2102,6 @@ export class BattleService {
 
     user.markModified('pendingAttack');
     user.markModified('pendingReturn');
-    user.markModified('fleet');
-    user.markModified('resources');
     await user.save();
 
     // 메시지

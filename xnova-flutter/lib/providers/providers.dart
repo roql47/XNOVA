@@ -327,6 +327,14 @@ class NavigationNotifier extends StateNotifier<NavigationState> {
     );
   }
 
+  void setDeployTarget(String coordinate) {
+    state = state.copyWith(
+      selectedTab: MainTab.fleet,
+      targetCoordinate: coordinate,
+      missionType: 'deploy',
+    );
+  }
+
   void setColonizeTarget(String coordinate) {
     state = state.copyWith(
       selectedTab: MainTab.fleet,
@@ -541,9 +549,21 @@ class GameNotifier extends StateNotifier<GameState> {
           ?.map((p) => MyPlanet.fromJson(p))
           .toList() ?? [];
       final activePlanetId = response['activePlanetId']?.toString();
+      
+      // 활성 행성의 좌표 찾기
+      String? activePlanetCoordinate;
+      if (activePlanetId != null && planets.isNotEmpty) {
+        final activePlanet = planets.firstWhere(
+          (p) => p.id == activePlanetId,
+          orElse: () => planets.first,
+        );
+        activePlanetCoordinate = activePlanet.coordinate;
+      }
+      
       state = state.copyWith(
         myPlanets: planets,
         activePlanetId: activePlanetId,
+        coordinate: activePlanetCoordinate,
       );
     } catch (e) {
       // ignore

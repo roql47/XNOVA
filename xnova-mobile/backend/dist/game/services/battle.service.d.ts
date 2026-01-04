@@ -1,5 +1,6 @@
 import { Model } from 'mongoose';
 import { UserDocument } from '../../user/schemas/user.schema';
+import { PlanetDocument } from '../../planet/schemas/planet.schema';
 import { ResourcesService } from './resources.service';
 import { FleetService } from './fleet.service';
 import { RankingService } from './ranking.service';
@@ -48,13 +49,15 @@ export interface BattleResult {
 }
 export declare class BattleService {
     private userModel;
+    private planetModel;
     private resourcesService;
     private fleetService;
     private rankingService;
     private messageService;
     private galaxyService;
     private battleReportService;
-    constructor(userModel: Model<UserDocument>, resourcesService: ResourcesService, fleetService: FleetService, rankingService: RankingService, messageService: MessageService, galaxyService: GalaxyService, battleReportService: BattleReportService);
+    constructor(userModel: Model<UserDocument>, planetModel: Model<PlanetDocument>, resourcesService: ResourcesService, fleetService: FleetService, rankingService: RankingService, messageService: MessageService, galaxyService: GalaxyService, battleReportService: BattleReportService);
+    private findPlanetByCoordinate;
     private calculateAttackPower;
     private calculateMaxShield;
     private calculateHull;

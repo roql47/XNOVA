@@ -178,6 +178,10 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
                     coordinate: '$_galaxy:$_system:$position',
                   ),
                 );
+                final gameState = ref.read(gameProvider);
+                final myCoord = gameState.coordinate ?? '';
+                final isMyColony = planet.isOwnPlanet && planet.coordinate != myCoord;
+                
                 return _PlanetRow(
                   position: position,
                   planet: planet,
@@ -193,8 +197,13 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
                   onMessage: planet.playerName != null && !planet.isOwnPlanet
                       ? () => _showMessageDialog(context, planet)
                       : null,
-                  onTransport: planet.playerName != null && !planet.isOwnPlanet
+                  // 수송: 다른 유저 행성 또는 내 식민지
+                  onTransport: (planet.playerName != null && !planet.isOwnPlanet) || isMyColony
                       ? () => _showTransportDialog(context, planet)
+                      : null,
+                  // 배치: 내 식민지만
+                  onDeploy: isMyColony
+                      ? () => _showDeployDialog(context, planet)
                       : null,
                   onColonize: planet.playerName == null
                       ? () => _showColonizeDialog(context, planet)
@@ -630,6 +639,11 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
   }
 
   void _showTransportDialog(BuildContext context, PlanetInfo planet) {
+    final isMyColony = planet.isOwnPlanet;
+    final description = isMyColony
+        ? '내 식민지 ${planet.coordinate}로 자원을 수송합니다.\n\n함대 탭에서 함선과 자원을 선택하여 수송할 수 있습니다.'
+        : '${planet.playerName}의 행성으로 자원을 수송하시겠습니까?\n\n함대 탭에서 함선과 자원을 선택하여 수송할 수 있습니다.';
+    
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -648,7 +662,7 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
           ],
         ),
         content: Text(
-          '${planet.playerName}의 행성으로 자원을 수송하시겠습니까?\n\n함대 탭에서 함선과 자원을 선택하여 수송할 수 있습니다.',
+          description,
           style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
         ),
         actions: [
@@ -666,6 +680,49 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
             ),
             child: const Text('수송 지점으로 설정'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  void _showDeployDialog(BuildContext context, PlanetInfo planet) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.panelBackground,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        title: Row(
+          children: [
+            Icon(Icons.home_work, color: AppColors.positive, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '배치: ${planet.coordinate}',
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          '내 식민지에 함대와 자원을 배치합니다.\n\n배치된 함대는 해당 행성에 주둔하며, 귀환하지 않습니다.\n\n함대 탭에서 함선과 자원을 선택하여 배치할 수 있습니다.',
+          style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('취소', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ref.read(navigationProvider.notifier).setDeployTarget(planet.coordinate);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.positive,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+            ),
+            child: const Text('배치 지점으로 설정'),
           ),
         ],
       ),
@@ -783,6 +840,7 @@ class _PlanetRow extends StatelessWidget {
   final VoidCallback? onSpy;
   final VoidCallback? onMessage;
   final VoidCallback? onTransport;
+  final VoidCallback? onDeploy;
   final VoidCallback? onColonize;
 
   const _PlanetRow({
@@ -793,6 +851,7 @@ class _PlanetRow extends StatelessWidget {
     this.onSpy,
     this.onMessage,
     this.onTransport,
+    this.onDeploy,
     this.onColonize,
   });
 
@@ -1032,17 +1091,31 @@ class _PlanetRow extends StatelessWidget {
                     ),
                   ),
                   // 수송 아이콘
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4),
-                    child: InkWell(
-                      onTap: onTransport,
-                      child: Icon(
-                        Icons.local_shipping,
-                        size: 16,
-                        color: AppColors.resourceDeuterium,
+                  if (onTransport != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: InkWell(
+                        onTap: onTransport,
+                        child: Icon(
+                          Icons.local_shipping,
+                          size: 16,
+                          color: AppColors.resourceDeuterium,
+                        ),
                       ),
                     ),
-                  ),
+                  // 배치 아이콘 (내 식민지)
+                  if (onDeploy != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: InkWell(
+                        onTap: onDeploy,
+                        child: Icon(
+                          Icons.home_work,
+                          size: 16,
+                          color: AppColors.positive,
+                        ),
+                      ),
+                    ),
                   // 정찰 아이콘
                   Padding(
                     padding: const EdgeInsets.only(left: 4),

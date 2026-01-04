@@ -17,6 +17,7 @@ const common_1 = require("@nestjs/common");
 const mongoose_1 = require("@nestjs/mongoose");
 const mongoose_2 = require("mongoose");
 const user_schema_1 = require("../../user/schemas/user.schema");
+const planet_schema_1 = require("../../planet/schemas/planet.schema");
 const resources_service_1 = require("./resources.service");
 const fleet_service_1 = require("./fleet.service");
 const ranking_service_1 = require("./ranking.service");
@@ -28,20 +29,34 @@ const FLEET_IN_DEBRIS = 0.3;
 const DEFENSE_IN_DEBRIS = 0;
 let BattleService = class BattleService {
     userModel;
+    planetModel;
     resourcesService;
     fleetService;
     rankingService;
     messageService;
     galaxyService;
     battleReportService;
-    constructor(userModel, resourcesService, fleetService, rankingService, messageService, galaxyService, battleReportService) {
+    constructor(userModel, planetModel, resourcesService, fleetService, rankingService, messageService, galaxyService, battleReportService) {
         this.userModel = userModel;
+        this.planetModel = planetModel;
         this.resourcesService = resourcesService;
         this.fleetService = fleetService;
         this.rankingService = rankingService;
         this.messageService = messageService;
         this.galaxyService = galaxyService;
         this.battleReportService = battleReportService;
+    }
+    async findPlanetByCoordinate(coordinate) {
+        const user = await this.userModel.findOne({ coordinate }).exec();
+        if (user) {
+            return { user, planet: null, ownerId: user._id.toString() };
+        }
+        const planet = await this.planetModel.findOne({ coordinate }).exec();
+        if (planet) {
+            const owner = await this.userModel.findById(planet.ownerId).exec();
+            return { user: owner, planet, ownerId: planet.ownerId };
+        }
+        return { user: null, planet: null, ownerId: null };
     }
     calculateAttackPower(baseAttack, weaponsTech) {
         return Math.floor(baseAttack * (10 + weaponsTech) / 10);
@@ -1189,10 +1204,11 @@ let BattleService = class BattleService {
         if (sender.pendingAttack || sender.pendingReturn) {
             throw new common_1.BadRequestException('이미 함대가 활동 중입니다.');
         }
-        const target = await this.userModel.findOne({ coordinate: targetCoord }).exec();
-        if (!target) {
+        const targetResult = await this.findPlanetByCoordinate(targetCoord);
+        if (!targetResult.ownerId) {
             throw new common_1.BadRequestException('해당 좌표에 행성이 존재하지 않습니다.');
         }
+        const targetOwnerId = targetResult.ownerId;
         for (const type in fleet) {
             if (fleet[type] > 0) {
                 if (!game_data_1.FLEET_DATA[type]) {
@@ -1240,13 +1256,14 @@ let BattleService = class BattleService {
         const arrivalTime = new Date(startTime.getTime() + travelTime * 1000);
         sender.pendingAttack = {
             targetCoord,
-            targetUserId: 'transport',
+            targetUserId: targetOwnerId,
             fleet,
             capacity: totalCapacity,
             travelTime,
             startTime,
             arrivalTime,
             battleCompleted: false,
+            missionType: 'transport',
             transportResources: resources,
         };
         sender.markModified('fleet');
@@ -1263,29 +1280,48 @@ let BattleService = class BattleService {
     }
     async processTransportArrival(userId) {
         const user = await this.userModel.findById(userId).exec();
-        if (!user || !user.pendingAttack || user.pendingAttack.targetUserId !== 'transport') {
+        if (!user || !user.pendingAttack)
             return null;
-        }
+        const isTransport = user.pendingAttack.missionType === 'transport' || user.pendingAttack.targetUserId === 'transport';
+        if (!isTransport)
+            return null;
         if (user.pendingAttack.arrivalTime.getTime() > Date.now()) {
             return null;
         }
         const targetCoord = user.pendingAttack.targetCoord;
         const transportResources = user.pendingAttack.transportResources || { metal: 0, crystal: 0, deuterium: 0 };
-        const target = await this.userModel.findOne({ coordinate: targetCoord }).exec();
-        if (target) {
-            target.resources.metal += transportResources.metal;
-            target.resources.crystal += transportResources.crystal;
-            target.resources.deuterium += transportResources.deuterium;
-            target.markModified('resources');
-            await target.save();
+        const targetResult = await this.findPlanetByCoordinate(targetCoord);
+        if (targetResult.user && !targetResult.planet) {
+            targetResult.user.resources.metal += transportResources.metal;
+            targetResult.user.resources.crystal += transportResources.crystal;
+            targetResult.user.resources.deuterium += transportResources.deuterium;
+            targetResult.user.markModified('resources');
+            await targetResult.user.save();
             await this.messageService.createMessage({
-                receiverId: target._id.toString(),
+                receiverId: targetResult.user._id.toString(),
                 senderName: '수송 사령부',
                 title: `${user.coordinate}에서 자원 도착`,
                 content: `자원이 도착했습니다! 수신된 자원: 메탈 ${transportResources.metal}, 크리스탈 ${transportResources.crystal}, 듀테륨 ${transportResources.deuterium}`,
                 type: 'system',
                 metadata: { resources: transportResources, from: user.coordinate },
             });
+        }
+        else if (targetResult.planet) {
+            targetResult.planet.resources.metal += transportResources.metal;
+            targetResult.planet.resources.crystal += transportResources.crystal;
+            targetResult.planet.resources.deuterium += transportResources.deuterium;
+            targetResult.planet.markModified('resources');
+            await targetResult.planet.save();
+            if (targetResult.ownerId) {
+                await this.messageService.createMessage({
+                    receiverId: targetResult.ownerId,
+                    senderName: '수송 사령부',
+                    title: `${user.coordinate}에서 자원 도착 (${targetCoord})`,
+                    content: `식민지 ${targetCoord}에 자원이 도착했습니다! 수신된 자원: 메탈 ${transportResources.metal}, 크리스탈 ${transportResources.crystal}, 듀테륨 ${transportResources.deuterium}`,
+                    type: 'system',
+                    metadata: { resources: transportResources, from: user.coordinate },
+                });
+            }
         }
         const travelTime = user.pendingAttack.travelTime;
         const returnTime = new Date(Date.now() + travelTime * 1000);
@@ -1318,11 +1354,11 @@ let BattleService = class BattleService {
         if (sender.pendingAttack || sender.pendingReturn) {
             throw new common_1.BadRequestException('이미 함대가 활동 중입니다.');
         }
-        const target = await this.userModel.findOne({ coordinate: targetCoord }).exec();
-        if (!target) {
+        const targetResult = await this.findPlanetByCoordinate(targetCoord);
+        if (!targetResult.ownerId) {
             throw new common_1.BadRequestException('해당 좌표에 행성이 존재하지 않습니다.');
         }
-        if (target._id.toString() !== userId) {
+        if (targetResult.ownerId !== userId) {
             throw new common_1.BadRequestException('배치 미션은 본인 소유의 행성에만 가능합니다.');
         }
         if (sender.coordinate === targetCoord) {
@@ -1375,13 +1411,14 @@ let BattleService = class BattleService {
         const arrivalTime = new Date(startTime.getTime() + travelTime * 1000);
         sender.pendingAttack = {
             targetCoord,
-            targetUserId: 'deploy',
+            targetUserId: targetResult.ownerId,
             fleet,
             capacity: totalCapacity,
             travelTime,
             startTime,
             arrivalTime,
             battleCompleted: false,
+            missionType: 'deploy',
             transportResources: resources,
         };
         sender.markModified('fleet');
@@ -1398,29 +1435,53 @@ let BattleService = class BattleService {
     }
     async processDeployArrival(userId) {
         const user = await this.userModel.findById(userId).exec();
-        if (!user || !user.pendingAttack || user.pendingAttack.targetUserId !== 'deploy') {
+        if (!user || !user.pendingAttack)
             return null;
-        }
+        const isDeploy = user.pendingAttack.missionType === 'deploy' || user.pendingAttack.targetUserId === 'deploy';
+        if (!isDeploy)
+            return null;
         if (user.pendingAttack.arrivalTime.getTime() > Date.now()) {
             return null;
         }
         const targetCoord = user.pendingAttack.targetCoord;
         const deployFleet = user.pendingAttack.fleet;
         const deployResources = user.pendingAttack.transportResources || { metal: 0, crystal: 0, deuterium: 0 };
-        for (const type in deployFleet) {
-            if (deployFleet[type] > 0) {
-                user.fleet[type] = (user.fleet[type] || 0) + deployFleet[type];
+        const targetResult = await this.findPlanetByCoordinate(targetCoord);
+        if (targetResult.user && !targetResult.planet) {
+            for (const type in deployFleet) {
+                if (deployFleet[type] > 0) {
+                    targetResult.user.fleet[type] = (targetResult.user.fleet[type] || 0) + deployFleet[type];
+                }
             }
+            targetResult.user.resources.metal += deployResources.metal;
+            targetResult.user.resources.crystal += deployResources.crystal;
+            targetResult.user.resources.deuterium += deployResources.deuterium;
+            targetResult.user.markModified('fleet');
+            targetResult.user.markModified('resources');
+            await targetResult.user.save();
         }
-        user.resources.metal += deployResources.metal;
-        user.resources.crystal += deployResources.crystal;
-        user.resources.deuterium += deployResources.deuterium;
+        else if (targetResult.planet) {
+            for (const type in deployFleet) {
+                if (deployFleet[type] > 0) {
+                    if (!targetResult.planet.fleet)
+                        targetResult.planet.fleet = {};
+                    targetResult.planet.fleet[type] = (targetResult.planet.fleet[type] || 0) + deployFleet[type];
+                }
+            }
+            if (!targetResult.planet.resources) {
+                targetResult.planet.resources = { metal: 0, crystal: 0, deuterium: 0, energy: 0 };
+            }
+            targetResult.planet.resources.metal += deployResources.metal;
+            targetResult.planet.resources.crystal += deployResources.crystal;
+            targetResult.planet.resources.deuterium += deployResources.deuterium;
+            targetResult.planet.markModified('fleet');
+            targetResult.planet.markModified('resources');
+            await targetResult.planet.save();
+        }
         user.pendingAttack = null;
         user.pendingReturn = null;
         user.markModified('pendingAttack');
         user.markModified('pendingReturn');
-        user.markModified('fleet');
-        user.markModified('resources');
         await user.save();
         const fleetList = Object.entries(deployFleet)
             .filter(([, count]) => count > 0)
@@ -1456,8 +1517,10 @@ exports.BattleService = BattleService;
 exports.BattleService = BattleService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(user_schema_1.User.name)),
-    __param(3, (0, common_1.Inject)((0, common_1.forwardRef)(() => ranking_service_1.RankingService))),
+    __param(1, (0, mongoose_1.InjectModel)(planet_schema_1.Planet.name)),
+    __param(4, (0, common_1.Inject)((0, common_1.forwardRef)(() => ranking_service_1.RankingService))),
     __metadata("design:paramtypes", [mongoose_2.Model,
+        mongoose_2.Model,
         resources_service_1.ResourcesService,
         fleet_service_1.FleetService,
         ranking_service_1.RankingService,
