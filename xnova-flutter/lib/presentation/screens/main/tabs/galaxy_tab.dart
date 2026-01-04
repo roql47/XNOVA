@@ -171,6 +171,7 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
               itemCount: 15,
               itemBuilder: (context, index) {
                 final position = index + 1;
+                final gameState = ref.read(gameProvider);
                 final planet = gameState.galaxyPlanets.firstWhere(
                   (p) => p.position == position,
                   orElse: () => PlanetInfo(
@@ -178,7 +179,6 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
                     coordinate: '$_galaxy:$_system:$position',
                   ),
                 );
-                final gameState = ref.read(gameProvider);
                 final myCoord = gameState.coordinate ?? '';
                 final isMyColony = planet.isOwnPlanet && planet.coordinate != myCoord;
                 
@@ -1077,6 +1077,32 @@ class _PlanetRow extends StatelessWidget {
                       ),
                     ),
                   ),
+                // 내 식민지인 경우 수송/배치 아이콘
+                if (!isEmpty && isOwn && onTransport != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: InkWell(
+                      onTap: onTransport,
+                      child: Icon(
+                        Icons.local_shipping,
+                        size: 16,
+                        color: AppColors.resourceDeuterium,
+                      ),
+                    ),
+                  ),
+                if (!isEmpty && isOwn && onDeploy != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: InkWell(
+                      onTap: onDeploy,
+                      child: Icon(
+                        Icons.home_work,
+                        size: 16,
+                        color: AppColors.positive,
+                      ),
+                    ),
+                  ),
+                // 다른 유저 행성인 경우
                 if (!isEmpty && !isOwn) ...[
                   // 메시지 아이콘
                   Padding(
@@ -1100,19 +1126,6 @@ class _PlanetRow extends StatelessWidget {
                           Icons.local_shipping,
                           size: 16,
                           color: AppColors.resourceDeuterium,
-                        ),
-                      ),
-                    ),
-                  // 배치 아이콘 (내 식민지)
-                  if (onDeploy != null)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: InkWell(
-                        onTap: onDeploy,
-                        child: Icon(
-                          Icons.home_work,
-                          size: 16,
-                          color: AppColors.positive,
                         ),
                       ),
                     ),

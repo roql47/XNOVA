@@ -1087,18 +1087,30 @@ class _PlanetInfoPanelState extends ConsumerState<_PlanetInfoPanel> {
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: Column(
-              children: [
-                _buildInfoRow('에너지', '${gameState.resources.energy} (${gameState.energyRatio}%)'),
-                const SizedBox(height: 6),
-                _buildInfoRow('연구소 레벨', '${gameState.labLevel}'),
-                const SizedBox(height: 6),
-                _buildInfoRow('조선소 레벨', '${gameState.shipyardLevel}'),
-                const SizedBox(height: 6),
-                _buildInfoRow('함선', '${gameState.fleet.fold<int>(0, (sum, f) => sum + f.count)}척'),
-                const SizedBox(height: 6),
-                _buildInfoRow('방어시설', '${gameState.defense.fold<int>(0, (sum, d) => sum + d.count)}기'),
-              ],
+            child: Builder(
+              builder: (context) {
+                // 건물에서 연구소/조선소 레벨 가져오기
+                final researchLabLevel = gameState.buildings
+                    .firstWhere((b) => b.type == 'researchLab', orElse: () => BuildingInfo(type: 'researchLab', name: '연구소', level: 0, category: 'facilities'))
+                    .level;
+                final shipyardLevel = gameState.buildings
+                    .firstWhere((b) => b.type == 'shipyard', orElse: () => BuildingInfo(type: 'shipyard', name: '조선소', level: 0, category: 'facilities'))
+                    .level;
+                
+                return Column(
+                  children: [
+                    _buildInfoRow('에너지', '${gameState.resources.energy} (${gameState.energyRatio}%)'),
+                    const SizedBox(height: 6),
+                    _buildInfoRow('연구소 레벨', '$researchLabLevel'),
+                    const SizedBox(height: 6),
+                    _buildInfoRow('조선소 레벨', '$shipyardLevel'),
+                    const SizedBox(height: 6),
+                    _buildInfoRow('함선', '${gameState.fleet.fold<int>(0, (sum, f) => sum + f.count)}척'),
+                    const SizedBox(height: 6),
+                    _buildInfoRow('방어시설', '${gameState.defense.fold<int>(0, (sum, d) => sum + d.count)}기'),
+                  ],
+                );
+              },
             ),
           ),
         ],
