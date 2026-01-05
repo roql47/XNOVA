@@ -742,10 +742,26 @@ let BattleService = class BattleService {
         }
         if (user.incomingAttack) {
             const remaining = Math.max(0, (user.incomingAttack.arrivalTime.getTime() - Date.now()) / 1000);
-            result.incomingAttack = {
-                attackerCoord: user.incomingAttack.targetCoord,
-                remainingTime: remaining,
-            };
+            if (remaining <= 0) {
+                const timeSinceArrival = (Date.now() - user.incomingAttack.arrivalTime.getTime()) / 1000;
+                if (timeSinceArrival > 300) {
+                    user.incomingAttack = null;
+                    user.markModified('incomingAttack');
+                    await user.save();
+                }
+                else {
+                    result.incomingAttack = {
+                        attackerCoord: user.incomingAttack.targetCoord,
+                        remainingTime: remaining,
+                    };
+                }
+            }
+            else {
+                result.incomingAttack = {
+                    attackerCoord: user.incomingAttack.targetCoord,
+                    remainingTime: remaining,
+                };
+            }
         }
         return result;
     }

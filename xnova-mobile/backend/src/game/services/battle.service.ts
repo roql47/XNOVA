@@ -1077,10 +1077,27 @@ export class BattleService {
 
     if (user.incomingAttack) {
       const remaining = Math.max(0, (user.incomingAttack.arrivalTime.getTime() - Date.now()) / 1000);
-      result.incomingAttack = {
-        attackerCoord: user.incomingAttack.targetCoord,
-        remainingTime: remaining,
-      };
+      
+      // 도착 시간이 지났고 오래된 incomingAttack은 자동 클리어 (5분 이상 지난 경우)
+      if (remaining <= 0) {
+        const timeSinceArrival = (Date.now() - user.incomingAttack.arrivalTime.getTime()) / 1000;
+        if (timeSinceArrival > 300) { // 5분 이상 지난 경우 자동 클리어
+          user.incomingAttack = null;
+          user.markModified('incomingAttack');
+          await user.save();
+          // result.incomingAttack는 이미 null이므로 그대로 반환
+        } else {
+          result.incomingAttack = {
+            attackerCoord: user.incomingAttack.targetCoord,
+            remainingTime: remaining,
+          };
+        }
+      } else {
+        result.incomingAttack = {
+          attackerCoord: user.incomingAttack.targetCoord,
+          remainingTime: remaining,
+        };
+      }
     }
 
     return result;
