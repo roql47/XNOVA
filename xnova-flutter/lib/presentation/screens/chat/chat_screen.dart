@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/date_utils.dart';
 import '../../../providers/providers.dart';
 import '../../../data/services/socket_service.dart';
 
@@ -267,8 +268,9 @@ class _ChatBubble extends StatelessWidget {
   });
 
   String _formatTime(DateTime time) {
-    final hour = time.hour.toString().padLeft(2, '0');
-    final minute = time.minute.toString().padLeft(2, '0');
+    final kst = toKST(time);
+    final hour = kst.hour.toString().padLeft(2, '0');
+    final minute = kst.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
   }
 

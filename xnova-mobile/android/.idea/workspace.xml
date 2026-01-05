@@ -9,7 +9,11 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="fb29376f-86bc-4260-886b-0498e2105846" name="Changes" comment="" />
+    <list default="true" id="fb29376f-86bc-4260-886b-0498e2105846" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/../../xnova-flutter/lib/presentation/screens/chat/chat_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../../xnova-flutter/lib/presentation/screens/chat/chat_screen.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../xnova-flutter/lib/providers/providers.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../../xnova-flutter/lib/providers/providers.dart" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />

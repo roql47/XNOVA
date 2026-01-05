@@ -452,6 +452,7 @@ class GameState {
     int? currentSystem,
     List<PlanetInfo>? galaxyPlanets,
     BattleStatus? battleStatus,
+    bool clearBattleStatus = false,
     List<MyPlanet>? myPlanets,
     String? activePlanetId,
   }) {
@@ -478,7 +479,7 @@ class GameState {
       currentGalaxy: currentGalaxy ?? this.currentGalaxy,
       currentSystem: currentSystem ?? this.currentSystem,
       galaxyPlanets: galaxyPlanets ?? this.galaxyPlanets,
-      battleStatus: battleStatus ?? this.battleStatus,
+      battleStatus: clearBattleStatus ? null : (battleStatus ?? this.battleStatus),
       myPlanets: myPlanets ?? this.myPlanets,
       activePlanetId: activePlanetId ?? this.activePlanetId,
     );
@@ -574,10 +575,16 @@ class GameNotifier extends StateNotifier<GameState> {
   Future<bool> switchPlanet(String planetId) async {
     try {
       await _apiService.switchPlanet(planetId);
-      // 행성 전환 후 모든 데이터 새로고침
+      // 행성 전환 후 모든 데이터 새로고침 (순차적으로)
       await loadMyPlanets();
       await loadProfile();
-      await loadAllData();
+      // 모든 게임 데이터를 순차적으로 로드 (병렬 로드 시 타이밍 이슈 방지)
+      await loadResources();
+      await loadBuildings();
+      await loadResearch();
+      await loadFleet();
+      await loadDefense();
+      await loadBattleStatus();
       return true;
     } catch (e) {
       state = state.copyWith(error: '행성 전환에 실패했습니다.');
@@ -841,31 +848,39 @@ class GameNotifier extends StateNotifier<GameState> {
   Future<void> loadBattleStatus() async {
     try {
       final response = await _apiService.getBattleStatus();
+      
+      // 응답이 null이거나 모든 상태가 비어있으면 battleStatus 클리어
+      if (response == null || 
+          (response.pendingAttack == null && 
+           response.pendingReturn == null && 
+           response.incomingAttack == null)) {
+        state = state.copyWith(clearBattleStatus: true);
+        return;
+      }
+      
       state = state.copyWith(battleStatus: response);
       
       // 이미 시간이 만료된 상태라면 자동 처리 시도
-      if (response != null) {
-        final now = DateTime.now();
-        bool needsProcess = false;
-        
-        if (response.pendingAttack != null) {
-          final remaining = response.pendingAttack!.finishDateTime.difference(now).inSeconds;
-          if (remaining <= 0 && !response.pendingAttack!.battleCompleted) {
-            needsProcess = true;
-          }
-        } 
-        
-        if (!needsProcess && response.pendingReturn != null) {
-          final remaining = response.pendingReturn!.finishDateTime.difference(now).inSeconds;
-          if (remaining <= 0) {
-            needsProcess = true;
-          }
+      final now = DateTime.now();
+      bool needsProcess = false;
+      
+      if (response.pendingAttack != null) {
+        final remaining = response.pendingAttack!.finishDateTime.difference(now).inSeconds;
+        if (remaining <= 0 && !response.pendingAttack!.battleCompleted) {
+          needsProcess = true;
         }
+      } 
+      
+      if (!needsProcess && response.pendingReturn != null) {
+        final remaining = response.pendingReturn!.finishDateTime.difference(now).inSeconds;
+        if (remaining <= 0) {
+          needsProcess = true;
+        }
+      }
 
-        if (needsProcess) {
-          // 중복 실행 방지를 위해 약간의 딜레이 후 실행
-          Future.delayed(const Duration(milliseconds: 500), () => processBattle());
-        }
+      if (needsProcess) {
+        // 중복 실행 방지를 위해 약간의 딜레이 후 실행
+        Future.delayed(const Duration(milliseconds: 500), () => processBattle());
       }
     } catch (e) {
       // ignore
