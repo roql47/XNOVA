@@ -325,3 +325,4 @@ export function generatePlanetCharacteristics(position: number): {
   return { planetType, tempMin, tempMax, maxFields, diameter };
 }
 
+

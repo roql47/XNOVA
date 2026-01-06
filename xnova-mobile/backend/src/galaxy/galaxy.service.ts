@@ -350,10 +350,11 @@ export class GalaxyService {
       energyRatio = Math.max(0.1, energyProduction / energyConsumption);
     }
 
-    // 자원 생산량 (시간당)
-    const metalProduction = Math.floor(90 * (metalMineLevel + 1) * Math.pow(1.1, metalMineLevel + 1)) * energyRatio;
-    const crystalProduction = Math.floor(60 * (crystalMineLevel + 1) * Math.pow(1.1, crystalMineLevel + 1)) * energyRatio;
-    const deuteriumProduction = Math.floor(30 * (deuteriumMineLevel + 1) * Math.pow(1.1, deuteriumMineLevel + 1)) * energyRatio;
+    // 자원 생산량 (시간당) - 5배 속도 적용
+    const SPEED_MULTIPLIER = 5;
+    const metalProduction = Math.floor(90 * (metalMineLevel + 1) * Math.pow(1.1, metalMineLevel + 1) * SPEED_MULTIPLIER) * energyRatio;
+    const crystalProduction = Math.floor(60 * (crystalMineLevel + 1) * Math.pow(1.1, crystalMineLevel + 1) * SPEED_MULTIPLIER) * energyRatio;
+    const deuteriumProduction = Math.floor(30 * (deuteriumMineLevel + 1) * Math.pow(1.1, deuteriumMineLevel + 1) * SPEED_MULTIPLIER) * energyRatio;
     const fusionConsumption = fusionLevel > 0 ? Math.floor(10 * fusionLevel * Math.pow(1.1, fusionLevel)) : 0;
 
     // 경과 시간에 따른 자원 계산

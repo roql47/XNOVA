@@ -26,16 +26,18 @@ export class ResourcesService {
   }
 
   // 자원 생산량 계산 (시간당) - XNOVA.js getResourceProduction 마이그레이션
+  // 생산 속도 5배 적용
   getResourceProduction(level: number, type: 'metal' | 'crystal' | 'deuterium'): number {
     const effectiveLevel = level + 1;
+    const SPEED_MULTIPLIER = 5; // 생산 속도 배율
     
     switch (type) {
       case 'metal':
-        return Math.floor(90 * effectiveLevel * Math.pow(1.1, effectiveLevel));
+        return Math.floor(90 * effectiveLevel * Math.pow(1.1, effectiveLevel) * SPEED_MULTIPLIER);
       case 'crystal':
-        return Math.floor(60 * effectiveLevel * Math.pow(1.1, effectiveLevel));
+        return Math.floor(60 * effectiveLevel * Math.pow(1.1, effectiveLevel) * SPEED_MULTIPLIER);
       case 'deuterium':
-        return Math.floor(30 * effectiveLevel * Math.pow(1.1, effectiveLevel));
+        return Math.floor(30 * effectiveLevel * Math.pow(1.1, effectiveLevel) * SPEED_MULTIPLIER);
       default:
         return 0;
     }

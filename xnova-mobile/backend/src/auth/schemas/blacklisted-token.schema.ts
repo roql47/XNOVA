@@ -23,3 +23,4 @@ BlacklistedTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 // 토큰 조회를 위한 인덱스
 BlacklistedTokenSchema.index({ token: 1 });
 
+
