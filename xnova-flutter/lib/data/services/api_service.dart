@@ -189,9 +189,11 @@ class ApiService {
     return response.data;
   }
 
-  /// 함대 귀환 명령 (공격 도중 귀환)
-  Future<Map<String, dynamic>> recallFleet() async {
-    final response = await _dio.post('game/battle/recall');
+  /// 함대 귀환 명령 (공격 도중 귀환) - 다중 함대 지원
+  Future<Map<String, dynamic>> recallFleet({String? missionId}) async {
+    final response = await _dio.post('game/battle/recall', data: {
+      if (missionId != null) 'missionId': missionId,
+    });
     return response.data;
   }
 

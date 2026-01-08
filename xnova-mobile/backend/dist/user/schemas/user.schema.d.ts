@@ -105,6 +105,8 @@ export declare class AttackProgress {
         deuterium: number;
     };
     missionType?: string;
+    originCoord?: string;
+    originPlanetId?: string;
 }
 export declare class ReturnProgress {
     fleet: Record<string, number>;
@@ -112,6 +114,30 @@ export declare class ReturnProgress {
     returnTime: Date;
     startTime: Date;
     missionType: string;
+    originPlanetId?: string;
+}
+export declare class FleetMission {
+    missionId: string;
+    phase: string;
+    missionType: string;
+    targetCoord: string;
+    targetUserId?: string;
+    fleet: Record<string, number>;
+    capacity: number;
+    travelTime: number;
+    startTime: Date;
+    arrivalTime: Date;
+    returnTime?: Date;
+    returnStartTime?: Date;
+    loot?: Record<string, number>;
+    transportResources?: {
+        metal: number;
+        crystal: number;
+        deuterium: number;
+    };
+    originCoord?: string;
+    originPlanetId?: string;
+    battleCompleted?: boolean;
 }
 export declare class VacationMode {
     isActive: boolean;
@@ -142,6 +168,7 @@ export declare class User {
     pendingAttack: AttackProgress | null;
     pendingReturn: ReturnProgress | null;
     incomingAttack: AttackProgress | null;
+    fleetMissions: FleetMission[];
     lastResourceUpdate: Date;
     lastActivity: Date;
 }
@@ -357,6 +384,15 @@ export declare const UserSchema: import("mongoose").Schema<User, import("mongoos
         id: string;
     }> | undefined;
     incomingAttack?: import("mongoose").SchemaDefinitionProperty<AttackProgress | null, User, Document<unknown, {}, User, {
+        id: string;
+    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
+        _id: import("mongoose").Types.ObjectId;
+    } & {
+        __v: number;
+    }, "id"> & {
+        id: string;
+    }> | undefined;
+    fleetMissions?: import("mongoose").SchemaDefinitionProperty<FleetMission[], User, Document<unknown, {}, User, {
         id: string;
     }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
         _id: import("mongoose").Types.ObjectId;

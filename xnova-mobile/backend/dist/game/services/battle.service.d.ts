@@ -58,6 +58,16 @@ export declare class BattleService {
     private battleReportService;
     constructor(userModel: Model<UserDocument>, planetModel: Model<PlanetDocument>, resourcesService: ResourcesService, fleetService: FleetService, rankingService: RankingService, messageService: MessageService, galaxyService: GalaxyService, battleReportService: BattleReportService);
     private findPlanetByCoordinate;
+    private isHomePlanet;
+    private getMaxFleetSlots;
+    private getActiveFleetCount;
+    private generateMissionId;
+    private hasAvailableFleetSlot;
+    private findMission;
+    private setMissionReturning;
+    private removeMission;
+    private syncLegacyFields;
+    private getActivePlanetData;
     private calculateAttackPower;
     private calculateMaxShield;
     private calculateHull;
@@ -86,16 +96,27 @@ export declare class BattleService {
         travelTime: number;
         arrivalTime: Date;
         distance: number;
+        missionId: string;
+        fleetSlots: {
+            used: number;
+            max: number;
+        };
     }>;
     getAttackStatus(userId: string): Promise<any>;
     startRecycle(attackerId: string, targetCoord: string, fleet: Record<string, number>): Promise<{
         message: string;
         travelTime: number;
         arrivalTime: Date;
+        missionId: string;
+        fleetSlots: {
+            used: number;
+            max: number;
+        };
     }>;
-    processRecycleArrival(userId: string): Promise<{
+    processRecycleArrival(userId: string, missionId?: string): Promise<{
         metalLoot: number;
         crystalLoot: number;
+        missionId: any;
     } | null>;
     processAttackArrival(attackerId: string): Promise<{
         battleResult: BattleResult;
@@ -107,16 +128,23 @@ export declare class BattleService {
         attacker: any;
         defender: any;
     }>>;
-    recallFleet(userId: string): Promise<{
+    recallFleet(userId: string, missionId?: string): Promise<{
         message: string;
         fleet: {
             [x: string]: number;
         };
         returnTime: number;
+        missionId?: undefined;
+    } | {
+        message: string;
+        fleet: any;
+        returnTime: number;
+        missionId: any;
     }>;
-    processFleetReturn(userId: string): Promise<{
-        returnedFleet: Record<string, number>;
-        loot: Record<string, number>;
+    processFleetReturn(userId: string, missionId?: string): Promise<{
+        returnedFleet: any;
+        loot: any;
+        missionId: any;
     } | null>;
     startTransport(userId: string, targetCoord: string, fleet: Record<string, number>, resources: {
         metal: number;
@@ -132,9 +160,15 @@ export declare class BattleService {
             crystal: number;
             deuterium: number;
         };
+        missionId: string;
+        fleetSlots: {
+            used: number;
+            max: number;
+        };
     }>;
-    processTransportArrival(userId: string): Promise<{
+    processTransportArrival(userId: string, missionId?: string): Promise<{
         delivered: any;
+        missionId: any;
     } | null>;
     startDeploy(userId: string, targetCoord: string, fleet: Record<string, number>, resources: {
         metal: number;
@@ -150,10 +184,16 @@ export declare class BattleService {
             crystal: number;
             deuterium: number;
         };
+        missionId: string;
+        fleetSlots: {
+            used: number;
+            max: number;
+        };
     }>;
-    processDeployArrival(userId: string): Promise<{
-        fleet: Record<string, number>;
+    processDeployArrival(userId: string, missionId?: string): Promise<{
+        fleet: any;
         resources: any;
+        missionId: any;
     } | null>;
     calculateAvailableCapacity(fleet: Record<string, number>, distance: number): {
         totalCapacity: number;

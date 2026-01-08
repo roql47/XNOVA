@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserSchema = exports.User = exports.VacationMode = exports.ReturnProgress = exports.AttackProgress = exports.ProgressInfo = exports.Defense = exports.Fleet = exports.ResearchLevels = exports.PlanetInfo = exports.Facilities = exports.Mines = exports.Resources = void 0;
+exports.UserSchema = exports.User = exports.VacationMode = exports.FleetMission = exports.ReturnProgress = exports.AttackProgress = exports.ProgressInfo = exports.Defense = exports.Fleet = exports.ResearchLevels = exports.PlanetInfo = exports.Facilities = exports.Mines = exports.Resources = void 0;
 const mongoose_1 = require("@nestjs/mongoose");
 let Resources = class Resources {
     metal;
@@ -440,6 +440,8 @@ let AttackProgress = class AttackProgress {
     battleCompleted;
     transportResources;
     missionType;
+    originCoord;
+    originPlanetId;
 };
 exports.AttackProgress = AttackProgress;
 __decorate([
@@ -482,6 +484,14 @@ __decorate([
     (0, mongoose_1.Prop)({ type: String, default: 'attack' }),
     __metadata("design:type", String)
 ], AttackProgress.prototype, "missionType", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: String, default: null }),
+    __metadata("design:type", String)
+], AttackProgress.prototype, "originCoord", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: String, default: null }),
+    __metadata("design:type", String)
+], AttackProgress.prototype, "originPlanetId", void 0);
 exports.AttackProgress = AttackProgress = __decorate([
     (0, mongoose_1.Schema)({ _id: false })
 ], AttackProgress);
@@ -491,6 +501,7 @@ let ReturnProgress = class ReturnProgress {
     returnTime;
     startTime;
     missionType;
+    originPlanetId;
 };
 exports.ReturnProgress = ReturnProgress;
 __decorate([
@@ -513,9 +524,104 @@ __decorate([
     (0, mongoose_1.Prop)({ default: 'attack' }),
     __metadata("design:type", String)
 ], ReturnProgress.prototype, "missionType", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: String, default: null }),
+    __metadata("design:type", String)
+], ReturnProgress.prototype, "originPlanetId", void 0);
 exports.ReturnProgress = ReturnProgress = __decorate([
     (0, mongoose_1.Schema)({ _id: false })
 ], ReturnProgress);
+let FleetMission = class FleetMission {
+    missionId;
+    phase;
+    missionType;
+    targetCoord;
+    targetUserId;
+    fleet;
+    capacity;
+    travelTime;
+    startTime;
+    arrivalTime;
+    returnTime;
+    returnStartTime;
+    loot;
+    transportResources;
+    originCoord;
+    originPlanetId;
+    battleCompleted;
+};
+exports.FleetMission = FleetMission;
+__decorate([
+    (0, mongoose_1.Prop)({ required: true }),
+    __metadata("design:type", String)
+], FleetMission.prototype, "missionId", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ required: true }),
+    __metadata("design:type", String)
+], FleetMission.prototype, "phase", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ required: true }),
+    __metadata("design:type", String)
+], FleetMission.prototype, "missionType", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ required: true }),
+    __metadata("design:type", String)
+], FleetMission.prototype, "targetCoord", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", String)
+], FleetMission.prototype, "targetUserId", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: Object, required: true }),
+    __metadata("design:type", Object)
+], FleetMission.prototype, "fleet", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 0 }),
+    __metadata("design:type", Number)
+], FleetMission.prototype, "capacity", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ required: true }),
+    __metadata("design:type", Number)
+], FleetMission.prototype, "travelTime", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ required: true }),
+    __metadata("design:type", Date)
+], FleetMission.prototype, "startTime", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ required: true }),
+    __metadata("design:type", Date)
+], FleetMission.prototype, "arrivalTime", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", Date)
+], FleetMission.prototype, "returnTime", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", Date)
+], FleetMission.prototype, "returnStartTime", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: Object }),
+    __metadata("design:type", Object)
+], FleetMission.prototype, "loot", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: Object }),
+    __metadata("design:type", Object)
+], FleetMission.prototype, "transportResources", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", String)
+], FleetMission.prototype, "originCoord", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", String)
+], FleetMission.prototype, "originPlanetId", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: false }),
+    __metadata("design:type", Boolean)
+], FleetMission.prototype, "battleCompleted", void 0);
+exports.FleetMission = FleetMission = __decorate([
+    (0, mongoose_1.Schema)({ _id: false })
+], FleetMission);
 let VacationMode = class VacationMode {
     isActive;
     startTime;
@@ -561,6 +667,7 @@ let User = class User {
     pendingAttack;
     pendingReturn;
     incomingAttack;
+    fleetMissions;
     lastResourceUpdate;
     lastActivity;
 };
@@ -657,6 +764,10 @@ __decorate([
     (0, mongoose_1.Prop)({ type: AttackProgress, default: null }),
     __metadata("design:type", Object)
 ], User.prototype, "incomingAttack", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: [FleetMission], default: [] }),
+    __metadata("design:type", Array)
+], User.prototype, "fleetMissions", void 0);
 __decorate([
     (0, mongoose_1.Prop)({ default: Date.now }),
     __metadata("design:type", Date)

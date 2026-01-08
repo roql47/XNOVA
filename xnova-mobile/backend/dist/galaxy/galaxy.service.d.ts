@@ -42,9 +42,14 @@ export declare class GalaxyService {
     private debrisModel;
     private messageService;
     constructor(userModel: Model<UserDocument>, planetModel: Model<PlanetDocument>, debrisModel: Model<DebrisDocument>, messageService: MessageService);
+    cleanupExpiredDebris(): Promise<number>;
+    private isDebrisExpired;
     getGalaxyMap(galaxy: number, system: number, currentUserId: string): Promise<PlanetInfo[]>;
     updateDebris(coordinate: string, metal: number, crystal: number): Promise<void>;
-    getDebris(coordinate: string): Promise<(import("mongoose").Document<unknown, {}, DebrisDocument, {}, import("mongoose").DefaultSchemaOptions> & Debris & import("mongoose").Document<import("mongoose").Types.ObjectId, any, any, Record<string, any>, {}> & Required<{
+    getDebris(coordinate: string): Promise<(import("mongoose").Document<unknown, {}, DebrisDocument, {}, import("mongoose").DefaultSchemaOptions> & Debris & import("mongoose").Document<import("mongoose").Types.ObjectId, any, any, Record<string, any>, {}> & {
+        createdAt: Date;
+        updatedAt: Date;
+    } & Required<{
         _id: import("mongoose").Types.ObjectId;
     }> & {
         __v: number;

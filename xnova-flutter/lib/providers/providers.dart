@@ -996,10 +996,10 @@ class GameNotifier extends StateNotifier<GameState> {
     }
   }
 
-  /// 함대 귀환 명령 (공격 도중 귀환)
-  Future<bool> recallFleet() async {
+  /// 함대 귀환 명령 (공격 도중 귀환) - 다중 함대 지원
+  Future<bool> recallFleet({String? missionId}) async {
     try {
-      await _apiService.recallFleet();
+      await _apiService.recallFleet(missionId: missionId);
       await loadBattleStatus();
       return true;
     } catch (e) {
@@ -1063,6 +1063,31 @@ class GameNotifier extends StateNotifier<GameState> {
           await _apiService.completeDefense();
           needsRefresh = true;
         }
+      }
+      
+      // 전투/수확/귀환 완료 체크
+      bool battleNeedsProcess = false;
+      if (state.battleStatus != null) {
+        // 공격/수확 도착 체크
+        if (state.battleStatus!.pendingAttack != null) {
+          final finishTime = state.battleStatus!.pendingAttack!.finishDateTime;
+          if (now.isAfter(finishTime) && !state.battleStatus!.pendingAttack!.battleCompleted) {
+            battleNeedsProcess = true;
+          }
+        }
+        // 귀환 완료 체크
+        if (!battleNeedsProcess && state.battleStatus!.pendingReturn != null) {
+          final finishTime = state.battleStatus!.pendingReturn!.finishDateTime;
+          if (now.isAfter(finishTime)) {
+            battleNeedsProcess = true;
+          }
+        }
+      }
+      
+      // 전투 관련 처리가 필요한 경우
+      if (battleNeedsProcess) {
+        await processBattle();
+        needsRefresh = true;
       }
       
       // 완료된 작업이 있으면 데이터 새로고침

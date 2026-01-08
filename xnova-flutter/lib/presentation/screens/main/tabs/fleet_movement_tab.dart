@@ -261,6 +261,10 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
   }
 
   void _showRecallConfirmDialog(BuildContext context, WidgetRef ref) {
+    _showRecallConfirmDialogForMission(context, ref, null);
+  }
+
+  void _showRecallConfirmDialogForMission(BuildContext context, WidgetRef ref, String? missionId) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -285,7 +289,7 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              final success = await ref.read(gameProvider.notifier).recallFleet();
+              final success = await ref.read(gameProvider.notifier).recallFleet(missionId: missionId);
               if (context.mounted) {
                 if (success) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -331,36 +335,81 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
       child: ListView(
         padding: const EdgeInsets.all(12),
         children: [
+          // 함대 슬롯 정보 표시
           if (gameState.battleStatus != null) ...[
-            if (gameState.battleStatus!.pendingAttack != null)
-              _BattleCard(
-                icon: gameState.battleStatus!.pendingAttack!.missionType == 'transport'
-                    ? Icons.local_shipping
-                    : gameState.battleStatus!.pendingAttack!.missionType == 'deploy'
-                        ? Icons.home_work
-                        : gameState.battleStatus!.pendingAttack!.missionType == 'recycle'
-                            ? Icons.blur_on
-                            : gameState.battleStatus!.pendingAttack!.missionType == 'colony'
-                                ? Icons.rocket_launch
-                                : Icons.flight_takeoff,
-                title: gameState.battleStatus!.pendingAttack!.missionTitle,
-                target: gameState.battleStatus!.pendingAttack!.targetCoord,
-                fleet: gameState.battleStatus!.pendingAttack!.fleet,
-                finishTime: gameState.battleStatus!.pendingAttack!.finishDateTime,
-                onComplete: () => ref.read(gameProvider.notifier).processBattle(),
-                showRecallButton: !gameState.battleStatus!.pendingAttack!.battleCompleted,
-                onRecall: () => _showRecallConfirmDialog(context, ref),
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: AppColors.panelBorder),
               ),
-            if (gameState.battleStatus!.pendingReturn != null)
-              _BattleCard(
-                icon: Icons.flight_land,
-                title: gameState.battleStatus!.pendingReturn!.returnTitle,
-                target: '본행성',
-                fleet: gameState.battleStatus!.pendingReturn!.fleet,
-                finishTime: gameState.battleStatus!.pendingReturn!.finishDateTime,
-                onComplete: () => ref.read(gameProvider.notifier).processBattle(),
-                loot: gameState.battleStatus!.pendingReturn!.loot,
+              child: Row(
+                children: [
+                  Icon(Icons.rocket, size: 16, color: AppColors.accent),
+                  const SizedBox(width: 8),
+                  Text(
+                    '함대 슬롯',
+                    style: const TextStyle(color: AppColors.textPrimary, fontSize: 12),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${gameState.battleStatus!.fleetSlots.used} / ${gameState.battleStatus!.fleetSlots.max}',
+                    style: TextStyle(
+                      color: gameState.battleStatus!.fleetSlots.used >= gameState.battleStatus!.fleetSlots.max
+                          ? AppColors.negative
+                          : AppColors.positive,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
               ),
+            ),
+
+            // 다중 함대 미션 표시 (새로운 fleetMissions 배열)
+            ...gameState.battleStatus!.fleetMissions.map((mission) => _FleetMissionCard(
+              mission: mission,
+              onComplete: () => ref.read(gameProvider.notifier).processBattle(),
+              onRecall: mission.phase == 'outbound' 
+                  ? () => _showRecallConfirmDialogForMission(context, ref, mission.missionId)
+                  : null,
+            )),
+
+            // 하위 호환성: 기존 pendingAttack/pendingReturn (fleetMissions가 비어있을 때만)
+            if (gameState.battleStatus!.fleetMissions.isEmpty) ...[
+              if (gameState.battleStatus!.pendingAttack != null)
+                _BattleCard(
+                  icon: gameState.battleStatus!.pendingAttack!.missionType == 'transport'
+                      ? Icons.local_shipping
+                      : gameState.battleStatus!.pendingAttack!.missionType == 'deploy'
+                          ? Icons.home_work
+                          : gameState.battleStatus!.pendingAttack!.missionType == 'recycle'
+                              ? Icons.blur_on
+                              : gameState.battleStatus!.pendingAttack!.missionType == 'colony'
+                                  ? Icons.rocket_launch
+                                  : Icons.flight_takeoff,
+                  title: gameState.battleStatus!.pendingAttack!.missionTitle,
+                  target: gameState.battleStatus!.pendingAttack!.targetCoord,
+                  fleet: gameState.battleStatus!.pendingAttack!.fleet,
+                  finishTime: gameState.battleStatus!.pendingAttack!.finishDateTime,
+                  onComplete: () => ref.read(gameProvider.notifier).processBattle(),
+                  showRecallButton: !gameState.battleStatus!.pendingAttack!.battleCompleted,
+                  onRecall: () => _showRecallConfirmDialog(context, ref),
+                ),
+              if (gameState.battleStatus!.pendingReturn != null)
+                _BattleCard(
+                  icon: Icons.flight_land,
+                  title: gameState.battleStatus!.pendingReturn!.returnTitle,
+                  target: '본행성',
+                  fleet: gameState.battleStatus!.pendingReturn!.fleet,
+                  finishTime: gameState.battleStatus!.pendingReturn!.finishDateTime,
+                  onComplete: () => ref.read(gameProvider.notifier).processBattle(),
+                  loot: gameState.battleStatus!.pendingReturn!.loot,
+                ),
+            ],
+
             if (gameState.battleStatus!.incomingAttack != null)
               _IncomingAttackCard(
                 attackerCoord: gameState.battleStatus!.incomingAttack!.attackerCoord,
@@ -823,6 +872,206 @@ class _BattleCard extends StatelessWidget {
                   ),
                 ),
                 if (showRecallButton && onRecall != null)
+                  Material(
+                    color: AppColors.warning,
+                    borderRadius: BorderRadius.circular(4),
+                    child: InkWell(
+                      onTap: onRecall,
+                      borderRadius: BorderRadius.circular(4),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.u_turn_left, size: 14, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text(
+                              '귀환',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// 다중 함대 미션 카드
+class _FleetMissionCard extends StatelessWidget {
+  final FleetMission mission;
+  final VoidCallback onComplete;
+  final VoidCallback? onRecall;
+
+  const _FleetMissionCard({
+    required this.mission,
+    required this.onComplete,
+    this.onRecall,
+  });
+
+  IconData get _missionIcon {
+    if (mission.isReturning) return Icons.flight_land;
+    switch (mission.missionType) {
+      case 'transport':
+        return Icons.local_shipping;
+      case 'deploy':
+        return Icons.home_work;
+      case 'recycle':
+        return Icons.blur_on;
+      case 'colony':
+        return Icons.rocket_launch;
+      default:
+        return Icons.flight_takeoff;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: mission.isReturning 
+              ? AppColors.positive.withOpacity(0.05)
+              : AppColors.panelBackground,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: mission.isReturning 
+                ? AppColors.positive.withOpacity(0.3)
+                : AppColors.panelBorder,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(_missionIcon, size: 16, color: AppColors.accent),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    mission.missionTitle,
+                    style: const TextStyle(
+                      color: AppColors.accent,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: mission.isReturning 
+                        ? AppColors.positive.withOpacity(0.1)
+                        : AppColors.accent.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    mission.isReturning ? '귀환' : '출격',
+                    style: TextStyle(
+                      color: mission.isReturning ? AppColors.positive : AppColors.accent,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '목표: ${mission.targetCoord}',
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+              ),
+            ),
+            if (mission.originCoord != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                '출발: ${mission.originCoord}',
+                style: const TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: mission.fleet.entries.where((e) => e.value > 0).map((e) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '${GameConstants.getName(e.key)}: ${e.value}',
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 10,
+                  ),
+                ),
+              )).toList(),
+            ),
+            if (mission.loot != null && mission.loot!.values.any((v) => v > 0)) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.positive.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.positive.withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '획득 자원:',
+                      style: TextStyle(
+                        color: AppColors.positive,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        _LootItem(label: '메탈', value: mission.loot!['metal'] ?? 0, color: AppColors.metalColor),
+                        const SizedBox(width: 12),
+                        _LootItem(label: '크리스탈', value: mission.loot!['crystal'] ?? 0, color: AppColors.crystalColor),
+                        const SizedBox(width: 12),
+                        _LootItem(label: '중수소', value: mission.loot!['deuterium'] ?? 0, color: AppColors.deuteriumColor),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.schedule, size: 14, color: AppColors.textMuted),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: ProgressTimer(
+                    finishTime: mission.finishDateTime,
+                    onComplete: onComplete,
+                  ),
+                ),
+                if (onRecall != null)
                   Material(
                     color: AppColors.warning,
                     borderRadius: BorderRadius.circular(4),

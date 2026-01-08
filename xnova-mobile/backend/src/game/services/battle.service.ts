@@ -94,6 +94,221 @@ export class BattleService {
   }
 
   /**
+   * 활성 행성이 모행성인지 확인
+   */
+  private isHomePlanet(activePlanetId: string | null | undefined, userId: string): boolean {
+    return !activePlanetId || activePlanetId === `home_${userId}`;
+  }
+
+  /**
+   * 최대 함대 슬롯 수 계산 (1 + 컴퓨터공학 레벨)
+   */
+  private getMaxFleetSlots(user: UserDocument): number {
+    const computerTech = user.researchLevels?.computerTech || 0;
+    return 1 + computerTech;
+  }
+
+  /**
+   * 현재 활성 함대 미션 수
+   */
+  private getActiveFleetCount(user: UserDocument): number {
+    // 새로운 fleetMissions 배열 사용
+    const fleetMissions = user.fleetMissions || [];
+    return fleetMissions.length;
+  }
+
+  /**
+   * 고유 미션 ID 생성
+   */
+  private generateMissionId(): string {
+    return `mission_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  /**
+   * 함대 슬롯 여유 확인
+   */
+  private hasAvailableFleetSlot(user: UserDocument): boolean {
+    return this.getActiveFleetCount(user) < this.getMaxFleetSlots(user);
+  }
+
+  /**
+   * fleetMissions 배열에서 특정 조건의 미션 찾기
+   */
+  private findMission(
+    user: UserDocument,
+    conditions: { missionType?: string; phase?: string; missionId?: string }
+  ): any | null {
+    if (!user.fleetMissions || user.fleetMissions.length === 0) return null;
+    
+    const now = Date.now();
+    return user.fleetMissions.find((m: any) => {
+      if (conditions.missionId && m.missionId !== conditions.missionId) return false;
+      if (conditions.missionType && m.missionType !== conditions.missionType) return false;
+      if (conditions.phase && m.phase !== conditions.phase) return false;
+      
+      // outbound인 경우 도착 시간 확인
+      if (conditions.phase === 'outbound') {
+        return new Date(m.arrivalTime).getTime() <= now;
+      }
+      // returning인 경우 귀환 시간 확인
+      if (conditions.phase === 'returning') {
+        return m.returnTime && new Date(m.returnTime).getTime() <= now;
+      }
+      return true;
+    });
+  }
+
+  /**
+   * fleetMissions 배열에서 미션을 귀환 상태로 전환
+   */
+  private setMissionReturning(
+    user: UserDocument,
+    missionId: string,
+    loot: { metal: number; crystal: number; deuterium: number },
+    returnTime: Date,
+    survivingFleet?: Record<string, number>,
+  ): void {
+    const missions = user.fleetMissions || [];
+    const index = missions.findIndex((m: any) => m.missionId === missionId);
+    if (index !== -1) {
+      const mission = missions[index] as any;
+      mission.phase = 'returning';
+      mission.returnStartTime = new Date();
+      mission.returnTime = returnTime;
+      mission.loot = loot;
+      if (survivingFleet) {
+        mission.fleet = survivingFleet;
+      }
+      user.markModified('fleetMissions');
+    }
+  }
+
+  /**
+   * fleetMissions 배열에서 미션 제거
+   */
+  private removeMission(user: UserDocument, missionId: string): void {
+    if (!user.fleetMissions) return;
+    user.fleetMissions = user.fleetMissions.filter((m: any) => m.missionId !== missionId);
+    user.markModified('fleetMissions');
+  }
+
+  /**
+   * pendingAttack/pendingReturn 동기화 (하위 호환성)
+   */
+  private syncLegacyFields(user: UserDocument): void {
+    const missions = user.fleetMissions || [];
+    
+    // 가장 먼저 시작된 outbound 미션을 pendingAttack으로
+    const outboundMission = missions.find((m: any) => m.phase === 'outbound');
+    if (outboundMission) {
+      const m = outboundMission as any;
+      user.pendingAttack = {
+        targetCoord: m.targetCoord,
+        targetUserId: m.targetUserId || '',
+        fleet: m.fleet,
+        capacity: m.capacity,
+        travelTime: m.travelTime,
+        startTime: m.startTime,
+        arrivalTime: m.arrivalTime,
+        battleCompleted: m.battleCompleted || false,
+        missionType: m.missionType,
+        originCoord: m.originCoord,
+        originPlanetId: m.originPlanetId,
+        transportResources: m.transportResources,
+      };
+    } else {
+      user.pendingAttack = null;
+    }
+
+    // 가장 먼저 시작된 returning 미션을 pendingReturn으로
+    const returningMission = missions.find((m: any) => m.phase === 'returning');
+    if (returningMission) {
+      const m = returningMission as any;
+      user.pendingReturn = {
+        fleet: m.fleet,
+        loot: m.loot || { metal: 0, crystal: 0, deuterium: 0 },
+        returnTime: m.returnTime,
+        startTime: m.returnStartTime || new Date(),
+        missionType: m.missionType,
+        originPlanetId: m.originPlanetId,
+      };
+    } else {
+      user.pendingReturn = null;
+    }
+
+    user.markModified('pendingAttack');
+    user.markModified('pendingReturn');
+  }
+
+  /**
+   * 활성 행성 데이터 가져오기 (출격용)
+   * 모행성 또는 식민지의 함대, 자원, 좌표 정보 반환
+   */
+  private async getActivePlanetData(userId: string): Promise<{
+    user: UserDocument;
+    planet: PlanetDocument | null;
+    isHome: boolean;
+    coordinate: string;
+    fleet: Record<string, number>;
+    resources: { metal: number; crystal: number; deuterium: number };
+  } | null> {
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) return null;
+
+    const isHome = this.isHomePlanet(user.activePlanetId, userId);
+
+    if (isHome) {
+      // 모행성
+      const fleetObj = (user.fleet as any).toObject ? (user.fleet as any).toObject() : user.fleet;
+      return {
+        user,
+        planet: null,
+        isHome: true,
+        coordinate: user.coordinate,
+        fleet: fleetObj,
+        resources: {
+          metal: user.resources.metal,
+          crystal: user.resources.crystal,
+          deuterium: user.resources.deuterium,
+        },
+      };
+    } else {
+      // 식민지
+      const planet = await this.planetModel.findById(user.activePlanetId).exec();
+      if (!planet) {
+        // 식민지가 없으면 모행성으로 폴백
+        const fleetObj = (user.fleet as any).toObject ? (user.fleet as any).toObject() : user.fleet;
+        return {
+          user,
+          planet: null,
+          isHome: true,
+          coordinate: user.coordinate,
+          fleet: fleetObj,
+          resources: {
+            metal: user.resources.metal,
+            crystal: user.resources.crystal,
+            deuterium: user.resources.deuterium,
+          },
+        };
+      }
+
+      const fleetObj = planet.fleet ? ((planet.fleet as any).toObject ? (planet.fleet as any).toObject() : planet.fleet) : {};
+      return {
+        user,
+        planet,
+        isHome: false,
+        coordinate: planet.coordinate,
+        fleet: fleetObj,
+        resources: {
+          metal: planet.resources?.metal || 0,
+          crystal: planet.resources?.crystal || 0,
+          deuterium: planet.resources?.deuterium || 0,
+        },
+      };
+    }
+  }
+
+  /**
    * OGame 공식에 따른 공격력 계산
    * 공격력 = 기본 공격력 × (10 + 무기기술 레벨) / 10
    */
@@ -892,20 +1107,25 @@ export class BattleService {
     };
   }
 
-  // 공격 시작
+  // 공격 시작 (활성 행성 기준)
   async startAttack(
     attackerId: string,
     targetCoord: string,
     fleet: Record<string, number>,
   ) {
-    const attacker = await this.resourcesService.updateResources(attackerId);
-    if (!attacker) {
+    // 활성 행성 데이터 가져오기
+    const activePlanetData = await this.getActivePlanetData(attackerId);
+    if (!activePlanetData) {
       throw new BadRequestException('공격자를 찾을 수 없습니다.');
     }
 
-    // 이미 공격 중인지 확인
-    if (attacker.pendingAttack) {
-      throw new BadRequestException('이미 함대가 출격 중입니다.');
+    const { user: attacker, planet: attackerPlanet, isHome, coordinate: attackerCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+
+    // 함대 슬롯 확인 (컴퓨터공학 레벨 + 1 = 최대 동시 운용 함대 수)
+    const maxSlots = this.getMaxFleetSlots(attacker);
+    const activeFleets = this.getActiveFleetCount(attacker);
+    if (activeFleets >= maxSlots) {
+      throw new BadRequestException(`최대 함대 슬롯(${maxSlots}개)을 모두 사용 중입니다. 컴퓨터공학 연구로 슬롯을 늘릴 수 있습니다.`);
     }
 
     // 타겟 찾기 (모행성 + 식민지)
@@ -940,7 +1160,7 @@ export class BattleService {
       );
     }
 
-    // 함대 확인
+    // 함대 확인 (활성 행성 기준)
     for (const type in fleet) {
       const count = fleet[type];
       
@@ -957,42 +1177,62 @@ export class BattleService {
         if (type === 'solarSatellite') {
           throw new BadRequestException('태양광인공위성은 공격에 참여할 수 없습니다.');
         }
-        if (!(attacker.fleet as any)[type] || (attacker.fleet as any)[type] < count) {
+        if (!availableFleet[type] || availableFleet[type] < count) {
           throw new BadRequestException(`${NAME_MAPPING[type] || type}을(를) ${count}대 보유하고 있지 않습니다.`);
         }
       }
     }
 
-    // 거리 및 이동 시간 계산
-    const distance = this.calculateDistance(attacker.coordinate, targetCoord);
+    // 거리 및 이동 시간 계산 (활성 행성 좌표 기준)
+    const distance = this.calculateDistance(attackerCoord, targetCoord);
     const minSpeed = this.fleetService.getFleetSpeed(fleet);
     const travelTime = (distance / minSpeed) * 3600;
 
     // 연료 소비량 계산
     const fuelConsumption = this.fleetService.calculateFuelConsumption(fleet, distance, travelTime);
 
-    if (attacker.resources.deuterium < fuelConsumption) {
-      throw new BadRequestException(`듀테륨이 부족합니다. 필요: ${fuelConsumption}, 보유: ${Math.floor(attacker.resources.deuterium)}`);
+    if (availableResources.deuterium < fuelConsumption) {
+      throw new BadRequestException(`듀테륨이 부족합니다. 필요: ${fuelConsumption}, 보유: ${Math.floor(availableResources.deuterium)}`);
     }
 
-    // 연료 차감
-    attacker.resources.deuterium -= fuelConsumption;
-
-    // 함대 차감
-    for (const type in fleet) {
-      if (fleet[type] > 0) {
-        (attacker.fleet as any)[type] -= fleet[type];
+    // 연료 및 함대 차감 (활성 행성 기준)
+    if (isHome) {
+      // 모행성에서 차감
+      attacker.resources.deuterium -= fuelConsumption;
+      for (const type in fleet) {
+        if (fleet[type] > 0) {
+          (attacker.fleet as any)[type] -= fleet[type];
+        }
       }
+      attacker.markModified('fleet');
+      attacker.markModified('resources');
+    } else if (attackerPlanet) {
+      // 식민지에서 차감
+      attackerPlanet.resources.deuterium -= fuelConsumption;
+      for (const type in fleet) {
+        if (fleet[type] > 0) {
+          if (!attackerPlanet.fleet) attackerPlanet.fleet = {} as any;
+          (attackerPlanet.fleet as any)[type] = ((attackerPlanet.fleet as any)[type] || 0) - fleet[type];
+        }
+      }
+      attackerPlanet.markModified('fleet');
+      attackerPlanet.markModified('resources');
+      await attackerPlanet.save();
     }
 
     // 선적량 계산
     const capacity = this.fleetService.calculateTotalCapacity(fleet);
 
-    // 공격 정보 저장
+    // 공격 정보 저장 (출발 좌표도 저장)
     const startTime = new Date();
     const arrivalTime = new Date(startTime.getTime() + travelTime * 1000);
+    const missionId = this.generateMissionId();
 
-    attacker.pendingAttack = {
+    // 새로운 fleetMissions 배열에 미션 추가
+    const newMission = {
+      missionId,
+      phase: 'outbound',
+      missionType: 'attack',
       targetCoord,
       targetUserId: target._id.toString(),
       fleet,
@@ -1000,12 +1240,36 @@ export class BattleService {
       travelTime,
       startTime,
       arrivalTime,
+      originCoord: attackerCoord,
+      originPlanetId: isHome ? undefined : attackerPlanet?._id.toString(),
       battleCompleted: false,
     };
 
+    if (!attacker.fleetMissions) {
+      attacker.fleetMissions = [];
+    }
+    attacker.fleetMissions.push(newMission as any);
+    attacker.markModified('fleetMissions');
+
+    // 하위 호환성을 위해 첫 번째 미션인 경우 pendingAttack도 설정
+    if (attacker.fleetMissions.length === 1) {
+      attacker.pendingAttack = {
+        targetCoord,
+        targetUserId: target._id.toString(),
+        fleet,
+        capacity,
+        travelTime,
+        startTime,
+        arrivalTime,
+        battleCompleted: false,
+        originCoord: attackerCoord,
+        originPlanetId: isHome ? undefined : attackerPlanet?._id.toString(),
+      };
+    }
+
     // 방어자에게 공격 알림
     target.incomingAttack = {
-      targetCoord: attacker.coordinate,
+      targetCoord: attackerCoord, // 출발 좌표 사용
       targetUserId: attackerId,
       fleet: {}, // 적 함대 정보는 숨김
       capacity: 0,
@@ -1019,13 +1283,15 @@ export class BattleService {
     await target.save();
 
     return {
-      message: `${targetCoord} 좌표로 함대가 출격했습니다.`,
+      message: `${targetCoord} 좌표로 함대가 출격했습니다. (${activeFleets + 1}/${maxSlots} 슬롯 사용중)`,
       fleet,
       capacity,
       fuelConsumption,
       travelTime,
       arrivalTime,
       distance,
+      missionId,
+      fleetSlots: { used: activeFleets + 1, max: maxSlots },
     };
   }
 
@@ -1034,12 +1300,41 @@ export class BattleService {
     const user = await this.userModel.findById(userId).exec();
     if (!user) return null;
 
+    // 함대 슬롯 정보
+    const maxSlots = this.getMaxFleetSlots(user);
+    const activeFleets = this.getActiveFleetCount(user);
+
     const result: any = {
       pendingAttack: null,
       pendingReturn: null,
       incomingAttack: null,
+      // 다중 함대 정보
+      fleetMissions: [],
+      fleetSlots: { used: activeFleets, max: maxSlots },
     };
 
+    // 새로운 fleetMissions 배열 처리
+    if (user.fleetMissions && user.fleetMissions.length > 0) {
+      const now = Date.now();
+      result.fleetMissions = user.fleetMissions.map((mission: any) => {
+        const isReturning = mission.phase === 'returning';
+        const targetTime = isReturning ? mission.returnTime : mission.arrivalTime;
+        const remaining = Math.max(0, (new Date(targetTime).getTime() - now) / 1000);
+        
+        return {
+          missionId: mission.missionId,
+          phase: mission.phase,
+          missionType: mission.missionType,
+          targetCoord: mission.targetCoord,
+          fleet: mission.fleet,
+          remainingTime: remaining,
+          loot: mission.loot,
+          originCoord: mission.originCoord,
+        };
+      });
+    }
+
+    // 하위 호환성: 기존 pendingAttack
     if (user.pendingAttack) {
       const remaining = Math.max(0, (user.pendingAttack.arrivalTime.getTime() - Date.now()) / 1000);
       // 미션 타입 결정 (새 missionType 필드 우선, 없으면 targetUserId로 판단)
@@ -1103,7 +1398,7 @@ export class BattleService {
     return result;
   }
 
-  // 데브리 수확 시작
+  // 데브리 수확 시작 (활성 행성 기준)
   async startRecycle(
     attackerId: string,
     targetCoord: string,
@@ -1127,30 +1422,35 @@ export class BattleService {
       throw new BadRequestException('수확선을 선택해주세요.');
     }
 
-    const attacker = await this.resourcesService.updateResources(attackerId);
-    if (!attacker) {
+    // 활성 행성 데이터 가져오기
+    const activePlanetData = await this.getActivePlanetData(attackerId);
+    if (!activePlanetData) {
       throw new BadRequestException('사용자를 찾을 수 없습니다.');
     }
 
-    // 이미 함대 활동 중인지 확인 (단순화: 공격/귀환 중이면 불가)
-    if (attacker.pendingAttack || attacker.pendingReturn) {
-      throw new BadRequestException('이미 함대가 활동 중입니다.');
+    const { user: attacker, planet: attackerPlanet, isHome, coordinate: attackerCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+
+    // 함대 슬롯 확인 (컴퓨터공학 레벨 + 1 = 최대 동시 운용 함대 수)
+    const maxSlots = this.getMaxFleetSlots(attacker);
+    const activeFleets = this.getActiveFleetCount(attacker);
+    if (activeFleets >= maxSlots) {
+      throw new BadRequestException(`최대 함대 슬롯(${maxSlots}개)을 모두 사용 중입니다. 컴퓨터공학 연구로 슬롯을 늘릴 수 있습니다.`);
     }
 
-    // 함대 보유 확인
-    if (!attacker.fleet.recycler || attacker.fleet.recycler < fleet.recycler) {
+    // 함대 보유 확인 (활성 행성 기준)
+    if (!availableFleet.recycler || availableFleet.recycler < fleet.recycler) {
       throw new BadRequestException(`수확선을 ${fleet.recycler}대 보유하고 있지 않습니다.`);
     }
 
-    // 거리 및 시간 계산
-    const distance = this.calculateDistance(attacker.coordinate, targetCoord);
+    // 거리 및 시간 계산 (활성 행성 좌표 기준)
+    const distance = this.calculateDistance(attackerCoord, targetCoord);
     const minSpeed = this.fleetService.getFleetSpeed(fleet);
     const travelTime = (distance / minSpeed) * 3600;
 
     // 연료 소비량
     const fuelConsumption = this.fleetService.calculateFuelConsumption(fleet, distance, travelTime);
-    if (attacker.resources.deuterium < fuelConsumption) {
-      throw new BadRequestException(`듀테륨이 부족합니다. 필요: ${fuelConsumption}, 보유: ${Math.floor(attacker.resources.deuterium)}`);
+    if (availableResources.deuterium < fuelConsumption) {
+      throw new BadRequestException(`듀테륨이 부족합니다. 필요: ${fuelConsumption}, 보유: ${Math.floor(availableResources.deuterium)}`);
     }
 
     // 데브리 존재 확인
@@ -1159,50 +1459,105 @@ export class BattleService {
       throw new BadRequestException('해당 좌표에 수확할 데브리가 없습니다.');
     }
 
-    // 차감 및 저장
-    attacker.resources.deuterium -= fuelConsumption;
-    attacker.fleet.recycler -= fleet.recycler;
+    // 차감 (활성 행성 기준)
+    if (isHome) {
+      attacker.resources.deuterium -= fuelConsumption;
+      attacker.fleet.recycler -= fleet.recycler;
+      attacker.markModified('fleet');
+      attacker.markModified('resources');
+    } else if (attackerPlanet) {
+      attackerPlanet.resources.deuterium -= fuelConsumption;
+      if (!attackerPlanet.fleet) attackerPlanet.fleet = {} as any;
+      (attackerPlanet.fleet as any).recycler = ((attackerPlanet.fleet as any).recycler || 0) - fleet.recycler;
+      attackerPlanet.markModified('fleet');
+      attackerPlanet.markModified('resources');
+      await attackerPlanet.save();
+    }
 
     const startTime = new Date();
     const arrivalTime = new Date(startTime.getTime() + travelTime * 1000);
+    const missionId = this.generateMissionId();
+    const capacity = this.fleetService.calculateTotalCapacity(fleet);
 
-    attacker.pendingAttack = {
+    // 새로운 fleetMissions 배열에 미션 추가
+    const newMission = {
+      missionId,
+      phase: 'outbound',
+      missionType: 'recycle',
       targetCoord,
-      targetUserId: 'debris', // 특수 ID
+      targetUserId: 'debris',
       fleet,
-      capacity: this.fleetService.calculateTotalCapacity(fleet),
+      capacity,
       travelTime,
       startTime,
       arrivalTime,
+      originCoord: attackerCoord,
+      originPlanetId: isHome ? undefined : attackerPlanet?._id.toString(),
       battleCompleted: false,
     };
 
-    attacker.markModified('fleet');
-    attacker.markModified('resources');
-    attacker.markModified('pendingAttack');
+    if (!attacker.fleetMissions) {
+      attacker.fleetMissions = [];
+    }
+    attacker.fleetMissions.push(newMission as any);
+    attacker.markModified('fleetMissions');
+
+    // 하위 호환성을 위해 첫 번째 미션인 경우 pendingAttack도 설정
+    if (attacker.fleetMissions.length === 1) {
+      attacker.pendingAttack = {
+        targetCoord,
+        targetUserId: 'debris',
+        fleet,
+        capacity,
+        travelTime,
+        startTime,
+        arrivalTime,
+        battleCompleted: false,
+        originCoord: attackerCoord,
+        originPlanetId: isHome ? undefined : attackerPlanet?._id.toString(),
+      };
+    }
+
     await attacker.save();
 
     return {
-      message: `${targetCoord} 좌표로 수확선이 출격했습니다.`,
+      message: `${targetCoord} 좌표로 수확선이 출격했습니다. (${activeFleets + 1}/${maxSlots} 슬롯 사용중)`,
       travelTime,
       arrivalTime,
+      missionId,
+      fleetSlots: { used: activeFleets + 1, max: maxSlots },
     };
   }
 
-  // 수확선 도착 처리
-  async processRecycleArrival(userId: string) {
+  // 수확선 도착 처리 (다중 함대 지원)
+  async processRecycleArrival(userId: string, missionId?: string) {
     const user = await this.userModel.findById(userId).exec();
-    if (!user || !user.pendingAttack || user.pendingAttack.targetUserId !== 'debris') {
-      return null;
+    if (!user) return null;
+
+    // fleetMissions 배열에서 도착한 recycle 미션 찾기
+    const mission = missionId
+      ? user.fleetMissions?.find((m: any) => m.missionId === missionId && m.missionType === 'recycle' && m.phase === 'outbound')
+      : this.findMission(user, { missionType: 'recycle', phase: 'outbound' });
+
+    if (!mission) {
+      // 하위 호환성: 기존 pendingAttack 확인
+      if (!user.pendingAttack || user.pendingAttack.targetUserId !== 'debris') {
+        return null;
+      }
+      if (user.pendingAttack.arrivalTime.getTime() > Date.now()) {
+        return null;
+      }
     }
 
-    if (user.pendingAttack.arrivalTime.getTime() > Date.now()) {
-      return null;
-    }
+    const m = mission as any;
+    const targetCoord = m?.targetCoord || user.pendingAttack?.targetCoord;
+    const capacity = m?.capacity || user.pendingAttack?.capacity || 0;
+    const travelTime = m?.travelTime || user.pendingAttack?.travelTime || 0;
+    const currentMissionId = m?.missionId;
+    const originPlanetId = m?.originPlanetId || (user.pendingAttack as any)?.originPlanetId;
+    const fleet = m?.fleet || user.pendingAttack?.fleet || {};
 
-    const targetCoord = user.pendingAttack.targetCoord;
     const debris = await this.galaxyService.getDebris(targetCoord);
-    const capacity = user.pendingAttack.capacity;
 
     let metalLoot = 0;
     let crystalLoot = 0;
@@ -1222,20 +1577,16 @@ export class BattleService {
     }
 
     // 귀환 설정
-    const travelTime = user.pendingAttack.travelTime;
     const returnTime = new Date(Date.now() + travelTime * 1000);
+    const loot = { metal: metalLoot, crystal: crystalLoot, deuterium: 0 };
 
-    user.pendingReturn = {
-      fleet: user.pendingAttack.fleet,
-      loot: { metal: metalLoot, crystal: crystalLoot, deuterium: 0 },
-      returnTime,
-      startTime: new Date(),
-      missionType: 'recycle',
-    };
+    if (currentMissionId) {
+      // fleetMissions 배열에서 귀환 상태로 전환
+      this.setMissionReturning(user, currentMissionId, loot, returnTime);
+    }
 
-    user.pendingAttack = null;
-    user.markModified('pendingReturn');
-    user.markModified('pendingAttack');
+    // 하위 호환성 동기화
+    this.syncLegacyFields(user);
     await user.save();
 
     // 메시지
@@ -1248,7 +1599,7 @@ export class BattleService {
       metadata: { loot: { metal: metalLoot, crystal: crystalLoot } },
     });
 
-    return { metalLoot, crystalLoot };
+    return { metalLoot, crystalLoot, missionId: currentMissionId };
   }
 
   // 공격 도착 처리
@@ -1427,25 +1778,26 @@ export class BattleService {
     // 생존 함대가 있는지 확인
     const hasSurvivingFleet = Object.values(battleResult.survivingAttackerFleet).some(count => count > 0);
 
+    // fleetMissions 배열에서 해당 미션 처리
+    const attackMission = updatedAttacker.fleetMissions?.find(
+      (m: any) => m.missionType === 'attack' && m.phase === 'outbound' && m.targetCoord === updatedTarget.coordinate
+    );
+    const currentMissionId = (attackMission as any)?.missionId;
+
     if (hasSurvivingFleet) {
       // 생존 함대가 있으면 귀환 정보 설정
-      updatedAttacker.pendingReturn = {
-        fleet: battleResult.survivingAttackerFleet,
-        loot,
-        returnTime,
-        startTime: new Date(),
-        missionType: 'attack',
-      };
-      updatedAttacker.markModified('pendingReturn');
+      if (currentMissionId) {
+        this.setMissionReturning(updatedAttacker, currentMissionId, loot, returnTime, battleResult.survivingAttackerFleet);
+      }
     } else {
-      // 함대 전멸 시 귀환 정보 없음
-      updatedAttacker.pendingReturn = null;
-      updatedAttacker.markModified('pendingReturn');
+      // 함대 전멸 시 미션 제거
+      if (currentMissionId) {
+        this.removeMission(updatedAttacker, currentMissionId);
+      }
     }
 
-    // 공격 정보 초기화
-    updatedAttacker.pendingAttack = null;
-    updatedAttacker.markModified('pendingAttack');
+    // 하위 호환성 동기화
+    this.syncLegacyFields(updatedAttacker);
 
     // 방어자 공격 알림 제거
     updatedTarget.incomingAttack = null;
@@ -1576,46 +1928,102 @@ export class BattleService {
   }
 
   /**
-   * 함대 귀환 명령 (공격 도중 귀환)
-   * - 공격 중인 함대를 귀환시킴
+   * 함대 귀환 명령 (공격 도중 귀환) - 다중 함대 지원
+   * - missionId로 특정 미션을 귀환시킴
    * - 귀환 시간 = 현재까지 진행된 편도 비행 시간
    * - 전투가 시작된 후에는 귀환 불가
    */
-  async recallFleet(userId: string) {
+  async recallFleet(userId: string, missionId?: string) {
     const user = await this.userModel.findById(userId).exec();
     if (!user) {
       throw new BadRequestException('사용자를 찾을 수 없습니다.');
     }
 
-    // 이미 귀환 중인 경우
-    if (user.pendingReturn) {
-      throw new BadRequestException('이미 함대가 귀환 중입니다.');
+    // fleetMissions 배열에서 출격 중인 미션 찾기
+    let mission: any = null;
+    if (missionId) {
+      mission = user.fleetMissions?.find((m: any) => m.missionId === missionId && m.phase === 'outbound');
+    } else {
+      // missionId가 없으면 첫 번째 outbound 미션 선택
+      mission = user.fleetMissions?.find((m: any) => m.phase === 'outbound');
     }
 
-    // 출격 중인 함대가 없는 경우
-    if (!user.pendingAttack) {
-      throw new BadRequestException('귀환시킬 함대가 없습니다.');
+    if (!mission) {
+      // 하위 호환성: 기존 pendingAttack 확인
+      if (user.pendingReturn) {
+        throw new BadRequestException('이미 함대가 귀환 중입니다.');
+      }
+      if (!user.pendingAttack) {
+        throw new BadRequestException('귀환시킬 함대가 없습니다.');
+      }
+      if (user.pendingAttack.battleCompleted) {
+        throw new BadRequestException('전투가 이미 완료되어 귀환 중입니다.');
+      }
+
+      // 기존 로직으로 폴백
+      const elapsedTime = (Date.now() - user.pendingAttack.startTime.getTime()) / 1000;
+      if (Date.now() >= user.pendingAttack.arrivalTime.getTime()) {
+        throw new BadRequestException('함대가 이미 목표에 도착했습니다. 전투 결과를 확인하세요.');
+      }
+
+      const returnTime = new Date(Date.now() + elapsedTime * 1000);
+      const returningFleet = { ...user.pendingAttack.fleet };
+      let missionType = (user.pendingAttack as any).missionType || 'attack';
+      let returnLoot = { metal: 0, crystal: 0, deuterium: 0 };
+      if (missionType === 'transport' || missionType === 'deploy') {
+        const transportResources = (user.pendingAttack as any).transportResources;
+        if (transportResources) {
+          returnLoot = { metal: transportResources.metal || 0, crystal: transportResources.crystal || 0, deuterium: transportResources.deuterium || 0 };
+        }
+      }
+
+      user.pendingReturn = {
+        fleet: returningFleet,
+        loot: returnLoot,
+        returnTime,
+        startTime: new Date(),
+        missionType,
+        originPlanetId: (user.pendingAttack as any).originPlanetId,
+      };
+      user.pendingAttack = null;
+      user.markModified('pendingAttack');
+      user.markModified('pendingReturn');
+      await user.save();
+
+      await this.messageService.createMessage({
+        receiverId: userId,
+        senderName: '함대 사령부',
+        title: '함대 귀환 명령',
+        content: `함대가 귀환 명령을 받았습니다. 예상 귀환 시간: ${Math.ceil(elapsedTime)}초`,
+        type: 'system',
+        metadata: { fleet: returningFleet },
+      });
+
+      return { message: '함대가 귀환 중입니다.', fleet: returningFleet, returnTime: elapsedTime };
     }
 
-    // 전투가 이미 완료된 경우
-    if (user.pendingAttack.battleCompleted) {
-      throw new BadRequestException('전투가 이미 완료되어 귀환 중입니다.');
+    const m = mission as any;
+    const currentMissionId = m.missionId;
+    const missionType = m.missionType;
+
+    // 이미 귀환 중인 미션인 경우
+    if (m.phase === 'returning') {
+      throw new BadRequestException('이 함대는 이미 귀환 중입니다.');
     }
 
-    // 현재까지 진행된 시간 계산 (초 단위)
-    const elapsedTime = (Date.now() - user.pendingAttack.startTime.getTime()) / 1000;
-    
-    // 도착 예정 시간이 지났으면 귀환 불가 (전투 처리 필요)
-    if (Date.now() >= user.pendingAttack.arrivalTime.getTime()) {
-      throw new BadRequestException('함대가 이미 목표에 도착했습니다. 전투 결과를 확인하세요.');
+    // 도착 예정 시간이 지났으면 귀환 불가
+    const arrivalTime = new Date(m.arrivalTime).getTime();
+    if (Date.now() >= arrivalTime) {
+      throw new BadRequestException('함대가 이미 목표에 도착했습니다. 미션 결과를 확인하세요.');
     }
 
-    // 귀환 시간 = 현재까지 진행된 편도 비행 시간
+    // 현재까지 진행된 시간 계산
+    const elapsedTime = (Date.now() - new Date(m.startTime).getTime()) / 1000;
     const returnTime = new Date(Date.now() + elapsedTime * 1000);
 
     // 방어자의 incomingAttack 제거 (공격 미션일 때만)
-    const targetUserId = user.pendingAttack.targetUserId;
-    if (targetUserId && targetUserId !== 'debris' && targetUserId !== 'transport' && targetUserId !== 'deploy') {
+    const targetUserId = m.targetUserId;
+    if (missionType === 'attack' && targetUserId && targetUserId !== 'debris') {
       const target = await this.userModel.findById(targetUserId).exec();
       if (target && target.incomingAttack) {
         target.incomingAttack = null;
@@ -1624,23 +2032,10 @@ export class BattleService {
       }
     }
 
-    // 귀환할 함대 정보 저장
-    const returningFleet = { ...user.pendingAttack.fleet };
-
-    // 미션 타입 결정
-    let missionType = 'attack';
-    if (user.pendingAttack.targetUserId === 'transport') {
-      missionType = 'transport';
-    } else if (user.pendingAttack.targetUserId === 'deploy') {
-      missionType = 'deploy';
-    } else if (user.pendingAttack.targetUserId === 'debris') {
-      missionType = 'recycle';
-    }
-
     // 수송/배치 미션인 경우 수송하려던 자원을 돌려받음
     let returnLoot = { metal: 0, crystal: 0, deuterium: 0 };
     if (missionType === 'transport' || missionType === 'deploy') {
-      const transportResources = (user.pendingAttack as any).transportResources;
+      const transportResources = m.transportResources;
       if (transportResources) {
         returnLoot = {
           metal: transportResources.metal || 0,
@@ -1650,20 +2045,11 @@ export class BattleService {
       }
     }
 
-    // pendingReturn 설정
-    user.pendingReturn = {
-      fleet: returningFleet,
-      loot: returnLoot,
-      returnTime,
-      startTime: new Date(),
-      missionType,
-    };
+    // fleetMissions 배열에서 귀환 상태로 전환
+    this.setMissionReturning(user, currentMissionId, returnLoot, returnTime);
 
-    // pendingAttack 초기화
-    user.pendingAttack = null;
-    
-    user.markModified('pendingAttack');
-    user.markModified('pendingReturn');
+    // 하위 호환성 동기화
+    this.syncLegacyFields(user);
     await user.save();
 
     // 알림 메시지
@@ -1673,49 +2059,93 @@ export class BattleService {
       title: '함대 귀환 명령',
       content: `함대가 귀환 명령을 받았습니다. 예상 귀환 시간: ${Math.ceil(elapsedTime)}초`,
       type: 'system',
-      metadata: { fleet: returningFleet },
+      metadata: { fleet: m.fleet, missionId: currentMissionId },
     });
 
     return {
       message: '함대가 귀환 중입니다.',
-      fleet: returningFleet,
+      fleet: m.fleet,
       returnTime: elapsedTime,
+      missionId: currentMissionId,
     };
   }
 
-  // 함대 귀환 처리
-  async processFleetReturn(userId: string) {
+  // 함대 귀환 처리 (출발 행성으로 반환) - 다중 함대 지원
+  async processFleetReturn(userId: string, missionId?: string) {
     const user = await this.userModel.findById(userId).exec();
-    if (!user || !user.pendingReturn) {
-      return null;
+    if (!user) return null;
+
+    // fleetMissions 배열에서 귀환 완료된 미션 찾기
+    const mission = missionId
+      ? user.fleetMissions?.find((m: any) => m.missionId === missionId && m.phase === 'returning')
+      : this.findMission(user, { phase: 'returning' });
+
+    if (!mission) {
+      // 하위 호환성: 기존 pendingReturn 확인
+      if (!user.pendingReturn) return null;
+      if (user.pendingReturn.returnTime.getTime() > Date.now()) return null;
     }
 
-    // 귀환 시간 확인
-    if (user.pendingReturn.returnTime.getTime() > Date.now()) {
-      return null;
+    const m = mission as any;
+    const returnedFleet = m?.fleet || user.pendingReturn?.fleet || {};
+    const loot = m?.loot || user.pendingReturn?.loot || { metal: 0, crystal: 0, deuterium: 0 };
+    const originPlanetId = m?.originPlanetId || (user.pendingReturn as any)?.originPlanetId;
+    const currentMissionId = m?.missionId;
+    const missionType = m?.missionType || (user.pendingReturn as any)?.missionType || 'attack';
+
+    // 출발 행성이 식민지인 경우
+    if (originPlanetId) {
+      const originPlanet = await this.planetModel.findById(originPlanetId).exec();
+      if (originPlanet) {
+        // 식민지에 함대 복구
+        if (!originPlanet.fleet) originPlanet.fleet = {} as any;
+        for (const type in returnedFleet) {
+          (originPlanet.fleet as any)[type] = ((originPlanet.fleet as any)[type] || 0) + returnedFleet[type];
+        }
+
+        // 식민지에 약탈 자원 추가
+        if (!originPlanet.resources) {
+          originPlanet.resources = { metal: 0, crystal: 0, deuterium: 0, energy: 0 } as any;
+        }
+        originPlanet.resources.metal += (loot.metal || 0);
+        originPlanet.resources.crystal += (loot.crystal || 0);
+        originPlanet.resources.deuterium += (loot.deuterium || 0);
+
+        originPlanet.markModified('fleet');
+        originPlanet.markModified('resources');
+        await originPlanet.save();
+      } else {
+        // 식민지가 없어졌으면 모행성으로 반환
+        for (const type in returnedFleet) {
+          (user.fleet as any)[type] = ((user.fleet as any)[type] || 0) + returnedFleet[type];
+        }
+        user.resources.metal += (loot.metal || 0);
+        user.resources.crystal += (loot.crystal || 0);
+        user.resources.deuterium += (loot.deuterium || 0);
+        user.markModified('fleet');
+        user.markModified('resources');
+      }
+    } else {
+      // 모행성에 함대 복구
+      for (const type in returnedFleet) {
+        (user.fleet as any)[type] = ((user.fleet as any)[type] || 0) + returnedFleet[type];
+      }
+
+      // 모행성에 약탈 자원 추가
+      user.resources.metal += (loot.metal || 0);
+      user.resources.crystal += (loot.crystal || 0);
+      user.resources.deuterium += (loot.deuterium || 0);
+      user.markModified('fleet');
+      user.markModified('resources');
     }
 
-    // 함대 복구
-    const returnedFleet = user.pendingReturn.fleet;
-    for (const type in returnedFleet) {
-      (user.fleet as any)[type] = ((user.fleet as any)[type] || 0) + returnedFleet[type];
+    // 미션 제거 (fleetMissions 배열에서)
+    if (currentMissionId) {
+      this.removeMission(user, currentMissionId);
     }
 
-    // 약탈 자원 추가
-    const loot = user.pendingReturn.loot;
-    user.resources.metal += (loot.metal || 0);
-    user.resources.crystal += (loot.crystal || 0);
-    user.resources.deuterium += (loot.deuterium || 0);
-
-    // 상태 초기화
-    user.pendingReturn = null;
-    user.pendingAttack = null;
-    
-    user.markModified('pendingReturn');
-    user.markModified('pendingAttack');
-    user.markModified('fleet');
-    user.markModified('resources');
-
+    // 하위 호환성 동기화
+    this.syncLegacyFields(user);
     await user.save();
 
     // 함대 귀환 메시지 전송
@@ -1723,7 +2153,7 @@ export class BattleService {
       receiverId: userId,
       senderName: '함대 사령부',
       title: '함대 귀환 보고',
-      content: `함대가 무사히 귀환했습니다. 약탈한 자원: 메탈 ${loot.metal}, 크리스탈 ${loot.crystal}, 듀테륨 ${loot.deuterium}`,
+      content: `함대가 무사히 귀환했습니다. 약탈한 자원: 메탈 ${loot.metal || 0}, 크리스탈 ${loot.crystal || 0}, 듀테륨 ${loot.deuterium || 0}`,
       type: 'system',
       metadata: { returnedFleet, loot },
     });
@@ -1731,13 +2161,14 @@ export class BattleService {
     return {
       returnedFleet,
       loot,
+      missionId: currentMissionId,
     };
   }
 
   // ===== 수송/배치 미션 =====
 
   /**
-   * 미션 3: 수송 (Transport)
+   * 미션 3: 수송 (Transport) - 다중 함대 지원
    * 자원을 목표 행성에 내리고, 함대만 귀환
    */
   async startTransport(
@@ -1746,14 +2177,19 @@ export class BattleService {
     fleet: Record<string, number>,
     resources: { metal: number; crystal: number; deuterium: number },
   ) {
-    const sender = await this.resourcesService.updateResources(userId);
-    if (!sender) {
+    // 활성 행성 데이터 가져오기
+    const activePlanetData = await this.getActivePlanetData(userId);
+    if (!activePlanetData) {
       throw new BadRequestException('사용자를 찾을 수 없습니다.');
     }
 
-    // 이미 함대가 출격 중인지 확인
-    if (sender.pendingAttack || sender.pendingReturn) {
-      throw new BadRequestException('이미 함대가 활동 중입니다.');
+    const { user: sender, planet: senderPlanet, isHome, coordinate: senderCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+
+    // 함대 슬롯 확인
+    const maxSlots = this.getMaxFleetSlots(sender);
+    const activeFleets = this.getActiveFleetCount(sender);
+    if (activeFleets >= maxSlots) {
+      throw new BadRequestException(`최대 함대 슬롯(${maxSlots}개)을 모두 사용 중입니다. 컴퓨터공학 연구로 슬롯을 늘릴 수 있습니다.`);
     }
 
     // 목표 행성 확인 (모행성 + 식민지 모두 검색)
@@ -1763,7 +2199,7 @@ export class BattleService {
     }
     const targetOwnerId = targetResult.ownerId;
 
-    // 함대 보유 확인
+    // 함대 보유 확인 (활성 행성 기준)
     for (const type in fleet) {
       if (fleet[type] > 0) {
         if (!FLEET_DATA[type]) {
@@ -1772,14 +2208,14 @@ export class BattleService {
         if (type === 'solarSatellite') {
           throw new BadRequestException('태양광인공위성은 수송에 참여할 수 없습니다.');
         }
-        if (!(sender.fleet as any)[type] || (sender.fleet as any)[type] < fleet[type]) {
+        if (!availableFleet[type] || availableFleet[type] < fleet[type]) {
           throw new BadRequestException(`${NAME_MAPPING[type] || type}을(를) ${fleet[type]}대 보유하고 있지 않습니다.`);
         }
       }
     }
 
-    // 거리 및 이동 시간 계산
-    const distance = this.calculateDistance(sender.coordinate, targetCoord);
+    // 거리 및 이동 시간 계산 (활성 행성 좌표 기준)
+    const distance = this.calculateDistance(senderCoord, targetCoord);
     const minSpeed = this.fleetService.getFleetSpeed(fleet);
     const travelTime = (distance / minSpeed) * 3600;
 
@@ -1800,76 +2236,113 @@ export class BattleService {
       throw new BadRequestException(`적재 공간이 부족합니다. 가용: ${availableCapacity}, 요청: ${totalResources}`);
     }
 
-    // 자원 보유량 확인 (듀테륨은 연료 제외)
-    if (sender.resources.metal < resources.metal) {
-      throw new BadRequestException(`메탈이 부족합니다. 필요: ${resources.metal}, 보유: ${Math.floor(sender.resources.metal)}`);
+    // 자원 보유량 확인 (활성 행성 기준, 듀테륨은 연료 제외)
+    if (availableResources.metal < resources.metal) {
+      throw new BadRequestException(`메탈이 부족합니다. 필요: ${resources.metal}, 보유: ${Math.floor(availableResources.metal)}`);
     }
-    if (sender.resources.crystal < resources.crystal) {
-      throw new BadRequestException(`크리스탈이 부족합니다. 필요: ${resources.crystal}, 보유: ${Math.floor(sender.resources.crystal)}`);
+    if (availableResources.crystal < resources.crystal) {
+      throw new BadRequestException(`크리스탈이 부족합니다. 필요: ${resources.crystal}, 보유: ${Math.floor(availableResources.crystal)}`);
     }
-    if (sender.resources.deuterium < resources.deuterium + fuelConsumption) {
-      throw new BadRequestException(`듀테륨이 부족합니다. 필요: ${resources.deuterium + fuelConsumption}, 보유: ${Math.floor(sender.resources.deuterium)}`);
+    if (availableResources.deuterium < resources.deuterium + fuelConsumption) {
+      throw new BadRequestException(`듀테륨이 부족합니다. 필요: ${resources.deuterium + fuelConsumption}, 보유: ${Math.floor(availableResources.deuterium)}`);
     }
 
-    // 자원 및 함대 차감
-    sender.resources.metal -= resources.metal;
-    sender.resources.crystal -= resources.crystal;
-    sender.resources.deuterium -= resources.deuterium + fuelConsumption;
-
-    for (const type in fleet) {
-      if (fleet[type] > 0) {
-        (sender.fleet as any)[type] -= fleet[type];
+    // 자원 및 함대 차감 (활성 행성 기준)
+    if (isHome) {
+      sender.resources.metal -= resources.metal;
+      sender.resources.crystal -= resources.crystal;
+      sender.resources.deuterium -= resources.deuterium + fuelConsumption;
+      for (const type in fleet) {
+        if (fleet[type] > 0) {
+          (sender.fleet as any)[type] -= fleet[type];
+        }
       }
+      sender.markModified('fleet');
+      sender.markModified('resources');
+    } else if (senderPlanet) {
+      senderPlanet.resources.metal -= resources.metal;
+      senderPlanet.resources.crystal -= resources.crystal;
+      senderPlanet.resources.deuterium -= resources.deuterium + fuelConsumption;
+      for (const type in fleet) {
+        if (fleet[type] > 0) {
+          if (!senderPlanet.fleet) senderPlanet.fleet = {} as any;
+          (senderPlanet.fleet as any)[type] = ((senderPlanet.fleet as any)[type] || 0) - fleet[type];
+        }
+      }
+      senderPlanet.markModified('fleet');
+      senderPlanet.markModified('resources');
+      await senderPlanet.save();
     }
 
     const startTime = new Date();
     const arrivalTime = new Date(startTime.getTime() + travelTime * 1000);
+    const missionId = this.generateMissionId();
 
-    sender.pendingAttack = {
+    // 새로운 fleetMissions 배열에 미션 추가
+    const newMission = {
+      missionId,
+      phase: 'outbound',
+      missionType: 'transport',
       targetCoord,
-      targetUserId: targetOwnerId, // 목표 행성 소유자 ID
+      targetUserId: targetOwnerId,
       fleet,
       capacity: totalCapacity,
       travelTime,
       startTime,
       arrivalTime,
-      battleCompleted: false,
-      missionType: 'transport',
-      // 수송할 자원 저장
+      originCoord: senderCoord,
+      originPlanetId: isHome ? undefined : senderPlanet?._id.toString(),
       transportResources: resources,
     };
 
-    sender.markModified('fleet');
-    sender.markModified('resources');
-    sender.markModified('pendingAttack');
+    if (!sender.fleetMissions) {
+      sender.fleetMissions = [];
+    }
+    sender.fleetMissions.push(newMission as any);
+    sender.markModified('fleetMissions');
+
+    // 하위 호환성 동기화
+    this.syncLegacyFields(sender);
     await sender.save();
 
     return {
-      message: `${targetCoord} 좌표로 수송 함대가 출격했습니다.`,
+      message: `${targetCoord} 좌표로 수송 함대가 출격했습니다. (${activeFleets + 1}/${maxSlots} 슬롯 사용중)`,
       travelTime,
       arrivalTime,
       fuelConsumption,
       resources,
+      missionId,
+      fleetSlots: { used: activeFleets + 1, max: maxSlots },
     };
   }
 
   /**
-   * 수송 도착 처리
+   * 수송 도착 처리 (다중 함대 지원)
    */
-  async processTransportArrival(userId: string) {
+  async processTransportArrival(userId: string, missionId?: string) {
     const user = await this.userModel.findById(userId).exec();
-    if (!user || !user.pendingAttack) return null;
-    
-    // missionType 또는 targetUserId로 수송 미션 확인
-    const isTransport = user.pendingAttack.missionType === 'transport' || user.pendingAttack.targetUserId === 'transport';
-    if (!isTransport) return null;
+    if (!user) return null;
 
-    if (user.pendingAttack.arrivalTime.getTime() > Date.now()) {
-      return null;
+    // fleetMissions 배열에서 도착한 transport 미션 찾기
+    const mission = missionId
+      ? user.fleetMissions?.find((m: any) => m.missionId === missionId && m.missionType === 'transport' && m.phase === 'outbound')
+      : this.findMission(user, { missionType: 'transport', phase: 'outbound' });
+
+    if (!mission) {
+      // 하위 호환성: 기존 pendingAttack 확인
+      if (!user.pendingAttack) return null;
+      const isTransport = user.pendingAttack.missionType === 'transport' || user.pendingAttack.targetUserId === 'transport';
+      if (!isTransport) return null;
+      if (user.pendingAttack.arrivalTime.getTime() > Date.now()) return null;
     }
 
-    const targetCoord = user.pendingAttack.targetCoord;
-    const transportResources = (user.pendingAttack as any).transportResources || { metal: 0, crystal: 0, deuterium: 0 };
+    const m = mission as any;
+    const targetCoord = m?.targetCoord || user.pendingAttack?.targetCoord;
+    const transportResources = m?.transportResources || (user.pendingAttack as any)?.transportResources || { metal: 0, crystal: 0, deuterium: 0 };
+    const travelTime = m?.travelTime || user.pendingAttack?.travelTime || 0;
+    const currentMissionId = m?.missionId;
+    const originCoord = m?.originCoord || user.coordinate;
+    const fleet = m?.fleet || user.pendingAttack?.fleet || {};
 
     // 목표 행성 찾기 (모행성 + 식민지)
     const targetResult = await this.findPlanetByCoordinate(targetCoord);
@@ -1886,10 +2359,10 @@ export class BattleService {
       await this.messageService.createMessage({
         receiverId: targetResult.user._id.toString(),
         senderName: '수송 사령부',
-        title: `${user.coordinate}에서 자원 도착`,
+        title: `${originCoord}에서 자원 도착`,
         content: `자원이 도착했습니다! 수신된 자원: 메탈 ${transportResources.metal}, 크리스탈 ${transportResources.crystal}, 듀테륨 ${transportResources.deuterium}`,
         type: 'system',
-        metadata: { resources: transportResources, from: user.coordinate },
+        metadata: { resources: transportResources, from: originCoord },
       });
     } else if (targetResult.planet) {
       // 식민지에 자원 추가
@@ -1904,29 +2377,25 @@ export class BattleService {
         await this.messageService.createMessage({
           receiverId: targetResult.ownerId,
           senderName: '수송 사령부',
-          title: `${user.coordinate}에서 자원 도착 (${targetCoord})`,
+          title: `${originCoord}에서 자원 도착 (${targetCoord})`,
           content: `식민지 ${targetCoord}에 자원이 도착했습니다! 수신된 자원: 메탈 ${transportResources.metal}, 크리스탈 ${transportResources.crystal}, 듀테륨 ${transportResources.deuterium}`,
           type: 'system',
-          metadata: { resources: transportResources, from: user.coordinate },
+          metadata: { resources: transportResources, from: originCoord },
         });
       }
     }
 
-    // 귀환 설정 (자원 없이)
-    const travelTime = user.pendingAttack.travelTime;
+    // 귀환 설정
     const returnTime = new Date(Date.now() + travelTime * 1000);
+    const loot = { metal: 0, crystal: 0, deuterium: 0 };
 
-    user.pendingReturn = {
-      fleet: user.pendingAttack.fleet,
-      loot: { metal: 0, crystal: 0, deuterium: 0 },
-      returnTime,
-      startTime: new Date(),
-      missionType: 'transport',
-    };
+    if (currentMissionId) {
+      // fleetMissions 배열에서 귀환 상태로 전환
+      this.setMissionReturning(user, currentMissionId, loot, returnTime);
+    }
 
-    user.pendingAttack = null;
-    user.markModified('pendingReturn');
-    user.markModified('pendingAttack');
+    // 하위 호환성 동기화
+    this.syncLegacyFields(user);
     await user.save();
 
     // 발신자에게 메시지 전송
@@ -1939,11 +2408,11 @@ export class BattleService {
       metadata: { resources: transportResources },
     });
 
-    return { delivered: transportResources };
+    return { delivered: transportResources, missionId: currentMissionId };
   }
 
   /**
-   * 미션 4: 배치 (Deploy/Stay)
+   * 미션 4: 배치 (Deploy/Stay) - 다중 함대 지원
    * 함대와 자원을 모두 목표 행성에 배치 (귀환 없음)
    */
   async startDeploy(
@@ -1952,14 +2421,19 @@ export class BattleService {
     fleet: Record<string, number>,
     resources: { metal: number; crystal: number; deuterium: number },
   ) {
-    const sender = await this.resourcesService.updateResources(userId);
-    if (!sender) {
+    // 활성 행성 데이터 가져오기
+    const activePlanetData = await this.getActivePlanetData(userId);
+    if (!activePlanetData) {
       throw new BadRequestException('사용자를 찾을 수 없습니다.');
     }
 
-    // 이미 함대가 출격 중인지 확인
-    if (sender.pendingAttack || sender.pendingReturn) {
-      throw new BadRequestException('이미 함대가 활동 중입니다.');
+    const { user: sender, planet: senderPlanet, isHome, coordinate: senderCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+
+    // 함대 슬롯 확인
+    const maxSlots = this.getMaxFleetSlots(sender);
+    const activeFleets = this.getActiveFleetCount(sender);
+    if (activeFleets >= maxSlots) {
+      throw new BadRequestException(`최대 함대 슬롯(${maxSlots}개)을 모두 사용 중입니다. 컴퓨터공학 연구로 슬롯을 늘릴 수 있습니다.`);
     }
 
     // 목표 행성 확인 (모행성 + 식민지 모두 검색)
@@ -1973,12 +2447,12 @@ export class BattleService {
       throw new BadRequestException('배치 미션은 본인 소유의 행성에만 가능합니다.');
     }
 
-    // 같은 행성인지 확인
-    if (sender.coordinate === targetCoord) {
+    // 같은 행성인지 확인 (활성 행성 좌표 기준)
+    if (senderCoord === targetCoord) {
       throw new BadRequestException('같은 행성에는 배치할 수 없습니다.');
     }
 
-    // 함대 보유 확인
+    // 함대 보유 확인 (활성 행성 기준)
     for (const type in fleet) {
       if (fleet[type] > 0) {
         if (!FLEET_DATA[type]) {
@@ -1987,14 +2461,14 @@ export class BattleService {
         if (type === 'solarSatellite') {
           throw new BadRequestException('태양광인공위성은 배치에 참여할 수 없습니다.');
         }
-        if (!(sender.fleet as any)[type] || (sender.fleet as any)[type] < fleet[type]) {
+        if (!availableFleet[type] || availableFleet[type] < fleet[type]) {
           throw new BadRequestException(`${NAME_MAPPING[type] || type}을(를) ${fleet[type]}대 보유하고 있지 않습니다.`);
         }
       }
     }
 
-    // 거리 및 이동 시간 계산
-    const distance = this.calculateDistance(sender.coordinate, targetCoord);
+    // 거리 및 이동 시간 계산 (활성 행성 좌표 기준)
+    const distance = this.calculateDistance(senderCoord, targetCoord);
     const minSpeed = this.fleetService.getFleetSpeed(fleet);
     const travelTime = (distance / minSpeed) * 3600;
 
@@ -2015,77 +2489,111 @@ export class BattleService {
       throw new BadRequestException(`적재 공간이 부족합니다. 가용: ${availableCapacity}, 요청: ${totalResources}`);
     }
 
-    // 자원 보유량 확인
-    if (sender.resources.metal < resources.metal) {
-      throw new BadRequestException(`메탈이 부족합니다. 필요: ${resources.metal}, 보유: ${Math.floor(sender.resources.metal)}`);
+    // 자원 보유량 확인 (활성 행성 기준)
+    if (availableResources.metal < resources.metal) {
+      throw new BadRequestException(`메탈이 부족합니다. 필요: ${resources.metal}, 보유: ${Math.floor(availableResources.metal)}`);
     }
-    if (sender.resources.crystal < resources.crystal) {
-      throw new BadRequestException(`크리스탈이 부족합니다. 필요: ${resources.crystal}, 보유: ${Math.floor(sender.resources.crystal)}`);
+    if (availableResources.crystal < resources.crystal) {
+      throw new BadRequestException(`크리스탈이 부족합니다. 필요: ${resources.crystal}, 보유: ${Math.floor(availableResources.crystal)}`);
     }
-    if (sender.resources.deuterium < resources.deuterium + fuelConsumption) {
-      throw new BadRequestException(`듀테륨이 부족합니다. 필요: ${resources.deuterium + fuelConsumption}, 보유: ${Math.floor(sender.resources.deuterium)}`);
+    if (availableResources.deuterium < resources.deuterium + fuelConsumption) {
+      throw new BadRequestException(`듀테륨이 부족합니다. 필요: ${resources.deuterium + fuelConsumption}, 보유: ${Math.floor(availableResources.deuterium)}`);
     }
 
-    // 자원 및 함대 차감
-    sender.resources.metal -= resources.metal;
-    sender.resources.crystal -= resources.crystal;
-    sender.resources.deuterium -= resources.deuterium + fuelConsumption;
-
-    for (const type in fleet) {
-      if (fleet[type] > 0) {
-        (sender.fleet as any)[type] -= fleet[type];
+    // 자원 및 함대 차감 (활성 행성 기준)
+    if (isHome) {
+      sender.resources.metal -= resources.metal;
+      sender.resources.crystal -= resources.crystal;
+      sender.resources.deuterium -= resources.deuterium + fuelConsumption;
+      for (const type in fleet) {
+        if (fleet[type] > 0) {
+          (sender.fleet as any)[type] -= fleet[type];
+        }
       }
+      sender.markModified('fleet');
+      sender.markModified('resources');
+    } else if (senderPlanet) {
+      senderPlanet.resources.metal -= resources.metal;
+      senderPlanet.resources.crystal -= resources.crystal;
+      senderPlanet.resources.deuterium -= resources.deuterium + fuelConsumption;
+      for (const type in fleet) {
+        if (fleet[type] > 0) {
+          if (!senderPlanet.fleet) senderPlanet.fleet = {} as any;
+          (senderPlanet.fleet as any)[type] = ((senderPlanet.fleet as any)[type] || 0) - fleet[type];
+        }
+      }
+      senderPlanet.markModified('fleet');
+      senderPlanet.markModified('resources');
+      await senderPlanet.save();
     }
 
     const startTime = new Date();
     const arrivalTime = new Date(startTime.getTime() + travelTime * 1000);
+    const missionId = this.generateMissionId();
 
-    sender.pendingAttack = {
+    // 새로운 fleetMissions 배열에 미션 추가
+    const newMission = {
+      missionId,
+      phase: 'outbound',
+      missionType: 'deploy',
       targetCoord,
-      targetUserId: targetResult.ownerId, // 목표 행성 소유자 ID (본인)
+      targetUserId: targetResult.ownerId,
       fleet,
       capacity: totalCapacity,
       travelTime,
       startTime,
       arrivalTime,
-      battleCompleted: false,
-      missionType: 'deploy',
-      // 배치할 자원 저장
+      originCoord: senderCoord,
+      originPlanetId: isHome ? undefined : senderPlanet?._id.toString(),
       transportResources: resources,
     };
 
-    sender.markModified('fleet');
-    sender.markModified('resources');
-    sender.markModified('pendingAttack');
+    if (!sender.fleetMissions) {
+      sender.fleetMissions = [];
+    }
+    sender.fleetMissions.push(newMission as any);
+    sender.markModified('fleetMissions');
+
+    // 하위 호환성 동기화
+    this.syncLegacyFields(sender);
     await sender.save();
 
     return {
-      message: `${targetCoord} 좌표로 배치 함대가 출격했습니다.`,
+      message: `${targetCoord} 좌표로 배치 함대가 출격했습니다. (${activeFleets + 1}/${maxSlots} 슬롯 사용중)`,
       travelTime,
       arrivalTime,
       fuelConsumption,
       resources,
+      missionId,
+      fleetSlots: { used: activeFleets + 1, max: maxSlots },
     };
   }
 
   /**
-   * 배치 도착 처리
+   * 배치 도착 처리 (다중 함대 지원)
    */
-  async processDeployArrival(userId: string) {
+  async processDeployArrival(userId: string, missionId?: string) {
     const user = await this.userModel.findById(userId).exec();
-    if (!user || !user.pendingAttack) return null;
-    
-    // missionType 또는 targetUserId로 배치 미션 확인
-    const isDeploy = user.pendingAttack.missionType === 'deploy' || user.pendingAttack.targetUserId === 'deploy';
-    if (!isDeploy) return null;
+    if (!user) return null;
 
-    if (user.pendingAttack.arrivalTime.getTime() > Date.now()) {
-      return null;
+    // fleetMissions 배열에서 도착한 deploy 미션 찾기
+    const mission = missionId
+      ? user.fleetMissions?.find((m: any) => m.missionId === missionId && m.missionType === 'deploy' && m.phase === 'outbound')
+      : this.findMission(user, { missionType: 'deploy', phase: 'outbound' });
+
+    if (!mission) {
+      // 하위 호환성: 기존 pendingAttack 확인
+      if (!user.pendingAttack) return null;
+      const isDeploy = user.pendingAttack.missionType === 'deploy' || user.pendingAttack.targetUserId === 'deploy';
+      if (!isDeploy) return null;
+      if (user.pendingAttack.arrivalTime.getTime() > Date.now()) return null;
     }
 
-    const targetCoord = user.pendingAttack.targetCoord;
-    const deployFleet = user.pendingAttack.fleet;
-    const deployResources = (user.pendingAttack as any).transportResources || { metal: 0, crystal: 0, deuterium: 0 };
+    const m = mission as any;
+    const targetCoord = m?.targetCoord || user.pendingAttack?.targetCoord;
+    const deployFleet = m?.fleet || user.pendingAttack?.fleet || {};
+    const deployResources = m?.transportResources || (user.pendingAttack as any)?.transportResources || { metal: 0, crystal: 0, deuterium: 0 };
+    const currentMissionId = m?.missionId;
 
     // 목표 행성 찾기 (모행성 + 식민지)
     const targetResult = await this.findPlanetByCoordinate(targetCoord);
@@ -2122,17 +2630,18 @@ export class BattleService {
       await targetResult.planet.save();
     }
 
-    // 미션 완료 (귀환 없음)
-    user.pendingAttack = null;
-    user.pendingReturn = null;
+    // 미션 완료 - 배치는 귀환 없이 바로 종료
+    if (currentMissionId) {
+      this.removeMission(user, currentMissionId);
+    }
 
-    user.markModified('pendingAttack');
-    user.markModified('pendingReturn');
+    // 하위 호환성 동기화
+    this.syncLegacyFields(user);
     await user.save();
 
     // 메시지
     const fleetList = Object.entries(deployFleet)
-      .filter(([, count]) => count > 0)
+      .filter(([, count]) => (count as number) > 0)
       .map(([type, count]) => `${NAME_MAPPING[type] || type}: ${count}`)
       .join(', ');
 
@@ -2148,6 +2657,7 @@ export class BattleService {
     return { 
       fleet: deployFleet, 
       resources: deployResources,
+      missionId: currentMissionId,
     };
   }
 

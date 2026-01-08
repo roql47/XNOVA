@@ -258,7 +258,7 @@ export class ProgressInfo {
   finishTime: Date;
 }
 
-// 공격 진행 상태 스키마
+// 공격 진행 상태 스키마 (하위 호환성 유지)
 @Schema({ _id: false })
 export class AttackProgress {
   @Prop()
@@ -290,9 +290,15 @@ export class AttackProgress {
 
   @Prop({ type: String, default: 'attack' })
   missionType?: string; // 'attack', 'transport', 'deploy', 'recycle', 'colony'
+
+  @Prop({ type: String, default: null })
+  originCoord?: string; // 출발 좌표 (식민지에서 출격 시)
+
+  @Prop({ type: String, default: null })
+  originPlanetId?: string; // 출발 식민지 ID (null이면 모행성)
 }
 
-// 귀환 진행 상태 스키마
+// 귀환 진행 상태 스키마 (하위 호환성 유지)
 @Schema({ _id: false })
 export class ReturnProgress {
   @Prop({ type: Object })
@@ -309,6 +315,64 @@ export class ReturnProgress {
 
   @Prop({ default: 'attack' })
   missionType: string; // 'attack', 'transport', 'recycle'
+
+  @Prop({ type: String, default: null })
+  originPlanetId?: string; // 출발 식민지 ID (null이면 모행성)
+}
+
+// 함대 미션 스키마 (출격 + 귀환 통합, 다중 함대 지원)
+@Schema({ _id: false })
+export class FleetMission {
+  @Prop({ required: true })
+  missionId: string; // 고유 미션 ID (UUID)
+
+  @Prop({ required: true })
+  phase: string; // 'outbound' (출격중), 'returning' (귀환중)
+
+  @Prop({ required: true })
+  missionType: string; // 'attack', 'transport', 'deploy', 'recycle', 'colony'
+
+  @Prop({ required: true })
+  targetCoord: string;
+
+  @Prop()
+  targetUserId?: string;
+
+  @Prop({ type: Object, required: true })
+  fleet: Record<string, number>;
+
+  @Prop({ default: 0 })
+  capacity: number;
+
+  @Prop({ required: true })
+  travelTime: number;
+
+  @Prop({ required: true })
+  startTime: Date;
+
+  @Prop({ required: true })
+  arrivalTime: Date;
+
+  @Prop()
+  returnTime?: Date;
+
+  @Prop()
+  returnStartTime?: Date;
+
+  @Prop({ type: Object })
+  loot?: Record<string, number>;
+
+  @Prop({ type: Object })
+  transportResources?: { metal: number; crystal: number; deuterium: number };
+
+  @Prop()
+  originCoord?: string; // 출발 좌표
+
+  @Prop()
+  originPlanetId?: string; // 출발 식민지 ID (undefined면 모행성)
+
+  @Prop({ default: false })
+  battleCompleted?: boolean;
 }
 
 // 휴가 모드 스키마
@@ -388,13 +452,17 @@ export class User {
   defenseProgress: ProgressInfo | null;
 
   @Prop({ type: AttackProgress, default: null })
-  pendingAttack: AttackProgress | null;
+  pendingAttack: AttackProgress | null;  // 하위 호환용 (단일 미션)
 
   @Prop({ type: ReturnProgress, default: null })
-  pendingReturn: ReturnProgress | null;
+  pendingReturn: ReturnProgress | null;  // 하위 호환용 (단일 미션)
 
   @Prop({ type: AttackProgress, default: null })
   incomingAttack: AttackProgress | null;
+
+  // 다중 함대 미션 지원 (컴퓨터공학 레벨 + 1 = 최대 동시 운용 함대 수)
+  @Prop({ type: [FleetMission], default: [] })
+  fleetMissions: FleetMission[];
 
   @Prop({ default: Date.now })
   lastResourceUpdate: Date;

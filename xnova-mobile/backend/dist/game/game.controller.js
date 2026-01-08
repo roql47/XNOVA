@@ -99,8 +99,8 @@ let GameController = class GameController {
     async deploy(req, body) {
         return this.battleService.startDeploy(req.user.userId, body.targetCoord, body.fleet, body.resources);
     }
-    async recallFleet(req) {
-        return this.battleService.recallFleet(req.user.userId);
+    async recallFleet(req, body) {
+        return this.battleService.recallFleet(req.user.userId, body?.missionId);
     }
     async getAttackStatus(req) {
         return this.battleService.getAttackStatus(req.user.userId);
@@ -312,8 +312,9 @@ __decorate([
 __decorate([
     (0, common_1.Post)('battle/recall'),
     __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", Promise)
 ], GameController.prototype, "recallFleet", null);
 __decorate([

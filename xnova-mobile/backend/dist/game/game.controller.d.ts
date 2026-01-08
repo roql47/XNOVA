@@ -176,6 +176,11 @@ export declare class GameController {
         travelTime: number;
         arrivalTime: Date;
         distance: number;
+        missionId: string;
+        fleetSlots: {
+            used: number;
+            max: number;
+        };
     }>;
     recycle(req: any, body: {
         targetCoord: string;
@@ -184,6 +189,11 @@ export declare class GameController {
         message: string;
         travelTime: number;
         arrivalTime: Date;
+        missionId: string;
+        fleetSlots: {
+            used: number;
+            max: number;
+        };
     }>;
     transport(req: any, body: {
         targetCoord: string;
@@ -202,6 +212,11 @@ export declare class GameController {
             metal: number;
             crystal: number;
             deuterium: number;
+        };
+        missionId: string;
+        fleetSlots: {
+            used: number;
+            max: number;
         };
     }>;
     deploy(req: any, body: {
@@ -222,13 +237,26 @@ export declare class GameController {
             crystal: number;
             deuterium: number;
         };
+        missionId: string;
+        fleetSlots: {
+            used: number;
+            max: number;
+        };
     }>;
-    recallFleet(req: any): Promise<{
+    recallFleet(req: any, body?: {
+        missionId?: string;
+    }): Promise<{
         message: string;
         fleet: {
             [x: string]: number;
         };
         returnTime: number;
+        missionId?: undefined;
+    } | {
+        message: string;
+        fleet: any;
+        returnTime: number;
+        missionId: any;
     }>;
     getAttackStatus(req: any): Promise<any>;
     processBattle(req: any): Promise<{

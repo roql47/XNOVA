@@ -34,6 +34,9 @@ export interface SpyReport {
   targetSpyLevel: number;
 }
 
+// 데브리 만료 시간: 3일 (밀리초)
+const DEBRIS_EXPIRY_MS = 3 * 24 * 60 * 60 * 1000;
+
 @Injectable()
 export class GalaxyService {
   constructor(
@@ -43,16 +46,44 @@ export class GalaxyService {
     private messageService: MessageService,
   ) {}
 
+  /**
+   * 만료된 데브리 정리 (3일 이상 경과한 데브리 삭제)
+   */
+  async cleanupExpiredDebris(): Promise<number> {
+    const expiryDate = new Date(Date.now() - DEBRIS_EXPIRY_MS);
+    const result = await this.debrisModel.deleteMany({
+      createdAt: { $lt: expiryDate },
+    }).exec();
+    return result.deletedCount || 0;
+  }
+
+  /**
+   * 데브리가 만료되었는지 확인
+   */
+  private isDebrisExpired(debris: DebrisDocument): boolean {
+    if (!debris.createdAt) return false;
+    const createdAt = debris.createdAt as Date;
+    return Date.now() - createdAt.getTime() > DEBRIS_EXPIRY_MS;
+  }
+
   // 특정 시스템의 은하 지도 조회
   async getGalaxyMap(galaxy: number, system: number, currentUserId: string): Promise<PlanetInfo[]> {
     // 해당 시스템의 모든 플레이어 및 식민지 조회
     const pattern = new RegExp(`^${galaxy}:${system}:\\d+$`);
+    const expiryDate = new Date(Date.now() - DEBRIS_EXPIRY_MS);
+    
     const [players, colonies, debrisFields] = await Promise.all([
       this.userModel.find({ coordinate: pattern }).exec(),
       this.planetModel.find({ coordinate: pattern }).populate('ownerId').exec(),
-      this.debrisModel.find({ coordinate: pattern }).exec(),
+      // 만료되지 않은 데브리만 조회
+      this.debrisModel.find({ 
+        coordinate: pattern,
+        createdAt: { $gte: expiryDate },
+      }).exec(),
       // 현재 사용자 활동 시간 업데이트
       this.userModel.findByIdAndUpdate(currentUserId, { lastActivity: new Date() }).exec(),
+      // 백그라운드에서 만료된 데브리 정리
+      this.cleanupExpiredDebris(),
     ]);
 
     // 행성 포인트 1~15 초기화
@@ -134,9 +165,18 @@ export class GalaxyService {
     }
   }
 
-  // 데브리 조회
+  // 데브리 조회 (만료된 데브리는 삭제 후 null 반환)
   async getDebris(coordinate: string) {
-    return this.debrisModel.findOne({ coordinate }).exec();
+    const debris = await this.debrisModel.findOne({ coordinate }).exec();
+    if (!debris) return null;
+    
+    // 만료된 데브리면 삭제하고 null 반환
+    if (this.isDebrisExpired(debris)) {
+      await this.debrisModel.deleteOne({ coordinate }).exec();
+      return null;
+    }
+    
+    return debris;
   }
 
   // 데브리 삭제 또는 감소

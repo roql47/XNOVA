@@ -173,10 +173,10 @@ const Map<String, Map<String, dynamic>> shipTechTree = {
   'heavyFighter': {'name': '공격기', 'requirements': {
     'shipyard': 3, 'impulseDrive': 2, 'armorTech': 2,
   }},
-  'cruiser': {'name': '순양함', 'requirements': {
+  'cruiser': {'name': '구축함', 'requirements': {
     'shipyard': 5, 'impulseDrive': 4, 'ionTech': 2,
   }},
-  'battleship': {'name': '전함', 'requirements': {
+  'battleship': {'name': '순양함', 'requirements': {
     'shipyard': 7, 'hyperspaceDrive': 4,
   }},
   'colonyShip': {'name': '이민선', 'requirements': {
@@ -194,7 +194,7 @@ const Map<String, Map<String, dynamic>> shipTechTree = {
   'solarSatellite': {'name': '태양광 인공위성', 'requirements': {
     'shipyard': 1,
   }},
-  'destroyer': {'name': '구축함', 'requirements': {
+  'destroyer': {'name': '전함', 'requirements': {
     'shipyard': 9, 'hyperspaceDrive': 6, 'hyperspaceTech': 5,
   }},
   'deathstar': {'name': '죽음의 별', 'requirements': {

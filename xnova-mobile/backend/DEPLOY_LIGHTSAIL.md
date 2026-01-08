@@ -206,3 +206,5 @@ pm2 restart xnova-backend
 $3.5 플랜 (512MB)에서 메모리 부족 시 $5 플랜 (1GB)으로 업그레이드
 
 
+
+

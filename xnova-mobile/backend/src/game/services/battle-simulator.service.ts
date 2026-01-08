@@ -622,3 +622,5 @@ export class BattleSimulatorService {
 }
 
 
+
+

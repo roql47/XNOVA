@@ -135,8 +135,8 @@ export class GameController {
   }
 
   @Post('battle/recall')
-  async recallFleet(@Request() req) {
-    return this.battleService.recallFleet(req.user.userId);
+  async recallFleet(@Request() req, @Body() body?: { missionId?: string }) {
+    return this.battleService.recallFleet(req.user.userId, body?.missionId);
   }
 
   @Get('battle/status')

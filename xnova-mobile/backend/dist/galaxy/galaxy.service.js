@@ -21,6 +21,7 @@ const planet_schema_1 = require("../planet/schemas/planet.schema");
 const debris_schema_1 = require("./schemas/debris.schema");
 const message_service_1 = require("../message/message.service");
 const game_data_1 = require("../game/constants/game-data");
+const DEBRIS_EXPIRY_MS = 3 * 24 * 60 * 60 * 1000;
 let GalaxyService = class GalaxyService {
     userModel;
     planetModel;
@@ -32,13 +33,31 @@ let GalaxyService = class GalaxyService {
         this.debrisModel = debrisModel;
         this.messageService = messageService;
     }
+    async cleanupExpiredDebris() {
+        const expiryDate = new Date(Date.now() - DEBRIS_EXPIRY_MS);
+        const result = await this.debrisModel.deleteMany({
+            createdAt: { $lt: expiryDate },
+        }).exec();
+        return result.deletedCount || 0;
+    }
+    isDebrisExpired(debris) {
+        if (!debris.createdAt)
+            return false;
+        const createdAt = debris.createdAt;
+        return Date.now() - createdAt.getTime() > DEBRIS_EXPIRY_MS;
+    }
     async getGalaxyMap(galaxy, system, currentUserId) {
         const pattern = new RegExp(`^${galaxy}:${system}:\\d+$`);
+        const expiryDate = new Date(Date.now() - DEBRIS_EXPIRY_MS);
         const [players, colonies, debrisFields] = await Promise.all([
             this.userModel.find({ coordinate: pattern }).exec(),
             this.planetModel.find({ coordinate: pattern }).populate('ownerId').exec(),
-            this.debrisModel.find({ coordinate: pattern }).exec(),
+            this.debrisModel.find({
+                coordinate: pattern,
+                createdAt: { $gte: expiryDate },
+            }).exec(),
             this.userModel.findByIdAndUpdate(currentUserId, { lastActivity: new Date() }).exec(),
+            this.cleanupExpiredDebris(),
         ]);
         const planets = [];
         for (let position = 1; position <= 15; position++) {
@@ -110,7 +129,14 @@ let GalaxyService = class GalaxyService {
         }
     }
     async getDebris(coordinate) {
-        return this.debrisModel.findOne({ coordinate }).exec();
+        const debris = await this.debrisModel.findOne({ coordinate }).exec();
+        if (!debris)
+            return null;
+        if (this.isDebrisExpired(debris)) {
+            await this.debrisModel.deleteOne({ coordinate }).exec();
+            return null;
+        }
+        return debris;
     }
     async consumeDebris(coordinate, metal, crystal) {
         const debris = await this.debrisModel.findOne({ coordinate }).exec();
@@ -272,9 +298,10 @@ let GalaxyService = class GalaxyService {
         if (energyProduction < energyConsumption) {
             energyRatio = Math.max(0.1, energyProduction / energyConsumption);
         }
-        const metalProduction = Math.floor(90 * (metalMineLevel + 1) * Math.pow(1.1, metalMineLevel + 1)) * energyRatio;
-        const crystalProduction = Math.floor(60 * (crystalMineLevel + 1) * Math.pow(1.1, crystalMineLevel + 1)) * energyRatio;
-        const deuteriumProduction = Math.floor(30 * (deuteriumMineLevel + 1) * Math.pow(1.1, deuteriumMineLevel + 1)) * energyRatio;
+        const SPEED_MULTIPLIER = 5;
+        const metalProduction = Math.floor(90 * (metalMineLevel + 1) * Math.pow(1.1, metalMineLevel + 1) * SPEED_MULTIPLIER) * energyRatio;
+        const crystalProduction = Math.floor(60 * (crystalMineLevel + 1) * Math.pow(1.1, crystalMineLevel + 1) * SPEED_MULTIPLIER) * energyRatio;
+        const deuteriumProduction = Math.floor(30 * (deuteriumMineLevel + 1) * Math.pow(1.1, deuteriumMineLevel + 1) * SPEED_MULTIPLIER) * energyRatio;
         const fusionConsumption = fusionLevel > 0 ? Math.floor(10 * fusionLevel * Math.pow(1.1, fusionLevel)) : 0;
         const hoursElapsed = elapsedSeconds / 3600;
         return {

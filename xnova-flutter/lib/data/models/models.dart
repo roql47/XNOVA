@@ -726,12 +726,87 @@ class AttackResponse {
   );
 }
 
+class FleetSlots {
+  final int used;
+  final int max;
+
+  FleetSlots({this.used = 0, this.max = 1});
+
+  factory FleetSlots.fromJson(Map<String, dynamic> json) => FleetSlots(
+    used: (json['used'] ?? 0).toInt(),
+    max: (json['max'] ?? 1).toInt(),
+  );
+}
+
+// 다중 함대 미션 정보
+class FleetMission {
+  final String missionId;
+  final String phase; // 'outbound', 'returning'
+  final String missionType;
+  final String targetCoord;
+  final Map<String, int> fleet;
+  final double remainingTime;
+  final Map<String, int>? loot;
+  final String? originCoord;
+  final DateTime createdAt;
+
+  FleetMission({
+    required this.missionId,
+    required this.phase,
+    required this.missionType,
+    required this.targetCoord,
+    required this.fleet,
+    required this.remainingTime,
+    this.loot,
+    this.originCoord,
+  }) : createdAt = DateTime.now();
+
+  factory FleetMission.fromJson(Map<String, dynamic> json) => FleetMission(
+    missionId: json['missionId'] ?? '',
+    phase: json['phase'] ?? 'outbound',
+    missionType: json['missionType'] ?? 'attack',
+    targetCoord: json['targetCoord'] ?? '',
+    fleet: Map<String, int>.from(json['fleet'] ?? {}),
+    remainingTime: (json['remainingTime'] ?? 0).toDouble(),
+    loot: json['loot'] != null ? Map<String, int>.from(json['loot']) : null,
+    originCoord: json['originCoord'],
+  );
+
+  DateTime get finishDateTime => createdAt.add(Duration(seconds: remainingTime.toInt()));
+
+  bool get isReturning => phase == 'returning';
+
+  String get missionTitle {
+    final prefix = isReturning ? '귀환: ' : '';
+    switch (missionType) {
+      case 'transport':
+        return '$prefix수송';
+      case 'deploy':
+        return '$prefix배치';
+      case 'recycle':
+        return '$prefix수확';
+      case 'colony':
+        return '$prefix식민';
+      default:
+        return '$prefix공격';
+    }
+  }
+}
+
 class BattleStatus {
   final PendingAttackInfo? pendingAttack;
   final PendingReturnInfo? pendingReturn;
   final IncomingAttackInfo? incomingAttack;
+  final List<FleetMission> fleetMissions;
+  final FleetSlots fleetSlots;
 
-  BattleStatus({this.pendingAttack, this.pendingReturn, this.incomingAttack});
+  BattleStatus({
+    this.pendingAttack,
+    this.pendingReturn,
+    this.incomingAttack,
+    this.fleetMissions = const [],
+    FleetSlots? fleetSlots,
+  }) : fleetSlots = fleetSlots ?? FleetSlots();
 
   factory BattleStatus.fromJson(Map<String, dynamic> json) => BattleStatus(
     pendingAttack: json['pendingAttack'] != null
@@ -743,7 +818,19 @@ class BattleStatus {
     incomingAttack: json['incomingAttack'] != null
         ? IncomingAttackInfo.fromJson(json['incomingAttack'])
         : null,
+    fleetMissions: (json['fleetMissions'] as List<dynamic>?)
+        ?.map((e) => FleetMission.fromJson(e))
+        .toList() ?? [],
+    fleetSlots: json['fleetSlots'] != null
+        ? FleetSlots.fromJson(json['fleetSlots'])
+        : null,
   );
+
+  // 활성 미션 수 (다중 함대)
+  int get activeMissionCount => fleetMissions.length;
+
+  // 남은 슬롯 수
+  int get remainingSlots => fleetSlots.max - fleetSlots.used;
 }
 
 class PendingAttackInfo {

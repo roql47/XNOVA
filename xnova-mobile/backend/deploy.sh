@@ -32,3 +32,5 @@ echo "📊 상태 확인: pm2 status"
 echo "📜 로그 확인: pm2 logs xnova-backend"
 
 
+
+

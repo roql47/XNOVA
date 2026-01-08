@@ -141,8 +141,8 @@ const Map<String, ResearchEffect> researchEffects = {
 // 엔진 적용 함선
 const Map<String, List<String>> engineShips = {
   'combustion': ['소형화물선*', '대형화물선', '전투기', '수확선', '무인정찰기'],
-  'impulse': ['공격기', '순양함', '폭격기*'],
-  'hyperspace': ['전함', '구축함', '죽음의별', '전투순양함'],
+  'impulse': ['공격기', '구축함', '폭격기*'],
+  'hyperspace': ['순양함', '전함', '죽음의별', '전투순양함'],
 };
 
 // 엔진 업그레이드 조건
@@ -150,5 +150,7 @@ const Map<String, String> engineUpgrades = {
   '소형화물선': '임펄스 엔진 5 → 임펄스 엔진으로 업그레이드',
   '폭격기': '초공간 엔진 8 → 초공간 엔진으로 업그레이드',
 };
+
+
 
 

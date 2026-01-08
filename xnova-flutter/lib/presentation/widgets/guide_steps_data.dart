@@ -92,7 +92,7 @@ class GuideStepsData {
         title: '조선소',
         description: '조선소에서 다양한 함선을 건조할 수 있습니다.\n\n'
             '• 민간 함선: 화물선, 정찰기\n'
-            '• 전투 함선: 전투기, 순양함, 전함\n'
+            '• 전투 함선: 전투기, 구축함, 순양함\n'
             '• 특수 함선: 식민선, 재활용선',
         icon: Icons.rocket_launch_rounded,
         tabToShow: 'shipyard',

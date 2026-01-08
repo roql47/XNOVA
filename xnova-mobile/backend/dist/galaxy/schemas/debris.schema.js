@@ -15,6 +15,8 @@ let Debris = class Debris {
     coordinate;
     metal;
     crystal;
+    createdAt;
+    updatedAt;
 };
 exports.Debris = Debris;
 __decorate([

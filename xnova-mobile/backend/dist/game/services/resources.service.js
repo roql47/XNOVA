@@ -38,13 +38,14 @@ let ResourcesService = class ResourcesService {
     }
     getResourceProduction(level, type) {
         const effectiveLevel = level + 1;
+        const SPEED_MULTIPLIER = 5;
         switch (type) {
             case 'metal':
-                return Math.floor(90 * effectiveLevel * Math.pow(1.1, effectiveLevel));
+                return Math.floor(90 * effectiveLevel * Math.pow(1.1, effectiveLevel) * SPEED_MULTIPLIER);
             case 'crystal':
-                return Math.floor(60 * effectiveLevel * Math.pow(1.1, effectiveLevel));
+                return Math.floor(60 * effectiveLevel * Math.pow(1.1, effectiveLevel) * SPEED_MULTIPLIER);
             case 'deuterium':
-                return Math.floor(30 * effectiveLevel * Math.pow(1.1, effectiveLevel));
+                return Math.floor(30 * effectiveLevel * Math.pow(1.1, effectiveLevel) * SPEED_MULTIPLIER);
             default:
                 return 0;
         }
