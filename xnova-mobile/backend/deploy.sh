@@ -34,3 +34,4 @@ echo "📜 로그 확인: pm2 logs xnova-backend"
 
 
 
+

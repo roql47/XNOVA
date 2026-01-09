@@ -76,7 +76,7 @@ let ResourcesService = class ResourcesService {
     getFusionDeuteriumConsumption(fusionLevel) {
         if (fusionLevel <= 0)
             return 0;
-        return Math.floor(10 * fusionLevel * Math.pow(1.1, fusionLevel));
+        return Math.floor(50 * fusionLevel * Math.pow(1.1, fusionLevel));
     }
     async updateResources(userId) {
         const user = await this.userModel.findById(userId).exec();

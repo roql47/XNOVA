@@ -70,10 +70,10 @@ export class ResourcesService {
     }
   }
 
-  // 핵융합로 듀테륨 소비량
+  // 핵융합로 듀테륨 소비량 (5배 증가)
   getFusionDeuteriumConsumption(fusionLevel: number): number {
     if (fusionLevel <= 0) return 0;
-    return Math.floor(10 * fusionLevel * Math.pow(1.1, fusionLevel));
+    return Math.floor(50 * fusionLevel * Math.pow(1.1, fusionLevel));
   }
 
   // 자원 업데이트 (경과 시간 기반) - 활성 행성 기준

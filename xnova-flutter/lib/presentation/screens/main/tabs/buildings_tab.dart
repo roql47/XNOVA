@@ -318,10 +318,16 @@ class _BuildingCardState extends State<_BuildingCard> {
                   children: [
                     if (widget.building.production != null)
                       _DetailRow(
-                        label: widget.building.type == 'solarPlant' ? '에너지 생산량' : '자원 생산량',
-                        currentValue: '+${_formatAmount(widget.building.production!)}/h',
+                        label: (widget.building.type == 'solarPlant' || widget.building.type == 'fusionReactor') 
+                            ? '에너지 생산량' : '자원 생산량',
+                        // 에너지 생산(태양광/핵융합로)은 "/h" 없이, 자원 생산은 "/h" 표시
+                        currentValue: (widget.building.type == 'solarPlant' || widget.building.type == 'fusionReactor')
+                            ? '+${_formatAmount(widget.building.production!)}'
+                            : '+${_formatAmount(widget.building.production!)}/h',
                         nextValue: widget.building.nextProduction != null 
-                            ? '+${_formatAmount(widget.building.nextProduction!)}/h' 
+                            ? (widget.building.type == 'solarPlant' || widget.building.type == 'fusionReactor')
+                                ? '+${_formatAmount(widget.building.nextProduction!)}'
+                                : '+${_formatAmount(widget.building.nextProduction!)}/h'
                             : null,
                         isPositive: true,
                       ),

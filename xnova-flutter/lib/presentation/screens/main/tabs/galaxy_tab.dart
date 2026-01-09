@@ -17,6 +17,24 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
   int _galaxy = 1;
   int _system = 1;
   bool _initialized = false;
+  
+  // TextEditingController를 멤버 변수로 관리 (리빌드 시 포커스 유지)
+  late final TextEditingController _galaxyController;
+  late final TextEditingController _systemController;
+
+  @override
+  void initState() {
+    super.initState();
+    _galaxyController = TextEditingController(text: '$_galaxy');
+    _systemController = TextEditingController(text: '$_system');
+  }
+
+  @override
+  void dispose() {
+    _galaxyController.dispose();
+    _systemController.dispose();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -28,6 +46,9 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
         if (parts.length >= 2) {
           _galaxy = int.tryParse(parts[0]) ?? 1;
           _system = int.tryParse(parts[1]) ?? 1;
+          // 컨트롤러 텍스트도 업데이트
+          _galaxyController.text = '$_galaxy';
+          _systemController.text = '$_system';
         }
       }
       _initialized = true;
@@ -45,6 +66,7 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
   void _previousSystem() {
     if (_system > 1) {
       setState(() => _system--);
+      _systemController.text = '$_system';
       _search();
     }
   }
@@ -52,6 +74,7 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
   void _nextSystem() {
     if (_system < 499) {
       setState(() => _system++);
+      _systemController.text = '$_system';
       _search();
     }
   }
@@ -75,7 +98,7 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
                     SizedBox(
                       width: 50,
                       child: TextField(
-                        controller: TextEditingController(text: '$_galaxy'),
+                        controller: _galaxyController,
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
@@ -119,7 +142,7 @@ class _GalaxyTabState extends ConsumerState<GalaxyTab> {
                     SizedBox(
                       width: 50,
                       child: TextField(
-                        controller: TextEditingController(text: '$_system'),
+                        controller: _systemController,
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),

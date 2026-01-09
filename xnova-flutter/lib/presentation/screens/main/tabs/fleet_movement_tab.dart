@@ -33,36 +33,87 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
     _targetController = TextEditingController(text: navState.targetCoordinate);
     _targetCoord = navState.targetCoordinate;
     
-    // 미션 타입 설정
-    if (navState.missionType == 'transport') {
-      _missionType = MissionType.transport;
-    } else if (navState.missionType == 'deploy') {
-      _missionType = MissionType.deploy;
-    } else if (navState.missionType == 'colony') {
-      _missionType = MissionType.colony;
-      // 식민 미션은 식민선 1대만 자동 선택
-      _selectedFleet['colonyShip'] = 1;
-    } else {
-      _missionType = MissionType.attack;
-    }
-    
     _metalController = TextEditingController(text: '0');
     _crystalController = TextEditingController(text: '0');
     _deuteriumController = TextEditingController(text: '0');
     
     _targetController.addListener(_onTargetChanged);
     
-    if (navState.targetCoordinate != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    // 미션 타입 설정 (postFrameCallback에서 처리 - ref.read가 build 이후에 가능)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeMissionType(navState);
+      
+      if (navState.targetCoordinate != null) {
         ref.read(navigationProvider.notifier).clearAttackTarget();
+      }
+    });
+  }
+  
+  void _initializeMissionType(NavigationState navState) {
+    // 네비게이션에서 설정한 미션 타입이 있으면 우선 사용
+    if (navState.missionType == 'transport') {
+      setState(() => _missionType = MissionType.transport);
+    } else if (navState.missionType == 'deploy') {
+      setState(() => _missionType = MissionType.deploy);
+    } else if (navState.missionType == 'colony') {
+      setState(() {
+        _missionType = MissionType.colony;
+        // 식민 미션은 식민선 1대만 자동 선택
+        _selectedFleet['colonyShip'] = 1;
+      });
+    } else {
+      // 네비게이션에서 미션 타입이 없으면 목표 좌표에 따라 자동 설정
+      final isTargetMyPlanet = _isMyPlanet(_targetCoord);
+      setState(() {
+        if (isTargetMyPlanet) {
+          // 내 행성이면 수송이 기본
+          _missionType = MissionType.transport;
+        } else {
+          // 다른 행성이면 공격이 기본
+          _missionType = MissionType.attack;
+        }
       });
     }
   }
 
   void _onTargetChanged() {
+    final newCoord = _targetController.text;
+    final wasMyPlanet = _isMyPlanet(_targetCoord);
+    final isNowMyPlanet = _isMyPlanet(newCoord);
+    
     setState(() {
-      _targetCoord = _targetController.text;
+      _targetCoord = newCoord;
+      
+      // 목표 좌표 유형이 바뀌면 미션 타입 자동 변경
+      if (wasMyPlanet != isNowMyPlanet) {
+        if (isNowMyPlanet) {
+          // 내 행성으로 변경됨 → 수송으로 자동 변경
+          if (_missionType == MissionType.attack || _missionType == MissionType.colony) {
+            _missionType = MissionType.transport;
+          }
+        } else {
+          // 다른 행성으로 변경됨 → 배치는 공격으로 변경
+          if (_missionType == MissionType.deploy) {
+            _missionType = MissionType.attack;
+          }
+        }
+      }
     });
+  }
+  
+  // 목표 좌표가 내 행성(모성 또는 식민지)인지 확인
+  bool _isMyPlanet(String? coord) {
+    if (coord == null || coord.isEmpty) return false;
+    final gameState = ref.read(gameProvider);
+    
+    // 내 모성 좌표 확인
+    if (gameState.coordinate == coord) return true;
+    
+    // 내 식민지 좌표 확인
+    for (final planet in gameState.myPlanets) {
+      if (planet.coordinate == coord) return true;
+    }
+    return false;
   }
 
   // 좌표 형식 유효성 검사
@@ -323,7 +374,8 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
   @override
   Widget build(BuildContext context) {
     final gameState = ref.watch(gameProvider);
-    final availableShips = gameState.fleet.where((f) => f.count > 0).toList();
+    // 태양광 인공위성은 함대 이동 불가 (행성에 고정)
+    final availableShips = gameState.fleet.where((f) => f.count > 0 && f.type != 'solarSatellite').toList();
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -496,45 +548,81 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
                         ),
                       ),
                       const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _MissionButton(
-                              icon: Icons.gps_fixed,
-                              label: '공격',
-                              isSelected: _missionType == MissionType.attack,
-                              color: AppColors.negative,
-                              onTap: () => setState(() => _missionType = MissionType.attack),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _MissionButton(
-                              icon: Icons.local_shipping,
-                              label: '수송',
-                              isSelected: _missionType == MissionType.transport,
-                              color: AppColors.accent,
-                              onTap: () => setState(() => _missionType = MissionType.transport),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: _MissionButton(
-                              icon: Icons.rocket_launch,
-                              label: '식민',
-                              isSelected: _missionType == MissionType.colony,
-                              color: AppColors.positive,
-                              onTap: () {
-                                setState(() {
-                                  _missionType = MissionType.colony;
-                                  // 식민 미션 선택 시 식민선 1대 자동 선택
-                                  _selectedFleet.clear();
-                                  _selectedFleet['colonyShip'] = 1;
-                                });
-                              },
-                            ),
-                          ),
-                        ],
+                      // 목표 좌표가 내 행성이면: 수송/배치만
+                      // 목표 좌표가 다른 행성이면: 공격/수송/식민
+                      Builder(
+                        builder: (context) {
+                          final isTargetMyPlanet = _isMyPlanet(_targetCoord);
+                          
+                          if (isTargetMyPlanet) {
+                            // 내 행성 → 수송/배치만 표시
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: _MissionButton(
+                                    icon: Icons.local_shipping,
+                                    label: '수송',
+                                    isSelected: _missionType == MissionType.transport,
+                                    color: AppColors.accent,
+                                    onTap: () => setState(() => _missionType = MissionType.transport),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _MissionButton(
+                                    icon: Icons.home_work,
+                                    label: '배치',
+                                    isSelected: _missionType == MissionType.deploy,
+                                    color: AppColors.positive,
+                                    onTap: () => setState(() => _missionType = MissionType.deploy),
+                                  ),
+                                ),
+                              ],
+                            );
+                          } else {
+                            // 다른 행성 → 공격/수송/식민 표시
+                            return Row(
+                              children: [
+                                Expanded(
+                                  child: _MissionButton(
+                                    icon: Icons.gps_fixed,
+                                    label: '공격',
+                                    isSelected: _missionType == MissionType.attack,
+                                    color: AppColors.negative,
+                                    onTap: () => setState(() => _missionType = MissionType.attack),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _MissionButton(
+                                    icon: Icons.local_shipping,
+                                    label: '수송',
+                                    isSelected: _missionType == MissionType.transport,
+                                    color: AppColors.accent,
+                                    onTap: () => setState(() => _missionType = MissionType.transport),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _MissionButton(
+                                    icon: Icons.rocket_launch,
+                                    label: '식민',
+                                    isSelected: _missionType == MissionType.colony,
+                                    color: AppColors.positive,
+                                    onTap: () {
+                                      setState(() {
+                                        _missionType = MissionType.colony;
+                                        // 식민 미션 선택 시 식민선 1대 자동 선택
+                                        _selectedFleet.clear();
+                                        _selectedFleet['colonyShip'] = 1;
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ],
+                            );
+                          }
+                        },
                       ),
                       const SizedBox(height: 8),
                       Text(

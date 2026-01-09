@@ -1082,6 +1082,16 @@ class GameNotifier extends StateNotifier<GameState> {
             battleNeedsProcess = true;
           }
         }
+        // 다중 함대 미션 완료 체크 (fleetMissions 배열)
+        if (!battleNeedsProcess && state.battleStatus!.fleetMissions.isNotEmpty) {
+          for (final mission in state.battleStatus!.fleetMissions) {
+            final finishTime = mission.finishDateTime;
+            if (now.isAfter(finishTime)) {
+              battleNeedsProcess = true;
+              break;
+            }
+          }
+        }
       }
       
       // 전투 관련 처리가 필요한 경우
