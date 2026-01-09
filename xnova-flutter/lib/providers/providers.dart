@@ -1068,25 +1068,26 @@ class GameNotifier extends StateNotifier<GameState> {
       // 전투/수확/귀환 완료 체크
       bool battleNeedsProcess = false;
       if (state.battleStatus != null) {
-        // 공격/수확 도착 체크
-        if (state.battleStatus!.pendingAttack != null) {
-          final finishTime = state.battleStatus!.pendingAttack!.finishDateTime;
-          if (now.isAfter(finishTime) && !state.battleStatus!.pendingAttack!.battleCompleted) {
+        // 공격/수확 도착 체크 (remainingTime <= 0 이거나 완료 시간이 지났으면)
+        if (state.battleStatus!.pendingAttack != null && 
+            !state.battleStatus!.pendingAttack!.battleCompleted) {
+          final pa = state.battleStatus!.pendingAttack!;
+          if (pa.remainingTime <= 0 || !pa.finishDateTime.isAfter(now)) {
             battleNeedsProcess = true;
           }
         }
         // 귀환 완료 체크
         if (!battleNeedsProcess && state.battleStatus!.pendingReturn != null) {
-          final finishTime = state.battleStatus!.pendingReturn!.finishDateTime;
-          if (now.isAfter(finishTime)) {
+          final pr = state.battleStatus!.pendingReturn!;
+          if (pr.remainingTime <= 0 || !pr.finishDateTime.isAfter(now)) {
             battleNeedsProcess = true;
           }
         }
         // 다중 함대 미션 완료 체크 (fleetMissions 배열)
         if (!battleNeedsProcess && state.battleStatus!.fleetMissions.isNotEmpty) {
           for (final mission in state.battleStatus!.fleetMissions) {
-            final finishTime = mission.finishDateTime;
-            if (now.isAfter(finishTime)) {
+            // remainingTime이 0 이하이거나 완료 시간이 지났으면 처리 필요
+            if (mission.remainingTime <= 0 || !mission.finishDateTime.isAfter(now)) {
               battleNeedsProcess = true;
               break;
             }

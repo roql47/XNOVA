@@ -1613,8 +1613,14 @@ export class BattleService {
     // - colony: ColonyService에서 처리
     // - transport: processTransportArrival에서 처리
     // - deploy: processDeployArrival에서 처리
+    // - recycle: processRecycleArrival에서 처리
     const missionType = attacker.pendingAttack.missionType;
-    if (missionType === 'colony' || missionType === 'transport' || missionType === 'deploy' || !attacker.pendingAttack.targetUserId) {
+    if (missionType === 'colony' || missionType === 'transport' || missionType === 'deploy' || missionType === 'recycle' || !attacker.pendingAttack.targetUserId) {
+      return null;
+    }
+    
+    // 데브리 수확 미션도 제외 (하위 호환성)
+    if (attacker.pendingAttack.targetUserId === 'debris') {
       return null;
     }
 

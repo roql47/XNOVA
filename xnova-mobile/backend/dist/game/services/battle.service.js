@@ -1145,7 +1145,10 @@ let BattleService = class BattleService {
             return null;
         }
         const missionType = attacker.pendingAttack.missionType;
-        if (missionType === 'colony' || missionType === 'transport' || missionType === 'deploy' || !attacker.pendingAttack.targetUserId) {
+        if (missionType === 'colony' || missionType === 'transport' || missionType === 'deploy' || missionType === 'recycle' || !attacker.pendingAttack.targetUserId) {
+            return null;
+        }
+        if (attacker.pendingAttack.targetUserId === 'debris') {
             return null;
         }
         const pa = attacker.pendingAttack;
