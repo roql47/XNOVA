@@ -129,9 +129,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       return true;
     } catch (e) {
+      // 서버에서 전달한 구체적인 에러 메시지 추출
+      String errorMessage = '회원가입에 실패했습니다.';
+      if (e is DioException && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map && data['message'] != null) {
+          errorMessage = data['message'].toString();
+        }
+      }
       state = state.copyWith(
         isLoading: false,
-        error: '회원가입에 실패했습니다. 다른 이메일이나 닉네임을 사용해주세요.',
+        error: errorMessage,
       );
       return false;
     }

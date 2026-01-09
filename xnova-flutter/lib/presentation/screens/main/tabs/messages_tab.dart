@@ -15,16 +15,74 @@ class MessagesTab extends ConsumerStatefulWidget {
   ConsumerState<MessagesTab> createState() => _MessagesTabState();
 }
 
-class _MessagesTabState extends ConsumerState<MessagesTab> {
+// 메시지 카테고리 enum
+enum MessageCategory {
+  announcement, // 공지사항
+  fleet,        // 함대 이벤트
+  espionage,    // 정탐 메시지
+  player,       // 개인 메시지
+}
+
+class _MessagesTabState extends ConsumerState<MessagesTab> with SingleTickerProviderStateMixin {
   bool _isSelectionMode = false;
   final Set<String> _selectedIds = {};
+  late TabController _tabController;
+  MessageCategory _currentCategory = MessageCategory.announcement;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        setState(() {
+          _currentCategory = MessageCategory.values[_tabController.index];
+          _selectedIds.clear();
+          _isSelectionMode = false;
+        });
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(messageProvider.notifier).loadMessages();
     });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  // 메시지를 카테고리별로 필터링
+  List<Message> _filterMessages(List<Message> messages, MessageCategory category) {
+    return messages.where((m) {
+      switch (category) {
+        case MessageCategory.announcement:
+          // 공지사항: metadata.isAnnouncement == true 또는 senderName이 [공지]로 시작
+          return m.metadata?['isAnnouncement'] == true || 
+                 m.senderName.startsWith('[공지]');
+        case MessageCategory.fleet:
+          // 함대 이벤트: type이 system이고 senderName에 '사령부' 포함 또는
+          // type이 battle이고 spy가 아닌 경우 (전투 보고서)
+          if (m.type == 'system' && m.senderName.contains('사령부')) return true;
+          if (m.type == 'system' && m.senderName.contains('관리국')) return true;
+          if (m.type == 'battle') {
+            final metaType = m.metadata?['type'] as String?;
+            return metaType != 'spy' && metaType != 'spy_alert';
+          }
+          return false;
+        case MessageCategory.espionage:
+          // 정탐 메시지: type이 battle이고 metadata.type이 spy 또는 spy_alert
+          if (m.type == 'battle') {
+            final metaType = m.metadata?['type'] as String?;
+            return metaType == 'spy' || metaType == 'spy_alert';
+          }
+          return false;
+        case MessageCategory.player:
+          // 개인 메시지: type이 player
+          return m.type == 'player';
+      }
+    }).toList();
   }
 
   void _toggleSelectionMode() {
@@ -126,77 +184,156 @@ class _MessagesTabState extends ConsumerState<MessagesTab> {
     }
   }
 
+  // 카테고리별 아이콘 반환
+  IconData _getCategoryIcon(MessageCategory category) {
+    switch (category) {
+      case MessageCategory.announcement:
+        return Icons.campaign;
+      case MessageCategory.fleet:
+        return Icons.rocket_launch;
+      case MessageCategory.espionage:
+        return Icons.radar;
+      case MessageCategory.player:
+        return Icons.person;
+    }
+  }
+
+  // 카테고리별 색상 반환
+  Color _getCategoryColor(MessageCategory category) {
+    switch (category) {
+      case MessageCategory.announcement:
+        return AppColors.warning;
+      case MessageCategory.fleet:
+        return AppColors.accent;
+      case MessageCategory.espionage:
+        return AppColors.infoBlue;
+      case MessageCategory.player:
+        return AppColors.positive;
+    }
+  }
+
+  // 카테고리별 라벨 반환
+  String _getCategoryLabel(MessageCategory category) {
+    switch (category) {
+      case MessageCategory.announcement:
+        return '공지';
+      case MessageCategory.fleet:
+        return '함대';
+      case MessageCategory.espionage:
+        return '정탐';
+      case MessageCategory.player:
+        return '개인';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final messageState = ref.watch(messageProvider);
-    final unreadCount = messageState.messages.where((m) => !m.isRead).length;
+    final filteredMessages = _filterMessages(messageState.messages, _currentCategory);
+    final unreadCount = filteredMessages.where((m) => !m.isRead).length;
+
+    // 각 카테고리별 안 읽은 메시지 수
+    final announcementUnread = _filterMessages(messageState.messages, MessageCategory.announcement)
+        .where((m) => !m.isRead).length;
+    final fleetUnread = _filterMessages(messageState.messages, MessageCategory.fleet)
+        .where((m) => !m.isRead).length;
+    final espionageUnread = _filterMessages(messageState.messages, MessageCategory.espionage)
+        .where((m) => !m.isRead).length;
+    final playerUnread = _filterMessages(messageState.messages, MessageCategory.player)
+        .where((m) => !m.isRead).length;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          // 상단 툴바
+          // 탭바
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: AppColors.surface,
               border: Border(bottom: BorderSide(color: AppColors.panelBorder)),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: _getCategoryColor(_currentCategory),
+              indicatorWeight: 2,
+              labelColor: _getCategoryColor(_currentCategory),
+              unselectedLabelColor: AppColors.textMuted,
+              labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
+              unselectedLabelStyle: const TextStyle(fontSize: 11),
+              tabs: [
+                _buildTab(MessageCategory.announcement, announcementUnread),
+                _buildTab(MessageCategory.fleet, fleetUnread),
+                _buildTab(MessageCategory.espionage, espionageUnread),
+                _buildTab(MessageCategory.player, playerUnread),
+              ],
+            ),
+          ),
+          // 상단 툴바
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.panelBackground,
+              border: Border(bottom: BorderSide(color: AppColors.panelBorder.withOpacity(0.5))),
             ),
             child: Row(
               children: [
                 // 안 읽은 메시지 표시
                 if (unreadCount > 0)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: AppColors.accent.withOpacity(0.2),
+                      color: _getCategoryColor(_currentCategory).withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.mail, size: 14, color: AppColors.accent),
+                        Icon(Icons.mail, size: 12, color: _getCategoryColor(_currentCategory)),
                         const SizedBox(width: 4),
                         Text(
                           '안 읽음 $unreadCount',
-                          style: TextStyle(color: AppColors.accent, fontSize: 11, fontWeight: FontWeight.w600),
+                          style: TextStyle(color: _getCategoryColor(_currentCategory), fontSize: 10, fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),
                   )
                 else
                   Text(
-                    '메시지 ${messageState.messages.length}개',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                    '${_getCategoryLabel(_currentCategory)} ${filteredMessages.length}개',
+                    style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
                   ),
                 const Spacer(),
                 // 선택 모드 버튼
                 if (_isSelectionMode) ...[
                   TextButton.icon(
-                    onPressed: () => _selectAll(messageState.messages),
+                    onPressed: () => _selectAll(filteredMessages),
                     icon: Icon(
-                      _selectedIds.length == messageState.messages.length 
+                      _selectedIds.length == filteredMessages.length 
                         ? Icons.deselect : Icons.select_all,
-                      size: 16,
+                      size: 14,
                     ),
-                    label: Text(_selectedIds.length == messageState.messages.length ? '선택해제' : '전체선택'),
+                    label: Text(_selectedIds.length == filteredMessages.length ? '해제' : '전체', style: const TextStyle(fontSize: 10)),
                     style: TextButton.styleFrom(
                       foregroundColor: AppColors.textSecondary,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                   ),
                   TextButton.icon(
                     onPressed: _selectedIds.isNotEmpty ? _deleteSelected : null,
-                    icon: const Icon(Icons.delete, size: 16),
-                    label: Text('삭제(${_selectedIds.length})'),
+                    icon: const Icon(Icons.delete, size: 14),
+                    label: Text('삭제(${_selectedIds.length})', style: const TextStyle(fontSize: 10)),
                     style: TextButton.styleFrom(
                       foregroundColor: _selectedIds.isNotEmpty ? AppColors.negative : AppColors.textMuted,
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
                   ),
                   IconButton(
                     onPressed: _toggleSelectionMode,
-                    icon: const Icon(Icons.close, size: 18),
+                    icon: const Icon(Icons.close, size: 16),
                     color: AppColors.textMuted,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -204,17 +341,17 @@ class _MessagesTabState extends ConsumerState<MessagesTab> {
                 ] else ...[
                   IconButton(
                     onPressed: _toggleSelectionMode,
-                    icon: const Icon(Icons.checklist, size: 18),
+                    icon: const Icon(Icons.checklist, size: 16),
                     color: AppColors.textSecondary,
                     tooltip: '선택 모드',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   IconButton(
-                    onPressed: messageState.messages.isNotEmpty ? _deleteAll : null,
-                    icon: const Icon(Icons.delete_sweep, size: 18),
-                    color: messageState.messages.isNotEmpty ? AppColors.negative : AppColors.textMuted,
+                    onPressed: filteredMessages.isNotEmpty ? () => _deleteAllFiltered(filteredMessages) : null,
+                    icon: const Icon(Icons.delete_sweep, size: 16),
+                    color: filteredMessages.isNotEmpty ? AppColors.negative : AppColors.textMuted,
                     tooltip: '전체 삭제',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -227,22 +364,33 @@ class _MessagesTabState extends ConsumerState<MessagesTab> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: () => ref.read(messageProvider.notifier).loadMessages(),
-              color: AppColors.accent,
+              color: _getCategoryColor(_currentCategory),
               backgroundColor: AppColors.surface,
               child: messageState.isLoading && messageState.messages.isEmpty
                   ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
-                  : messageState.messages.isEmpty
-                      ? const Center(
-                          child: Text(
-                            '메시지가 없습니다.',
-                            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                  : filteredMessages.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                _getCategoryIcon(_currentCategory),
+                                size: 48,
+                                color: AppColors.textMuted.withOpacity(0.3),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                '${_getCategoryLabel(_currentCategory)} 메시지가 없습니다.',
+                                style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                              ),
+                            ],
                           ),
                         )
                       : ListView.builder(
                           padding: const EdgeInsets.all(12),
-                          itemCount: messageState.messages.length,
+                          itemCount: filteredMessages.length,
                           itemBuilder: (context, index) {
-                            final message = messageState.messages[index];
+                            final message = filteredMessages[index];
                             return _MessageCard(
                               message: message,
                               isSelectionMode: _isSelectionMode,
@@ -256,6 +404,68 @@ class _MessagesTabState extends ConsumerState<MessagesTab> {
         ],
       ),
     );
+  }
+
+  Widget _buildTab(MessageCategory category, int unreadCount) {
+    return Tab(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(_getCategoryIcon(category), size: 14),
+          const SizedBox(width: 4),
+          Text(_getCategoryLabel(category)),
+          if (unreadCount > 0) ...[
+            const SizedBox(width: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+              decoration: BoxDecoration(
+                color: _getCategoryColor(category),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                unreadCount > 99 ? '99+' : '$unreadCount',
+                style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteAllFiltered(List<Message> messages) async {
+    if (messages.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.panelBackground,
+        title: Text('${_getCategoryLabel(_currentCategory)} 전체 삭제', style: const TextStyle(color: AppColors.textPrimary)),
+        content: Text('${_getCategoryLabel(_currentCategory)} 메시지 ${messages.length}개를 모두 삭제하시겠습니까?', 
+          style: const TextStyle(color: AppColors.textSecondary)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('전체 삭제', style: TextStyle(color: AppColors.negative)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      for (final message in messages) {
+        await ref.read(messageProvider.notifier).deleteMessage(message.id);
+      }
+      setState(() {
+        _selectedIds.clear();
+        _isSelectionMode = false;
+      });
+    }
   }
 }
 
