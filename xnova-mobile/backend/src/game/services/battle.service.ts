@@ -2624,6 +2624,7 @@ export class BattleService {
 
     const m = mission as any;
     const targetCoord = m?.targetCoord || user.pendingAttack?.targetCoord;
+    const originCoord = m?.originCoord || user.coordinate || '';
     const deployFleet = m?.fleet || user.pendingAttack?.fleet || {};
     const deployResources = m?.transportResources || (user.pendingAttack as any)?.transportResources || { metal: 0, crystal: 0, deuterium: 0 };
     const currentMissionId = m?.missionId;

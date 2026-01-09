@@ -21,12 +21,18 @@ git push origin main
 cd ~/XNOVA
 git pull origin main
 cd xnova-mobile/backend
+npm install          # 새 패키지 추가 시
+npx nest build       # 서버 코드 변경 시
 npx pm2 restart xnova-backend
 ```
 
 ### 한 줄 명령어 (Lightsail)
 ```bash
+# 코드만 변경 시
 cd ~/XNOVA && git pull origin main && cd xnova-mobile/backend && npx pm2 restart xnova-backend
+
+# 새 패키지 + 코드 변경 시
+cd ~/XNOVA && git pull origin main && cd xnova-mobile/backend && npm install && npx nest build && npx pm2 restart xnova-backend
 ```
 
 ---

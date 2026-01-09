@@ -1500,6 +1500,8 @@ let BattleService = class BattleService {
         const originPlanetId = m?.originPlanetId || user.pendingReturn?.originPlanetId;
         const currentMissionId = m?.missionId;
         const missionType = m?.missionType || user.pendingReturn?.missionType || 'attack';
+        const targetCoord = m?.targetCoord || '';
+        const originCoord = m?.originCoord || user.coordinate || '';
         if (originPlanetId) {
             const originPlanet = await this.planetModel.findById(originPlanetId).exec();
             if (originPlanet) {
@@ -1544,13 +1546,31 @@ let BattleService = class BattleService {
         }
         this.syncLegacyFields(user);
         await user.save();
+        const fleetList = Object.entries(returnedFleet)
+            .filter(([, count]) => count > 0)
+            .map(([type, count]) => `${game_data_1.NAME_MAPPING[type] || type}: ${count}`)
+            .join(', ');
+        let messageTitle = '함대 귀환 보고';
+        let messageContent = '';
+        if (missionType === 'transport') {
+            messageTitle = `수송 귀환 완료 [${targetCoord}]`;
+            messageContent = `${originCoord}에서 출발한 함대가 ${targetCoord}에 자원을 전달하고 귀환했습니다.\n\n귀환 함대: ${fleetList}`;
+        }
+        else if (missionType === 'recycle') {
+            messageTitle = `수확 귀환 완료 [${targetCoord}]`;
+            messageContent = `${originCoord}에서 출발한 함대가 ${targetCoord}의 데브리를 수확하고 귀환했습니다.\n\n귀환 함대: ${fleetList}\n획득 자원: 메탈 ${loot.metal || 0}, 크리스탈 ${loot.crystal || 0}`;
+        }
+        else {
+            messageTitle = `공격 귀환 완료 [${targetCoord}]`;
+            messageContent = `${originCoord}에서 출발한 함대가 ${targetCoord} 공격 후 귀환했습니다.\n\n귀환 함대: ${fleetList}\n약탈 자원: 메탈 ${loot.metal || 0}, 크리스탈 ${loot.crystal || 0}, 듀테륨 ${loot.deuterium || 0}`;
+        }
         await this.messageService.createMessage({
             receiverId: userId,
             senderName: '함대 사령부',
-            title: '함대 귀환 보고',
-            content: `함대가 무사히 귀환했습니다. 약탈한 자원: 메탈 ${loot.metal || 0}, 크리스탈 ${loot.crystal || 0}, 듀테륨 ${loot.deuterium || 0}`,
+            title: messageTitle,
+            content: messageContent,
             type: 'system',
-            metadata: { returnedFleet, loot },
+            metadata: { returnedFleet, loot, missionType, targetCoord, originCoord },
         });
         return {
             returnedFleet,
@@ -1734,13 +1754,17 @@ let BattleService = class BattleService {
         }
         this.syncLegacyFields(user);
         await user.save();
+        const transportFleetList = Object.entries(fleet)
+            .filter(([, count]) => count > 0)
+            .map(([type, count]) => `${game_data_1.NAME_MAPPING[type] || type}: ${count}`)
+            .join(', ');
         await this.messageService.createMessage({
             receiverId: userId,
             senderName: '수송 사령부',
-            title: `${targetCoord} 수송 완료`,
-            content: `자원 수송이 완료되었습니다. 전달된 자원: 메탈 ${transportResources.metal}, 크리스탈 ${transportResources.crystal}, 듀테륨 ${transportResources.deuterium}. 함대가 귀환 중입니다.`,
+            title: `수송 완료 [${originCoord} → ${targetCoord}]`,
+            content: `${originCoord}에서 출발한 함대가 ${targetCoord}에 자원을 전달했습니다.\n\n수송 함대: ${transportFleetList}\n전달 자원: 메탈 ${transportResources.metal}, 크리스탈 ${transportResources.crystal}, 듀테륨 ${transportResources.deuterium}\n\n함대가 귀환 중입니다.`,
             type: 'system',
-            metadata: { resources: transportResources },
+            metadata: { resources: transportResources, fleet, originCoord, targetCoord },
         });
         return { delivered: transportResources, missionId: currentMissionId };
     }
@@ -1880,6 +1904,7 @@ let BattleService = class BattleService {
         }
         const m = mission;
         const targetCoord = m?.targetCoord || user.pendingAttack?.targetCoord;
+        const originCoord = m?.originCoord || user.coordinate || '';
         const deployFleet = m?.fleet || user.pendingAttack?.fleet || {};
         const deployResources = m?.transportResources || user.pendingAttack?.transportResources || { metal: 0, crystal: 0, deuterium: 0 };
         const currentMissionId = m?.missionId;
@@ -1927,10 +1952,10 @@ let BattleService = class BattleService {
         await this.messageService.createMessage({
             receiverId: userId,
             senderName: '배치 사령부',
-            title: `${targetCoord} 배치 완료`,
-            content: `함대와 자원이 배치되었습니다.\n함대: ${fleetList}\n자원: 메탈 ${deployResources.metal}, 크리스탈 ${deployResources.crystal}, 듀테륨 ${deployResources.deuterium}`,
+            title: `배치 완료 [${originCoord} → ${targetCoord}]`,
+            content: `${originCoord}에서 출발한 함대가 ${targetCoord}에 배치되었습니다.\n\n배치 함대: ${fleetList}\n배치 자원: 메탈 ${deployResources.metal}, 크리스탈 ${deployResources.crystal}, 듀테륨 ${deployResources.deuterium}`,
             type: 'system',
-            metadata: { fleet: deployFleet, resources: deployResources },
+            metadata: { fleet: deployFleet, resources: deployResources, originCoord, targetCoord },
         });
         return {
             fleet: deployFleet,
