@@ -23,6 +23,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late ApiService _apiService;
   bool _isLoading = false;
   Map<String, dynamic>? _vacationStatus;
+  String? _kakaoLinkCode;
+  DateTime? _kakaoLinkExpiry;
 
   @override
   void initState() {
@@ -80,6 +82,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       onTap: () => _showPlanetNameDialog(gameState.playerName ?? ''),
                     ),
                   ]),
+                  
+                  const SizedBox(height: 24),
+                  _buildSectionTitle('카카오톡 연동'),
+                  _buildKakaoLinkCard(),
                   
                   const SizedBox(height: 24),
                   _buildSectionTitle('계정 설정'),
@@ -410,6 +416,182 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ],
     );
+  }
+
+  // 카카오톡 연동 카드
+  Widget _buildKakaoLinkCard() {
+    final hasValidCode = _kakaoLinkCode != null && 
+        _kakaoLinkExpiry != null && 
+        _kakaoLinkExpiry!.isAfter(DateTime.now());
+    
+    String? remainingTime;
+    if (hasValidCode) {
+      final diff = _kakaoLinkExpiry!.difference(DateTime.now());
+      final minutes = diff.inMinutes;
+      final seconds = diff.inSeconds % 60;
+      remainingTime = '$minutes분 $seconds초';
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.panelBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.panelBorder),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE500).withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.chat_bubble_rounded,
+                  color: Color(0xFF3C1E1E),
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '카카오톡 메신저봇 연동',
+                      style: TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      '카카오톡에서 게임 정보 조회',
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildInfoRow('사용법', '아래 인증코드를 카카오톡에서 입력'),
+                const SizedBox(height: 6),
+                _buildInfoRow('명령어', '!인증 [코드]'),
+                const SizedBox(height: 6),
+                _buildInfoRow('기능', '자원/건물/함대 조회, 알림'),
+              ],
+            ),
+          ),
+          if (hasValidCode) ...[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.accent.withOpacity(0.3)),
+              ),
+              child: Column(
+                children: [
+                  const Text(
+                    '인증코드',
+                    style: TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _kakaoLinkCode!,
+                    style: const TextStyle(
+                      color: AppColors.accent,
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 8,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '유효시간: $remainingTime',
+                    style: const TextStyle(
+                      color: AppColors.warning,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    '카카오톡에서 "!인증 $_kakaoLinkCode" 입력',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _generateKakaoLinkCode,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFEE500),
+                foregroundColor: const Color(0xFF3C1E1E),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: Text(
+                hasValidCode ? '새 인증코드 발급' : '인증코드 발급',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _generateKakaoLinkCode() async {
+    setState(() => _isLoading = true);
+    try {
+      final result = await _apiService.generateKakaoLinkCode();
+      if (result['success'] == true) {
+        setState(() {
+          _kakaoLinkCode = result['code'];
+          _kakaoLinkExpiry = DateTime.parse(result['expiresAt']);
+        });
+        _showMessage('인증코드가 발급되었습니다. 5분 내에 사용하세요.');
+      } else {
+        _showMessage(result['message'] ?? '인증코드 발급에 실패했습니다.', isError: true);
+      }
+    } catch (e) {
+      _showMessage('오류가 발생했습니다.', isError: true);
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   void _showPlanetNameDialog(String currentName) {

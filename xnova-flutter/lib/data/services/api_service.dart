@@ -426,5 +426,12 @@ class ApiService {
     final response = await _dio.post('game/colony/return');
     return response.data;
   }
+
+  // ===== 카카오톡 연동 =====
+  // 카카오톡 연동용 인증코드 생성
+  Future<Map<String, dynamic>> generateKakaoLinkCode() async {
+    final response = await _dio.post('auth/kakao-link/generate');
+    return response.data;
+  }
 }
 
