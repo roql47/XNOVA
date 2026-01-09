@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import configuration from './config/configuration';
 import { AuthModule } from './auth/auth.module';
 import { UserModule } from './user/user.module';
@@ -19,6 +20,8 @@ import { PlanetModule } from './planet/planet.module';
       isGlobal: true,
       load: [configuration],
     }),
+    // 스케줄러 모듈 - 함대 미션 자동 처리
+    ScheduleModule.forRoot(),
     // Rate Limiting - 무차별 대입 공격 방지
     ThrottlerModule.forRoot([
       {

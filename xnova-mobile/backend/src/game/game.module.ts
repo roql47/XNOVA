@@ -11,6 +11,7 @@ import { BattleReportService } from './services/battle-report.service';
 import { BattleSimulatorService } from './services/battle-simulator.service';
 import { RankingService } from './services/ranking.service';
 import { ColonyService } from './services/colony.service';
+import { FleetSchedulerService } from './services/fleet-scheduler.service';
 import { UserModule } from '../user/user.module';
 import { MessageModule } from '../message/message.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
@@ -30,6 +31,7 @@ import { PlanetModule } from '../planet/planet.module';
     BattleSimulatorService,
     RankingService,
     ColonyService,
+    FleetSchedulerService,
   ],
   exports: [
     ResourcesService,
@@ -42,6 +44,7 @@ import { PlanetModule } from '../planet/planet.module';
     BattleSimulatorService,
     RankingService,
     ColonyService,
+    FleetSchedulerService,
   ],
 })
 export class GameModule {}
