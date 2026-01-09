@@ -10,6 +10,7 @@ import { LocalStrategy } from './strategies/local.strategy';
 import { UserModule } from '../user/user.module';
 import { RefreshToken, RefreshTokenSchema } from './schemas/refresh-token.schema';
 import { BlacklistedToken, BlacklistedTokenSchema } from './schemas/blacklisted-token.schema';
+import { KakaoLinkCode, KakaoLinkCodeSchema } from './schemas/kakao-link-code.schema';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { BlacklistedToken, BlacklistedTokenSchema } from './schemas/blacklisted-
     MongooseModule.forFeature([
       { name: RefreshToken.name, schema: RefreshTokenSchema },
       { name: BlacklistedToken.name, schema: BlacklistedTokenSchema },
+      { name: KakaoLinkCode.name, schema: KakaoLinkCodeSchema },
     ]),
     JwtModule.registerAsync({
       imports: [ConfigModule],

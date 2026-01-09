@@ -1,5 +1,5 @@
 import { AuthService } from './auth.service';
-import { RegisterDto, GoogleAuthDto, GoogleCompleteDto, RefreshTokenDto, LogoutDto } from './dto/auth.dto';
+import { RegisterDto, GoogleAuthDto, GoogleCompleteDto, RefreshTokenDto, LogoutDto, KakaoLinkVerifyDto } from './dto/auth.dto';
 export declare class AuthController {
     private authService;
     constructor(authService: AuthService);
@@ -68,4 +68,16 @@ export declare class AuthController {
         message: string;
     }>;
     getProfile(req: any): Promise<any>;
+    generateKakaoLinkCode(req: any): Promise<{
+        success: boolean;
+        code: string;
+        expiresAt: Date;
+        message: string;
+    }>;
+    verifyKakaoLinkCode(kakaoLinkVerifyDto: KakaoLinkVerifyDto, req: any, userAgent: string, ip: string): Promise<{
+        success: boolean;
+        accessToken: string;
+        refreshToken: string;
+        username: string;
+    }>;
 }

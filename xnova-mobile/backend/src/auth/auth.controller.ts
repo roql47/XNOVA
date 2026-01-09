@@ -1,6 +1,6 @@
 import { Controller, Post, Body, UseGuards, Request, Get, Headers, Ip } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, GoogleAuthDto, GoogleCompleteDto, RefreshTokenDto, LogoutDto } from './dto/auth.dto';
+import { RegisterDto, LoginDto, GoogleAuthDto, GoogleCompleteDto, RefreshTokenDto, LogoutDto, KakaoLinkVerifyDto } from './dto/auth.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
@@ -112,5 +112,39 @@ export class AuthController {
   @Get('profile')
   async getProfile(@Request() req) {
     return this.authService.getProfile(req.user.userId);
+  }
+
+  // ===== 카카오톡 연동 =====
+
+  // 카카오톡 연동 코드 생성 (앱에서 호출)
+  @UseGuards(JwtAuthGuard)
+  @Post('kakao-link/generate')
+  async generateKakaoLinkCode(@Request() req) {
+    const result = await this.authService.generateKakaoLinkCode(req.user.userId);
+    return {
+      success: true,
+      code: result.code,
+      expiresAt: result.expiresAt,
+      message: '카카오톡에서 "!인증 ' + result.code + '" 를 입력하세요.',
+    };
+  }
+
+  // 카카오톡 연동 코드 검증 (메신저봇에서 호출)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('kakao-link/verify')
+  async verifyKakaoLinkCode(
+    @Body() kakaoLinkVerifyDto: KakaoLinkVerifyDto,
+    @Request() req,
+    @Headers('user-agent') userAgent: string,
+    @Ip() ip: string,
+  ) {
+    const clientInfo = this.getClientInfo(req, userAgent, ip);
+    const result = await this.authService.verifyKakaoLinkCode(kakaoLinkVerifyDto.code, clientInfo);
+    return {
+      success: true,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      username: result.username,
+    };
   }
 }

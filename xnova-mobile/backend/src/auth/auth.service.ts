@@ -9,6 +9,7 @@ import { UserService } from '../user/user.service';
 import { RegisterDto, GoogleAuthDto, GoogleCompleteDto } from './dto/auth.dto';
 import { RefreshToken, RefreshTokenDocument } from './schemas/refresh-token.schema';
 import { BlacklistedToken, BlacklistedTokenDocument } from './schemas/blacklisted-token.schema';
+import { KakaoLinkCode, KakaoLinkCodeDocument } from './schemas/kakao-link-code.schema';
 
 interface TokenPayload {
   email: string;
@@ -34,6 +35,7 @@ export class AuthService {
     private configService: ConfigService,
     @InjectModel(RefreshToken.name) private refreshTokenModel: Model<RefreshTokenDocument>,
     @InjectModel(BlacklistedToken.name) private blacklistedTokenModel: Model<BlacklistedTokenDocument>,
+    @InjectModel(KakaoLinkCode.name) private kakaoLinkCodeModel: Model<KakaoLinkCodeDocument>,
   ) {
     this.googleClient = new OAuth2Client();
   }
@@ -372,5 +374,85 @@ export class AuthService {
     
     const { password: _, ...result } = user.toObject();
     return result;
+  }
+
+  // ===== 카카오톡 연동 =====
+
+  /**
+   * 카카오톡 연동용 인증코드 생성 (앱에서 호출)
+   */
+  async generateKakaoLinkCode(userId: string): Promise<{ code: string; expiresAt: Date }> {
+    // 기존 미사용 코드 삭제
+    await this.kakaoLinkCodeModel.deleteMany({
+      userId: new Types.ObjectId(userId),
+      used: false,
+    });
+
+    // 6자리 영숫자 코드 생성
+    const code = this.generateRandomCode(6);
+    
+    // 5분 후 만료
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+
+    await this.kakaoLinkCodeModel.create({
+      userId: new Types.ObjectId(userId),
+      code,
+      expiresAt,
+      used: false,
+    });
+
+    return { code, expiresAt };
+  }
+
+  /**
+   * 카카오톡 연동 인증코드 검증 (메신저봇에서 호출)
+   */
+  async verifyKakaoLinkCode(code: string, clientInfo: ClientInfo): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    username: string;
+  }> {
+    const linkCode = await this.kakaoLinkCodeModel.findOne({
+      code: code.toUpperCase(),
+      used: false,
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!linkCode) {
+      throw new BadRequestException('유효하지 않거나 만료된 인증코드입니다.');
+    }
+
+    // 코드 사용 처리
+    linkCode.used = true;
+    await linkCode.save();
+
+    // 사용자 조회
+    const user = await this.userService.findById(linkCode.userId.toString());
+    if (!user) {
+      throw new BadRequestException('사용자를 찾을 수 없습니다.');
+    }
+
+    // 토큰 발급
+    const accessToken = this.generateAccessToken(user, clientInfo);
+    const refreshToken = await this.generateRefreshToken(user._id.toString(), clientInfo);
+
+    return {
+      accessToken,
+      refreshToken,
+      username: user.playerName,
+    };
+  }
+
+  /**
+   * 랜덤 영숫자 코드 생성
+   */
+  private generateRandomCode(length: number): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < length; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
   }
 }

@@ -56,21 +56,24 @@ const crypto = __importStar(require("crypto"));
 const user_service_1 = require("../user/user.service");
 const refresh_token_schema_1 = require("./schemas/refresh-token.schema");
 const blacklisted_token_schema_1 = require("./schemas/blacklisted-token.schema");
+const kakao_link_code_schema_1 = require("./schemas/kakao-link-code.schema");
 let AuthService = class AuthService {
     userService;
     jwtService;
     configService;
     refreshTokenModel;
     blacklistedTokenModel;
+    kakaoLinkCodeModel;
     googleClient;
     REFRESH_TOKEN_EXPIRY_DAYS = 30;
     ACCESS_TOKEN_EXPIRY_DAYS = 7;
-    constructor(userService, jwtService, configService, refreshTokenModel, blacklistedTokenModel) {
+    constructor(userService, jwtService, configService, refreshTokenModel, blacklistedTokenModel, kakaoLinkCodeModel) {
         this.userService = userService;
         this.jwtService = jwtService;
         this.configService = configService;
         this.refreshTokenModel = refreshTokenModel;
         this.blacklistedTokenModel = blacklistedTokenModel;
+        this.kakaoLinkCodeModel = kakaoLinkCodeModel;
         this.googleClient = new google_auth_library_1.OAuth2Client();
     }
     generateAccessToken(user, clientInfo) {
@@ -307,15 +310,64 @@ let AuthService = class AuthService {
         const { password: _, ...result } = user.toObject();
         return result;
     }
+    async generateKakaoLinkCode(userId) {
+        await this.kakaoLinkCodeModel.deleteMany({
+            userId: new mongoose_2.Types.ObjectId(userId),
+            used: false,
+        });
+        const code = this.generateRandomCode(6);
+        const expiresAt = new Date();
+        expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+        await this.kakaoLinkCodeModel.create({
+            userId: new mongoose_2.Types.ObjectId(userId),
+            code,
+            expiresAt,
+            used: false,
+        });
+        return { code, expiresAt };
+    }
+    async verifyKakaoLinkCode(code, clientInfo) {
+        const linkCode = await this.kakaoLinkCodeModel.findOne({
+            code: code.toUpperCase(),
+            used: false,
+            expiresAt: { $gt: new Date() },
+        });
+        if (!linkCode) {
+            throw new common_1.BadRequestException('유효하지 않거나 만료된 인증코드입니다.');
+        }
+        linkCode.used = true;
+        await linkCode.save();
+        const user = await this.userService.findById(linkCode.userId.toString());
+        if (!user) {
+            throw new common_1.BadRequestException('사용자를 찾을 수 없습니다.');
+        }
+        const accessToken = this.generateAccessToken(user, clientInfo);
+        const refreshToken = await this.generateRefreshToken(user._id.toString(), clientInfo);
+        return {
+            accessToken,
+            refreshToken,
+            username: user.playerName,
+        };
+    }
+    generateRandomCode(length) {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let code = '';
+        for (let i = 0; i < length; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return code;
+    }
 };
 exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
     __param(3, (0, mongoose_1.InjectModel)(refresh_token_schema_1.RefreshToken.name)),
     __param(4, (0, mongoose_1.InjectModel)(blacklisted_token_schema_1.BlacklistedToken.name)),
+    __param(5, (0, mongoose_1.InjectModel)(kakao_link_code_schema_1.KakaoLinkCode.name)),
     __metadata("design:paramtypes", [user_service_1.UserService,
         jwt_1.JwtService,
         config_1.ConfigService,
+        mongoose_2.Model,
         mongoose_2.Model,
         mongoose_2.Model])
 ], AuthService);

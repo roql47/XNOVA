@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LogoutDto = exports.RefreshTokenDto = exports.GoogleCompleteDto = exports.GoogleAuthDto = exports.LoginDto = exports.RegisterDto = void 0;
+exports.KakaoLinkVerifyDto = exports.LogoutDto = exports.RefreshTokenDto = exports.GoogleCompleteDto = exports.GoogleAuthDto = exports.LoginDto = exports.RegisterDto = void 0;
 const class_validator_1 = require("class-validator");
 class RegisterDto {
     email;
@@ -96,4 +96,15 @@ __decorate([
     (0, class_validator_1.IsNotEmpty)({ message: 'Refresh Token은 필수입니다.' }),
     __metadata("design:type", String)
 ], LogoutDto.prototype, "refreshToken", void 0);
+class KakaoLinkVerifyDto {
+    code;
+}
+exports.KakaoLinkVerifyDto = KakaoLinkVerifyDto;
+__decorate([
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)({ message: '인증코드는 필수입니다.' }),
+    (0, class_validator_1.MinLength)(6, { message: '인증코드는 6자리입니다.' }),
+    (0, class_validator_1.MaxLength)(6, { message: '인증코드는 6자리입니다.' }),
+    __metadata("design:type", String)
+], KakaoLinkVerifyDto.prototype, "code", void 0);
 //# sourceMappingURL=auth.dto.js.map

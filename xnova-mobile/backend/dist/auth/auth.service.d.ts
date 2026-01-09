@@ -5,6 +5,7 @@ import { UserService } from '../user/user.service';
 import { RegisterDto, GoogleAuthDto, GoogleCompleteDto } from './dto/auth.dto';
 import { RefreshTokenDocument } from './schemas/refresh-token.schema';
 import { BlacklistedTokenDocument } from './schemas/blacklisted-token.schema';
+import { KakaoLinkCodeDocument } from './schemas/kakao-link-code.schema';
 interface ClientInfo {
     userAgent: string;
     ipAddress: string;
@@ -15,10 +16,11 @@ export declare class AuthService {
     private configService;
     private refreshTokenModel;
     private blacklistedTokenModel;
+    private kakaoLinkCodeModel;
     private googleClient;
     private readonly REFRESH_TOKEN_EXPIRY_DAYS;
     private readonly ACCESS_TOKEN_EXPIRY_DAYS;
-    constructor(userService: UserService, jwtService: JwtService, configService: ConfigService, refreshTokenModel: Model<RefreshTokenDocument>, blacklistedTokenModel: Model<BlacklistedTokenDocument>);
+    constructor(userService: UserService, jwtService: JwtService, configService: ConfigService, refreshTokenModel: Model<RefreshTokenDocument>, blacklistedTokenModel: Model<BlacklistedTokenDocument>, kakaoLinkCodeModel: Model<KakaoLinkCodeDocument>);
     private generateAccessToken;
     private generateRefreshToken;
     private hashString;
@@ -93,5 +95,15 @@ export declare class AuthService {
         expiresIn: number;
     }>;
     getProfile(userId: string): Promise<any>;
+    generateKakaoLinkCode(userId: string): Promise<{
+        code: string;
+        expiresAt: Date;
+    }>;
+    verifyKakaoLinkCode(code: string, clientInfo: ClientInfo): Promise<{
+        accessToken: string;
+        refreshToken: string;
+        username: string;
+    }>;
+    private generateRandomCode;
 }
 export {};

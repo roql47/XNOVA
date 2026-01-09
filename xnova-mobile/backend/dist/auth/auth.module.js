@@ -19,6 +19,7 @@ const local_strategy_1 = require("./strategies/local.strategy");
 const user_module_1 = require("../user/user.module");
 const refresh_token_schema_1 = require("./schemas/refresh-token.schema");
 const blacklisted_token_schema_1 = require("./schemas/blacklisted-token.schema");
+const kakao_link_code_schema_1 = require("./schemas/kakao-link-code.schema");
 let AuthModule = class AuthModule {
 };
 exports.AuthModule = AuthModule;
@@ -30,6 +31,7 @@ exports.AuthModule = AuthModule = __decorate([
             mongoose_1.MongooseModule.forFeature([
                 { name: refresh_token_schema_1.RefreshToken.name, schema: refresh_token_schema_1.RefreshTokenSchema },
                 { name: blacklisted_token_schema_1.BlacklistedToken.name, schema: blacklisted_token_schema_1.BlacklistedTokenSchema },
+                { name: kakao_link_code_schema_1.KakaoLinkCode.name, schema: kakao_link_code_schema_1.KakaoLinkCodeSchema },
             ]),
             jwt_1.JwtModule.registerAsync({
                 imports: [config_1.ConfigModule],

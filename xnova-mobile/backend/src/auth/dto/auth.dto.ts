@@ -62,3 +62,12 @@ export class LogoutDto {
   refreshToken: string;
 }
 
+// 카카오톡 연동용 DTO
+export class KakaoLinkVerifyDto {
+  @IsString()
+  @IsNotEmpty({ message: '인증코드는 필수입니다.' })
+  @MinLength(6, { message: '인증코드는 6자리입니다.' })
+  @MaxLength(6, { message: '인증코드는 6자리입니다.' })
+  code: string;
+}
+

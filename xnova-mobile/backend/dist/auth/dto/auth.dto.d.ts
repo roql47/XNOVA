@@ -20,3 +20,6 @@ export declare class RefreshTokenDto {
 export declare class LogoutDto {
     refreshToken: string;
 }
+export declare class KakaoLinkVerifyDto {
+    code: string;
+}
