@@ -174,18 +174,49 @@ class Production {
 class ResourcesResponse {
   final Resources resources;
   final Production production;
+  final Storage storage;
   final int energyRatio;
 
   ResourcesResponse({
     required this.resources,
     required this.production,
+    required this.storage,
     this.energyRatio = 100,
   });
 
   factory ResourcesResponse.fromJson(Map<String, dynamic> json) => ResourcesResponse(
     resources: Resources.fromJson(json['resources'] ?? {}),
     production: Production.fromJson(json['production'] ?? {}),
+    storage: Storage.fromJson(json['storage'] ?? {}),
     energyRatio: (json['energyRatio'] ?? 100).toInt(),
+  );
+}
+
+// 창고 용량 정보
+class Storage {
+  final int metalCapacity;
+  final int crystalCapacity;
+  final int deuteriumCapacity;
+  final int metalLevel;
+  final int crystalLevel;
+  final int deuteriumLevel;
+
+  Storage({
+    this.metalCapacity = 100000,
+    this.crystalCapacity = 100000,
+    this.deuteriumCapacity = 100000,
+    this.metalLevel = 0,
+    this.crystalLevel = 0,
+    this.deuteriumLevel = 0,
+  });
+
+  factory Storage.fromJson(Map<String, dynamic>? json) => Storage(
+    metalCapacity: (json?['metalCapacity'] ?? 100000).toInt(),
+    crystalCapacity: (json?['crystalCapacity'] ?? 100000).toInt(),
+    deuteriumCapacity: (json?['deuteriumCapacity'] ?? 100000).toInt(),
+    metalLevel: (json?['metalLevel'] ?? 0).toInt(),
+    crystalLevel: (json?['crystalLevel'] ?? 0).toInt(),
+    deuteriumLevel: (json?['deuteriumLevel'] ?? 0).toInt(),
   );
 }
 

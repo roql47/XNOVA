@@ -75,25 +75,34 @@ class OverviewTab extends ConsumerWidget {
           
           // 전투 상태
           if (gameState.battleStatus != null) ...[
-            if (gameState.battleStatus!.pendingAttack != null)
-              _BattleStatusPanel(
-                icon: gameState.battleStatus!.pendingAttack!.missionType == 'transport'
-                    ? Icons.local_shipping
-                    : gameState.battleStatus!.pendingAttack!.missionType == 'deploy'
-                        ? Icons.home_work
-                        : gameState.battleStatus!.pendingAttack!.missionType == 'recycle'
-                            ? Icons.blur_on
-                            : Icons.flight_takeoff,
-                title: gameState.battleStatus!.pendingAttack!.missionTitle,
-                description: '목표: ${gameState.battleStatus!.pendingAttack!.targetCoord}',
-                finishTime: gameState.battleStatus!.pendingAttack!.finishDateTime,
-                onComplete: () => ref.read(gameProvider.notifier).processBattle(),
-              ),
-            if (gameState.battleStatus!.pendingReturn != null)
-              _FleetReturnPanel(
-                pendingReturn: gameState.battleStatus!.pendingReturn!,
-                onComplete: () => ref.read(gameProvider.notifier).processBattle(),
-              ),
+            // 다중 함대 미션 표시 (fleetMissions 배열)
+            ...gameState.battleStatus!.fleetMissions.map((mission) => _FleetMissionPanel(
+              mission: mission,
+              onComplete: () => ref.read(gameProvider.notifier).processBattle(),
+            )),
+            
+            // 하위 호환성: 기존 pendingAttack/pendingReturn (fleetMissions가 비어있을 때만)
+            if (gameState.battleStatus!.fleetMissions.isEmpty) ...[
+              if (gameState.battleStatus!.pendingAttack != null)
+                _BattleStatusPanel(
+                  icon: gameState.battleStatus!.pendingAttack!.missionType == 'transport'
+                      ? Icons.local_shipping
+                      : gameState.battleStatus!.pendingAttack!.missionType == 'deploy'
+                          ? Icons.home_work
+                          : gameState.battleStatus!.pendingAttack!.missionType == 'recycle'
+                              ? Icons.blur_on
+                              : Icons.flight_takeoff,
+                  title: gameState.battleStatus!.pendingAttack!.missionTitle,
+                  description: '목표: ${gameState.battleStatus!.pendingAttack!.targetCoord}',
+                  finishTime: gameState.battleStatus!.pendingAttack!.finishDateTime,
+                  onComplete: () => ref.read(gameProvider.notifier).processBattle(),
+                ),
+              if (gameState.battleStatus!.pendingReturn != null)
+                _FleetReturnPanel(
+                  pendingReturn: gameState.battleStatus!.pendingReturn!,
+                  onComplete: () => ref.read(gameProvider.notifier).processBattle(),
+                ),
+            ],
             if (gameState.battleStatus!.incomingAttack != null)
               _IncomingAttackPanel(
                 incomingAttack: gameState.battleStatus!.incomingAttack!,
@@ -111,6 +120,7 @@ class OverviewTab extends ConsumerWidget {
               gameState.researchProgress == null &&
               gameState.fleetProgress == null &&
               gameState.defenseProgress == null &&
+              (gameState.battleStatus?.fleetMissions.isEmpty ?? true) &&
               (gameState.battleStatus?.pendingAttack == null) &&
               (gameState.battleStatus?.pendingReturn == null))
             GamePanel(
@@ -1309,6 +1319,170 @@ class _IncomingAttackPanel extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// 다중 함대 미션 표시 패널
+class _FleetMissionPanel extends StatelessWidget {
+  final FleetMission mission;
+  final VoidCallback onComplete;
+
+  const _FleetMissionPanel({
+    required this.mission,
+    required this.onComplete,
+  });
+
+  IconData _getMissionIcon() {
+    if (mission.isReturning) return Icons.flight_land;
+    switch (mission.missionType) {
+      case 'transport':
+        return Icons.local_shipping;
+      case 'deploy':
+        return Icons.home_work;
+      case 'recycle':
+        return Icons.blur_on;
+      case 'colony':
+        return Icons.public;
+      default:
+        return Icons.flight_takeoff;
+    }
+  }
+
+  Color _getMissionColor() {
+    if (mission.isReturning) return AppColors.positive;
+    switch (mission.missionType) {
+      case 'transport':
+        return AppColors.accent;
+      case 'deploy':
+        return AppColors.resourceCrystal;
+      case 'recycle':
+        return AppColors.resourceDeuterium;
+      case 'colony':
+        return AppColors.positive;
+      default:
+        return AppColors.negative;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final missionColor = _getMissionColor();
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            missionColor.withOpacity(mission.isReturning ? 0.1 : 0.08),
+            missionColor.withOpacity(0.03),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: missionColor.withOpacity(0.3)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(_getMissionIcon(), color: missionColor, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    mission.missionTitle,
+                    style: TextStyle(
+                      color: missionColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              mission.isReturning 
+                  ? '출발지: ${mission.originCoord ?? "모행성"}'
+                  : '목표: ${mission.targetCoord}',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+            // 귀환 시 전리품 표시
+            if (mission.isReturning && mission.loot != null && mission.loot!.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  if ((mission.loot!['metal'] ?? 0) > 0)
+                    _buildLootItem('M', mission.loot!['metal']!, AppColors.resourceMetal),
+                  if ((mission.loot!['crystal'] ?? 0) > 0)
+                    _buildLootItem('C', mission.loot!['crystal']!, AppColors.resourceCrystal),
+                  if ((mission.loot!['deuterium'] ?? 0) > 0)
+                    _buildLootItem('D', mission.loot!['deuterium']!, AppColors.resourceDeuterium),
+                ],
+              ),
+            ],
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.schedule, size: 14, color: missionColor),
+                const SizedBox(width: 6),
+                ProgressTimer(
+                  finishTime: mission.finishDateTime,
+                  onComplete: onComplete,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLootItem(String label, int amount, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            _formatNumber(amount),
+            style: const TextStyle(
+              color: AppColors.textPrimary,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatNumber(int number) {
+    if (number >= 1000000) {
+      return '${(number / 1000000).toStringAsFixed(1)}M';
+    } else if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(1)}K';
+    }
+    return number.toString();
   }
 }
 

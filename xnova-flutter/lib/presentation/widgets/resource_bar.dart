@@ -6,12 +6,14 @@ import '../../providers/providers.dart';
 class ResourceBar extends StatelessWidget {
   final GameResources resources;
   final GameProduction production;
+  final StorageCapacity storageCapacity;
   final int energyRatio;
 
   const ResourceBar({
     super.key,
     required this.resources,
     required this.production,
+    required this.storageCapacity,
     required this.energyRatio,
   });
 
@@ -26,6 +28,11 @@ class ResourceBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 창고 용량 초과 여부 확인
+    final metalOverflow = resources.metal >= storageCapacity.metalCapacity;
+    final crystalOverflow = resources.crystal >= storageCapacity.crystalCapacity;
+    final deuteriumOverflow = resources.deuterium >= storageCapacity.deuteriumCapacity;
+
     return Container(
       color: AppColors.surface,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -36,6 +43,8 @@ class ResourceBar extends StatelessWidget {
             color: AppColors.resourceMetal,
             value: _formatNumber(resources.metal),
             production: '+${_formatNumber(production.metal)}',
+            isOverflow: metalOverflow,
+            capacity: storageCapacity.metalCapacity,
           ),
           const SizedBox(width: 16),
           _ResourceItem(
@@ -43,6 +52,8 @@ class ResourceBar extends StatelessWidget {
             color: AppColors.resourceCrystal,
             value: _formatNumber(resources.crystal),
             production: '+${_formatNumber(production.crystal)}',
+            isOverflow: crystalOverflow,
+            capacity: storageCapacity.crystalCapacity,
           ),
           const SizedBox(width: 16),
           _ResourceItem(
@@ -50,6 +61,8 @@ class ResourceBar extends StatelessWidget {
             color: AppColors.resourceDeuterium,
             value: _formatNumber(resources.deuterium),
             production: '+${_formatNumber(production.deuterium)}',
+            isOverflow: deuteriumOverflow,
+            capacity: storageCapacity.deuteriumCapacity,
           ),
           const Spacer(),
           _EnergyItem(
@@ -67,16 +80,32 @@ class _ResourceItem extends StatelessWidget {
   final Color color;
   final String value;
   final String production;
+  final bool isOverflow;
+  final int capacity;
 
   const _ResourceItem({
     required this.label,
     required this.color,
     required this.value,
     required this.production,
+    this.isOverflow = false,
+    this.capacity = 100000,
   });
+
+  String _formatCapacity(int number) {
+    if (number >= 1000000) {
+      return '${(number / 1000000).toStringAsFixed(0)}M';
+    } else if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(0)}K';
+    }
+    return number.toString();
+  }
 
   @override
   Widget build(BuildContext context) {
+    // 창고 초과 시 빨간색으로 표시
+    final displayColor = isOverflow ? AppColors.negative : color;
+    
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -84,7 +113,7 @@ class _ResourceItem extends StatelessWidget {
           width: 18,
           height: 18,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.15),
+            color: displayColor.withOpacity(0.15),
             borderRadius: BorderRadius.circular(4),
           ),
           child: Center(
@@ -93,7 +122,7 @@ class _ResourceItem extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
-                color: color,
+                color: displayColor,
               ),
             ),
           ),
@@ -103,19 +132,30 @@ class _ResourceItem extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              value,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: isOverflow ? AppColors.negative : AppColors.textPrimary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (isOverflow)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 2),
+                    child: Icon(Icons.warning, size: 10, color: AppColors.negative),
+                  ),
+              ],
             ),
             Text(
-              production,
-              style: const TextStyle(
-                color: AppColors.textMuted,
+              isOverflow ? '창고 가득참' : production,
+              style: TextStyle(
+                color: isOverflow ? AppColors.negative : AppColors.textMuted,
                 fontSize: 9,
+                fontWeight: isOverflow ? FontWeight.w500 : FontWeight.normal,
               ),
             ),
           ],

@@ -69,6 +69,7 @@ export declare class GalaxyService {
         __v: number;
     }) | null>;
     getActiveSystems(galaxy: number): Promise<number[]>;
+    private findPlanetByCoordinate;
     spyOnPlanet(attackerId: string, targetCoord: string, probeCount: number): Promise<{
         success: boolean;
         error: string;
@@ -81,7 +82,7 @@ export declare class GalaxyService {
         error?: undefined;
     }>;
     private getTotalFleetCount;
-    private calculateCurrentResources;
+    private calculateCurrentResourcesForSpy;
     private generateSpyReport;
     private filterNonZero;
     private formatSpyReportContent;

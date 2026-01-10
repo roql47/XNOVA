@@ -1,9 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.NAME_MAPPING = exports.ESPIONAGE_INFO_LEVELS = exports.SHIP_ENGINE_DATA = exports.RESEARCH_EFFECTS = exports.RESEARCH_DATA = exports.DEFENSE_DATA = exports.FLEET_DATA = exports.BUILDING_COSTS = void 0;
+exports.NAME_MAPPING = exports.STORAGE_MAPPING = exports.STORAGE_FACTOR = exports.BASE_STORAGE_CAPACITY = exports.ESPIONAGE_INFO_LEVELS = exports.SHIP_ENGINE_DATA = exports.RESEARCH_EFFECTS = exports.RESEARCH_DATA = exports.DEFENSE_DATA = exports.FLEET_DATA = exports.BUILDING_COSTS = void 0;
 exports.calculateShipSpeed = calculateShipSpeed;
 exports.calculateFleetSlots = calculateFleetSlots;
 exports.calculateCombatStats = calculateCombatStats;
+exports.calculateStorageCapacity = calculateStorageCapacity;
 exports.BUILDING_COSTS = {
     metalMine: {
         base: { metal: 60, crystal: 15 },
@@ -39,6 +40,18 @@ exports.BUILDING_COSTS = {
     },
     nanoFactory: {
         base: { metal: 1000000, crystal: 500000, deuterium: 100000 },
+        factor: 2,
+    },
+    metalStorage: {
+        base: { metal: 1000, crystal: 0, deuterium: 0 },
+        factor: 2,
+    },
+    crystalStorage: {
+        base: { metal: 1000, crystal: 500, deuterium: 0 },
+        factor: 2,
+    },
+    deuteriumTank: {
+        base: { metal: 1000, crystal: 1000, deuterium: 0 },
         factor: 2,
     },
 };
@@ -400,6 +413,16 @@ function calculateCombatStats(baseAttack, baseShield, baseHull, weaponsTech, shi
         hull: Math.floor(baseHull * (1 + 0.1 * armorTech)),
     };
 }
+exports.BASE_STORAGE_CAPACITY = 100000;
+exports.STORAGE_FACTOR = 2;
+function calculateStorageCapacity(storageLevel) {
+    return Math.floor(exports.BASE_STORAGE_CAPACITY * Math.pow(exports.STORAGE_FACTOR, storageLevel));
+}
+exports.STORAGE_MAPPING = {
+    metal: 'metalStorage',
+    crystal: 'crystalStorage',
+    deuterium: 'deuteriumTank',
+};
 exports.NAME_MAPPING = {
     metalMine: '메탈광산',
     crystalMine: '크리스탈광산',
@@ -410,6 +433,9 @@ exports.NAME_MAPPING = {
     shipyard: '조선소',
     researchLab: '연구소',
     nanoFactory: '나노공장',
+    metalStorage: '메탈 저장소',
+    crystalStorage: '크리스탈 저장소',
+    deuteriumTank: '듀테륨 탱크',
     smallCargo: '소형화물선',
     largeCargo: '대형화물선',
     lightFighter: '전투기',

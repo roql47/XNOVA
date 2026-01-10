@@ -61,6 +61,7 @@ export declare class BattleService {
     private isHomePlanet;
     private getMaxFleetSlots;
     private getActiveFleetCount;
+    private cleanupExpiredMissions;
     private generateMissionId;
     private hasAvailableFleetSlot;
     private findMission;

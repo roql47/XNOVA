@@ -180,6 +180,18 @@ let GalaxyService = class GalaxyService {
         }
         return Array.from(systems).sort((a, b) => a - b);
     }
+    async findPlanetByCoordinate(coordinate) {
+        const user = await this.userModel.findOne({ coordinate }).exec();
+        if (user) {
+            return { user, planet: null, ownerId: user._id.toString(), isColony: false };
+        }
+        const planet = await this.planetModel.findOne({ coordinate }).exec();
+        if (planet) {
+            const owner = await this.userModel.findById(planet.ownerId).exec();
+            return { user: owner, planet, ownerId: planet.ownerId, isColony: true };
+        }
+        return { user: null, planet: null, ownerId: null, isColony: false };
+    }
     async spyOnPlanet(attackerId, targetCoord, probeCount) {
         const attacker = await this.userModel.findById(attackerId).exec();
         if (!attacker) {
@@ -189,15 +201,21 @@ let GalaxyService = class GalaxyService {
         if (availableProbes < probeCount) {
             return { success: false, error: `정찰 위성이 부족합니다. (보유: ${availableProbes})` };
         }
-        const target = await this.userModel.findOne({ coordinate: targetCoord }).exec();
-        if (!target) {
+        const targetResult = await this.findPlanetByCoordinate(targetCoord);
+        if (!targetResult.ownerId) {
             return { success: false, error: '해당 좌표에 행성이 없습니다.' };
         }
-        if (target._id.toString() === attackerId) {
+        const targetOwner = targetResult.user;
+        const targetPlanet = targetResult.planet;
+        const isColony = targetResult.isColony;
+        if (targetResult.ownerId === attackerId) {
             return { success: false, error: '자신의 행성은 정찰할 수 없습니다.' };
         }
+        if (!targetOwner) {
+            return { success: false, error: '대상 행성의 소유자를 찾을 수 없습니다.' };
+        }
         const mySpyLevel = attacker.researchLevels?.espionageTech || 0;
-        const targetSpyLevel = target.researchLevels?.espionageTech || 0;
+        const targetSpyLevel = targetOwner.researchLevels?.espionageTech || 0;
         let stScore;
         if (targetSpyLevel > mySpyLevel) {
             const diff = targetSpyLevel - mySpyLevel;
@@ -210,7 +228,8 @@ let GalaxyService = class GalaxyService {
         else {
             stScore = mySpyLevel;
         }
-        const targetFleetCount = this.getTotalFleetCount(target.fleet);
+        const targetFleet = isColony ? (targetPlanet?.fleet || {}) : (targetOwner.fleet || {});
+        const targetFleetCount = this.getTotalFleetCount(targetFleet);
         let targetForce = (targetFleetCount * probeCount) / 4;
         if (targetForce > 100)
             targetForce = 100;
@@ -226,20 +245,20 @@ let GalaxyService = class GalaxyService {
             await this.updateDebris(targetCoord, 0, probeCount * 300);
             await attacker.save();
         }
-        const report = this.generateSpyReport(target, stScore, probesLost, probesSurvived, targetCoord, mySpyLevel, targetSpyLevel);
+        const report = this.generateSpyReport(targetOwner, targetPlanet, isColony, stScore, probesLost, probesSurvived, targetCoord, mySpyLevel, targetSpyLevel);
         await this.messageService.createMessage({
             receiverId: attackerId,
             senderName: '함대 사령부',
-            title: `정찰 보고서: ${targetCoord} [${target.playerName}]`,
+            title: `정찰 보고서: ${targetCoord} [${targetOwner.playerName}]${isColony ? ' (식민지)' : ''}`,
             content: this.formatSpyReportContent(report),
             type: 'battle',
             metadata: { type: 'spy', report },
         });
         await this.messageService.createMessage({
-            receiverId: target._id.toString(),
+            receiverId: targetResult.ownerId,
             senderName: '방어 시스템',
             title: `정찰 감지: ${attacker.coordinate}`,
-            content: `적 함대가 ${attacker.coordinate}에서 당신의 행성을 정찰했습니다.\n\n` +
+            content: `적 함대가 ${attacker.coordinate}에서 당신의 ${isColony ? '식민지' : '행성'}(${targetCoord})을 정찰했습니다.\n\n` +
                 `정찰 위성 ${probeCount}대가 발견되었습니다.` +
                 (probesDestroyed ? `\n방어 시스템에 의해 모든 정찰 위성이 파괴되었습니다.` : ''),
             type: 'battle',
@@ -270,16 +289,19 @@ let GalaxyService = class GalaxyService {
             (fleet.espionageProbe || 0) +
             (fleet.solarSatellite || 0));
     }
-    calculateCurrentResources(target) {
+    calculateCurrentResourcesForSpy(owner, planet, isColony) {
         const now = new Date();
-        const lastUpdate = target.lastResourceUpdate || now;
+        const resources = isColony ? (planet?.resources || {}) : (owner.resources || {});
+        const mines = isColony ? (planet?.mines || {}) : (owner.mines || {});
+        const fleet = isColony ? (planet?.fleet || {}) : (owner.fleet || {});
+        const lastUpdate = isColony ? (planet?.lastResourceUpdate || now) : (owner.lastResourceUpdate || now);
+        const planetTemperature = isColony
+            ? (planet?.planetInfo?.tempMax ?? 50)
+            : (owner.planetInfo?.temperature ?? 50);
         const elapsedSeconds = (now.getTime() - lastUpdate.getTime()) / 1000;
-        const mines = target.mines || {};
-        const fleet = target.fleet || {};
         const solarPlantLevel = mines.solarPlant || 0;
         const fusionLevel = mines.fusionReactor || 0;
         const satelliteCount = fleet.solarSatellite || 0;
-        const planetTemperature = target.planetInfo?.temperature ?? 50;
         const solarEnergy = solarPlantLevel > 0 ? Math.floor(20 * solarPlantLevel * Math.pow(1.1, solarPlantLevel)) : 0;
         const satelliteEnergy = satelliteCount > 0 ? Math.floor((planetTemperature / 4 + 20) * satelliteCount) : 0;
         const fusionEnergy = fusionLevel > 0 ? Math.floor(30 * fusionLevel * Math.pow(1.05, fusionLevel)) : 0;
@@ -305,24 +327,28 @@ let GalaxyService = class GalaxyService {
         const fusionConsumption = fusionLevel > 0 ? Math.floor(10 * fusionLevel * Math.pow(1.1, fusionLevel)) : 0;
         const hoursElapsed = elapsedSeconds / 3600;
         return {
-            metal: (target.resources?.metal || 0) + metalProduction * hoursElapsed,
-            crystal: (target.resources?.crystal || 0) + crystalProduction * hoursElapsed,
-            deuterium: (target.resources?.deuterium || 0) + (deuteriumProduction - fusionConsumption) * hoursElapsed,
+            metal: (resources.metal || 0) + metalProduction * hoursElapsed,
+            crystal: (resources.crystal || 0) + crystalProduction * hoursElapsed,
+            deuterium: (resources.deuterium || 0) + (deuteriumProduction - fusionConsumption) * hoursElapsed,
             energy: energyProduction - energyConsumption,
         };
     }
-    generateSpyReport(target, stScore, probesLost, probesSurvived, targetCoord, mySpyLevel, targetSpyLevel) {
+    generateSpyReport(owner, planet, isColony, stScore, probesLost, probesSurvived, targetCoord, mySpyLevel, targetSpyLevel) {
         const report = {
             targetCoord,
-            targetName: target.playerName,
+            targetName: owner.playerName + (isColony ? ' (식민지)' : ''),
             probesLost,
             probesSurvived,
             stScore,
             mySpyLevel,
             targetSpyLevel,
         };
+        const targetFleet = isColony ? (planet?.fleet || {}) : (owner.fleet || {});
+        const targetDefense = isColony ? (planet?.defense || {}) : (owner.defense || {});
+        const targetMines = isColony ? (planet?.mines || {}) : (owner.mines || {});
+        const targetFacilities = isColony ? (planet?.facilities || {}) : (owner.facilities || {});
         if (stScore >= 1) {
-            const currentResources = this.calculateCurrentResources(target);
+            const currentResources = this.calculateCurrentResourcesForSpy(owner, planet, isColony);
             report.resources = {
                 metal: currentResources.metal,
                 crystal: currentResources.crystal,
@@ -331,20 +357,20 @@ let GalaxyService = class GalaxyService {
             };
         }
         if (stScore >= 2) {
-            report.fleet = this.filterNonZero(target.fleet);
+            report.fleet = this.filterNonZero(targetFleet);
         }
         if (stScore >= 3) {
-            report.defense = this.filterNonZero(target.defense);
+            report.defense = this.filterNonZero(targetDefense);
         }
         if (stScore >= 5) {
             const buildings = {
-                ...this.filterNonZero(target.mines),
-                ...this.filterNonZero(target.facilities),
+                ...this.filterNonZero(targetMines),
+                ...this.filterNonZero(targetFacilities),
             };
             report.buildings = Object.keys(buildings).length > 0 ? buildings : { _empty: 0 };
         }
         if (stScore >= 7) {
-            const research = this.filterNonZero(target.researchLevels);
+            const research = this.filterNonZero(owner.researchLevels);
             report.research = Object.keys(research).length > 0 ? research : { _empty: 0 };
         }
         return report;

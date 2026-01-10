@@ -240,12 +240,7 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
     switch (_missionType) {
       case MissionType.attack:
         missionName = '공격';
-        try {
-          await ref.read(gameProvider.notifier).attack(targetCoord, fleet);
-          success = true;
-        } catch (e) {
-          success = false;
-        }
+        success = await ref.read(gameProvider.notifier).attack(targetCoord, fleet);
         break;
       case MissionType.transport:
         missionName = '수송';

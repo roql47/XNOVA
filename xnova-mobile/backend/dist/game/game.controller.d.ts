@@ -32,6 +32,14 @@ export declare class GameController {
             energyProduction: number;
             energyConsumption: number;
         };
+        storage: {
+            metalCapacity: number;
+            crystalCapacity: number;
+            deuteriumCapacity: number;
+            metalLevel: any;
+            crystalLevel: any;
+            deuteriumLevel: any;
+        };
         energyRatio: number;
         activePlanetId: string | null;
         isHomePlanet: boolean;

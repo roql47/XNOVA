@@ -67,7 +67,19 @@ let BattleService = class BattleService {
     }
     getActiveFleetCount(user) {
         const fleetMissions = user.fleetMissions || [];
-        return fleetMissions.length;
+        const now = Date.now();
+        return fleetMissions.filter((m) => {
+            if (m.phase === 'outbound') {
+                return new Date(m.arrivalTime).getTime() > now;
+            }
+            else if (m.phase === 'returning') {
+                return m.returnTime && new Date(m.returnTime).getTime() > now;
+            }
+            return false;
+        }).length;
+    }
+    async cleanupExpiredMissions(user) {
+        return;
     }
     generateMissionId() {
         return `mission_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -757,11 +769,17 @@ let BattleService = class BattleService {
         };
     }
     async startAttack(attackerId, targetCoord, fleet) {
-        const activePlanetData = await this.getActivePlanetData(attackerId);
+        let activePlanetData = await this.getActivePlanetData(attackerId);
         if (!activePlanetData) {
             throw new common_1.BadRequestException('공격자를 찾을 수 없습니다.');
         }
-        const { user: attacker, planet: attackerPlanet, isHome, coordinate: attackerCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+        let { user: attacker, planet: attackerPlanet, isHome, coordinate: attackerCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+        await this.cleanupExpiredMissions(attacker);
+        activePlanetData = await this.getActivePlanetData(attackerId);
+        if (!activePlanetData) {
+            throw new common_1.BadRequestException('공격자를 찾을 수 없습니다.');
+        }
+        ({ user: attacker, planet: attackerPlanet, isHome, coordinate: attackerCoord, fleet: availableFleet, resources: availableResources } = activePlanetData);
         const maxSlots = this.getMaxFleetSlots(attacker);
         const activeFleets = this.getActiveFleetCount(attacker);
         if (activeFleets >= maxSlots) {
@@ -1023,11 +1041,17 @@ let BattleService = class BattleService {
         if (!fleet.recycler || fleet.recycler <= 0) {
             throw new common_1.BadRequestException('수확선을 선택해주세요.');
         }
-        const activePlanetData = await this.getActivePlanetData(attackerId);
+        let activePlanetData = await this.getActivePlanetData(attackerId);
         if (!activePlanetData) {
             throw new common_1.BadRequestException('사용자를 찾을 수 없습니다.');
         }
-        const { user: attacker, planet: attackerPlanet, isHome, coordinate: attackerCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+        let { user: attacker, planet: attackerPlanet, isHome, coordinate: attackerCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+        await this.cleanupExpiredMissions(attacker);
+        activePlanetData = await this.getActivePlanetData(attackerId);
+        if (!activePlanetData) {
+            throw new common_1.BadRequestException('사용자를 찾을 수 없습니다.');
+        }
+        ({ user: attacker, planet: attackerPlanet, isHome, coordinate: attackerCoord, fleet: availableFleet, resources: availableResources } = activePlanetData);
         const maxSlots = this.getMaxFleetSlots(attacker);
         const activeFleets = this.getActiveFleetCount(attacker);
         if (activeFleets >= maxSlots) {
@@ -1604,11 +1628,17 @@ let BattleService = class BattleService {
         };
     }
     async startTransport(userId, targetCoord, fleet, resources) {
-        const activePlanetData = await this.getActivePlanetData(userId);
+        let activePlanetData = await this.getActivePlanetData(userId);
         if (!activePlanetData) {
             throw new common_1.BadRequestException('사용자를 찾을 수 없습니다.');
         }
-        const { user: sender, planet: senderPlanet, isHome, coordinate: senderCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+        let { user: sender, planet: senderPlanet, isHome, coordinate: senderCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+        await this.cleanupExpiredMissions(sender);
+        activePlanetData = await this.getActivePlanetData(userId);
+        if (!activePlanetData) {
+            throw new common_1.BadRequestException('사용자를 찾을 수 없습니다.');
+        }
+        ({ user: sender, planet: senderPlanet, isHome, coordinate: senderCoord, fleet: availableFleet, resources: availableResources } = activePlanetData);
         const maxSlots = this.getMaxFleetSlots(sender);
         const activeFleets = this.getActiveFleetCount(sender);
         if (activeFleets >= maxSlots) {
@@ -1794,11 +1824,17 @@ let BattleService = class BattleService {
         return { delivered: transportResources, missionId: currentMissionId };
     }
     async startDeploy(userId, targetCoord, fleet, resources) {
-        const activePlanetData = await this.getActivePlanetData(userId);
+        let activePlanetData = await this.getActivePlanetData(userId);
         if (!activePlanetData) {
             throw new common_1.BadRequestException('사용자를 찾을 수 없습니다.');
         }
-        const { user: sender, planet: senderPlanet, isHome, coordinate: senderCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+        let { user: sender, planet: senderPlanet, isHome, coordinate: senderCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+        await this.cleanupExpiredMissions(sender);
+        activePlanetData = await this.getActivePlanetData(userId);
+        if (!activePlanetData) {
+            throw new common_1.BadRequestException('사용자를 찾을 수 없습니다.');
+        }
+        ({ user: sender, planet: senderPlanet, isHome, coordinate: senderCoord, fleet: availableFleet, resources: availableResources } = activePlanetData);
         const maxSlots = this.getMaxFleetSlots(sender);
         const activeFleets = this.getActiveFleetCount(sender);
         if (activeFleets >= maxSlots) {

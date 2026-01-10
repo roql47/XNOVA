@@ -364,6 +364,7 @@ final navigationProvider = StateNotifierProvider<NavigationNotifier, NavigationS
 class GameState {
   final GameResources resources;
   final GameProduction production;
+  final StorageCapacity storageCapacity;  // 창고 용량 정보 추가
   final int energyRatio;
   final String? playerName;
   final String? coordinate;
@@ -407,6 +408,7 @@ class GameState {
   GameState({
     this.resources = const GameResources(),
     this.production = const GameProduction(),
+    this.storageCapacity = const StorageCapacity(),
     this.energyRatio = 100,
     this.playerName,
     this.coordinate,
@@ -435,6 +437,7 @@ class GameState {
   GameState copyWith({
     GameResources? resources,
     GameProduction? production,
+    StorageCapacity? storageCapacity,
     int? energyRatio,
     String? playerName,
     String? coordinate,
@@ -467,6 +470,7 @@ class GameState {
     return GameState(
       resources: resources ?? this.resources,
       production: production ?? this.production,
+      storageCapacity: storageCapacity ?? this.storageCapacity,
       energyRatio: energyRatio ?? this.energyRatio,
       playerName: playerName ?? this.playerName,
       coordinate: coordinate ?? this.coordinate,
@@ -521,6 +525,25 @@ class GameProduction {
     this.deuterium = 0,
     this.energyProduction = 0,
     this.energyConsumption = 0,
+  });
+}
+
+// 창고 용량 정보
+class StorageCapacity {
+  final int metalCapacity;
+  final int crystalCapacity;
+  final int deuteriumCapacity;
+  final int metalLevel;
+  final int crystalLevel;
+  final int deuteriumLevel;
+
+  const StorageCapacity({
+    this.metalCapacity = 100000,
+    this.crystalCapacity = 100000,
+    this.deuteriumCapacity = 100000,
+    this.metalLevel = 0,
+    this.crystalLevel = 0,
+    this.deuteriumLevel = 0,
   });
 }
 
@@ -661,6 +684,14 @@ class GameNotifier extends StateNotifier<GameState> {
           deuterium: response.production.deuterium,
           energyProduction: response.production.energyProduction,
           energyConsumption: response.production.energyConsumption,
+        ),
+        storageCapacity: StorageCapacity(
+          metalCapacity: response.storage.metalCapacity,
+          crystalCapacity: response.storage.crystalCapacity,
+          deuteriumCapacity: response.storage.deuteriumCapacity,
+          metalLevel: response.storage.metalLevel,
+          crystalLevel: response.storage.crystalLevel,
+          deuteriumLevel: response.storage.deuteriumLevel,
         ),
         energyRatio: response.energyRatio,
       );

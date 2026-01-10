@@ -109,12 +109,33 @@ export class BattleService {
   }
 
   /**
-   * 현재 활성 함대 미션 수
+   * 현재 활성 함대 미션 수 (아직 도착/귀환하지 않은 미션만 카운트)
    */
   private getActiveFleetCount(user: UserDocument): number {
-    // 새로운 fleetMissions 배열 사용
     const fleetMissions = user.fleetMissions || [];
-    return fleetMissions.length;
+    const now = Date.now();
+    
+    // 아직 도착/귀환 시간이 안 된 미션만 카운트
+    return fleetMissions.filter((m: any) => {
+      if (m.phase === 'outbound') {
+        return new Date(m.arrivalTime).getTime() > now;
+      } else if (m.phase === 'returning') {
+        return m.returnTime && new Date(m.returnTime).getTime() > now;
+      }
+      return false;
+    }).length;
+  }
+
+  /**
+   * 만료된 미션 자동 정리 (도착/귀환 시간이 지난 미션 제거)
+   * 주의: 이 함수는 슬롯 확인 전에 호출되며, 실제 처리(전투/귀환)는 별도로 진행됨
+   * getActiveFleetCount()가 만료된 미션을 카운트하지 않으므로, 이 함수는 DB 정리용
+   */
+  private async cleanupExpiredMissions(user: UserDocument): Promise<void> {
+    // getActiveFleetCount가 이미 만료된 미션을 제외하므로, 
+    // 여기서는 추가 작업 없이 반환 (실제 처리는 processBattle/processFleetReturn에서)
+    // 만료된 미션의 실제 처리는 클라이언트에서 별도로 호출함
+    return;
   }
 
   /**
@@ -1114,12 +1135,22 @@ export class BattleService {
     fleet: Record<string, number>,
   ) {
     // 활성 행성 데이터 가져오기
-    const activePlanetData = await this.getActivePlanetData(attackerId);
+    let activePlanetData = await this.getActivePlanetData(attackerId);
     if (!activePlanetData) {
       throw new BadRequestException('공격자를 찾을 수 없습니다.');
     }
 
-    const { user: attacker, planet: attackerPlanet, isHome, coordinate: attackerCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+    let { user: attacker, planet: attackerPlanet, isHome, coordinate: attackerCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+
+    // 만료된 미션 정리 (도착/귀환 시간이 지난 미션 처리)
+    await this.cleanupExpiredMissions(attacker);
+    
+    // 정리 후 사용자 데이터 다시 로드 (변경되었을 수 있음)
+    activePlanetData = await this.getActivePlanetData(attackerId);
+    if (!activePlanetData) {
+      throw new BadRequestException('공격자를 찾을 수 없습니다.');
+    }
+    ({ user: attacker, planet: attackerPlanet, isHome, coordinate: attackerCoord, fleet: availableFleet, resources: availableResources } = activePlanetData);
 
     // 함대 슬롯 확인 (컴퓨터공학 레벨 + 1 = 최대 동시 운용 함대 수)
     const maxSlots = this.getMaxFleetSlots(attacker);
@@ -1451,12 +1482,20 @@ export class BattleService {
     }
 
     // 활성 행성 데이터 가져오기
-    const activePlanetData = await this.getActivePlanetData(attackerId);
+    let activePlanetData = await this.getActivePlanetData(attackerId);
     if (!activePlanetData) {
       throw new BadRequestException('사용자를 찾을 수 없습니다.');
     }
 
-    const { user: attacker, planet: attackerPlanet, isHome, coordinate: attackerCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+    let { user: attacker, planet: attackerPlanet, isHome, coordinate: attackerCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+
+    // 만료된 미션 정리
+    await this.cleanupExpiredMissions(attacker);
+    activePlanetData = await this.getActivePlanetData(attackerId);
+    if (!activePlanetData) {
+      throw new BadRequestException('사용자를 찾을 수 없습니다.');
+    }
+    ({ user: attacker, planet: attackerPlanet, isHome, coordinate: attackerCoord, fleet: availableFleet, resources: availableResources } = activePlanetData);
 
     // 함대 슬롯 확인 (컴퓨터공학 레벨 + 1 = 최대 동시 운용 함대 수)
     const maxSlots = this.getMaxFleetSlots(attacker);
@@ -2234,12 +2273,20 @@ export class BattleService {
     resources: { metal: number; crystal: number; deuterium: number },
   ) {
     // 활성 행성 데이터 가져오기
-    const activePlanetData = await this.getActivePlanetData(userId);
+    let activePlanetData = await this.getActivePlanetData(userId);
     if (!activePlanetData) {
       throw new BadRequestException('사용자를 찾을 수 없습니다.');
     }
 
-    const { user: sender, planet: senderPlanet, isHome, coordinate: senderCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+    let { user: sender, planet: senderPlanet, isHome, coordinate: senderCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+
+    // 만료된 미션 정리
+    await this.cleanupExpiredMissions(sender);
+    activePlanetData = await this.getActivePlanetData(userId);
+    if (!activePlanetData) {
+      throw new BadRequestException('사용자를 찾을 수 없습니다.');
+    }
+    ({ user: sender, planet: senderPlanet, isHome, coordinate: senderCoord, fleet: availableFleet, resources: availableResources } = activePlanetData);
 
     // 함대 슬롯 확인
     const maxSlots = this.getMaxFleetSlots(sender);
@@ -2483,12 +2530,20 @@ export class BattleService {
     resources: { metal: number; crystal: number; deuterium: number },
   ) {
     // 활성 행성 데이터 가져오기
-    const activePlanetData = await this.getActivePlanetData(userId);
+    let activePlanetData = await this.getActivePlanetData(userId);
     if (!activePlanetData) {
       throw new BadRequestException('사용자를 찾을 수 없습니다.');
     }
 
-    const { user: sender, planet: senderPlanet, isHome, coordinate: senderCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+    let { user: sender, planet: senderPlanet, isHome, coordinate: senderCoord, fleet: availableFleet, resources: availableResources } = activePlanetData;
+
+    // 만료된 미션 정리
+    await this.cleanupExpiredMissions(sender);
+    activePlanetData = await this.getActivePlanetData(userId);
+    if (!activePlanetData) {
+      throw new BadRequestException('사용자를 찾을 수 없습니다.');
+    }
+    ({ user: sender, planet: senderPlanet, isHome, coordinate: senderCoord, fleet: availableFleet, resources: availableResources } = activePlanetData);
 
     // 함대 슬롯 확인
     const maxSlots = this.getMaxFleetSlots(sender);

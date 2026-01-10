@@ -157,6 +157,10 @@ const CODE_TO_NAME = {
     "shipyard": "조선소",
     "researchLab": "연구소",
     "nanoFactory": "나노공장",
+    // 창고 건물
+    "metalStorage": "메탈저장소",
+    "crystalStorage": "크리스탈저장소",
+    "deuteriumTank": "듀테륨탱크",
     // 함대
     "smallCargo": "소형화물선",
     "largeCargo": "대형화물선",
@@ -349,6 +353,10 @@ function apiGetPlanets(token) {
     return httpGet(CONFIG.API_BASE_URL + "/planet/list", token);
 }
 
+function apiSwitchPlanet(token, planetId) {
+    return httpPostAuth(CONFIG.API_BASE_URL + "/planet/switch", { planetId: planetId }, token);
+}
+
 function apiGetBattleStatus(token) {
     return httpGet(CONFIG.API_BASE_URL + "/game/battle/status", token);
 }
@@ -485,6 +493,11 @@ function onMessage(msg) {
             case "행성":
             case "planet":
                 cmdPlanets(msg, senderHash);
+                break;
+            case "행성전환":
+            case "전환":
+            case "switch":
+                cmdSwitchPlanet(msg, senderHash, args);
                 break;
             case "상태":
             case "status":
@@ -625,11 +638,29 @@ function cmdResources(msg, senderHash) {
     let data = result.data;
     let res = data.resources || data;
     let prod = data.production;
+    let storage = data.storage;
     
     let text = "[자원 현황]\n\n";
-    text += "메탈: " + formatNumber(res.metal) + "\n";
-    text += "크리스탈: " + formatNumber(res.crystal) + "\n";
-    text += "중수소: " + formatNumber(res.deuterium) + "\n";
+    
+    // 창고 용량 정보 포함
+    if (storage) {
+        let metalOver = res.metal >= storage.metalCapacity;
+        let crystalOver = res.crystal >= storage.crystalCapacity;
+        let deuteriumOver = res.deuterium >= storage.deuteriumCapacity;
+        
+        text += "메탈: " + formatNumber(res.metal) + "/" + formatNumber(storage.metalCapacity);
+        text += metalOver ? " ⚠️가득참\n" : "\n";
+        
+        text += "크리스탈: " + formatNumber(res.crystal) + "/" + formatNumber(storage.crystalCapacity);
+        text += crystalOver ? " ⚠️가득참\n" : "\n";
+        
+        text += "중수소: " + formatNumber(res.deuterium) + "/" + formatNumber(storage.deuteriumCapacity);
+        text += deuteriumOver ? " ⚠️가득참\n" : "\n";
+    } else {
+        text += "메탈: " + formatNumber(res.metal) + "\n";
+        text += "크리스탈: " + formatNumber(res.crystal) + "\n";
+        text += "중수소: " + formatNumber(res.deuterium) + "\n";
+    }
     
     if (prod) {
         let maxEnergy = prod.energyProduction || 0;
@@ -846,13 +877,59 @@ function cmdPlanets(msg, senderHash) {
         for (let i = 0; i < data.planets.length; i++) {
             let planet = data.planets[i];
             let isActive = planet.id === data.activePlanetId || planet._id === data.activePlanetId;
-            text += (isActive ? "> " : "  ") + planet.name + " [" + planet.coordinate + "]\n";
+            text += (isActive ? "▶ " : "  ") + (i + 1) + ". " + planet.name + " [" + planet.coordinate + "]\n";
         }
+        text += "\n행성 전환: !전환 [번호]\n예: !전환 2";
     } else {
         text += "행성 없음";
     }
     
     msg.reply(text);
+}
+
+function cmdSwitchPlanet(msg, senderHash, args) {
+    let token = getValidToken(senderHash);
+    if (!token) {
+        msg.reply("[오류] 먼저 계정을 연동하세요. (!연동)");
+        return;
+    }
+    
+    if (args.length < 1) {
+        msg.reply("[행성 전환]\n!전환 [번호]\n\n먼저 !행성 명령어로 행성 목록을 확인하세요.");
+        return;
+    }
+    
+    let planetIndex = parseInt(args[0], 10);
+    if (isNaN(planetIndex) || planetIndex < 1) {
+        msg.reply("[오류] 올바른 행성 번호를 입력하세요.\n\n먼저 !행성 명령어로 행성 목록을 확인하세요.");
+        return;
+    }
+    
+    // 행성 목록 조회
+    let listResult = apiGetPlanets(token);
+    if (!listResult.success || !listResult.data.planets) {
+        msg.reply("[오류] 행성 목록 조회 실패");
+        return;
+    }
+    
+    let planets = listResult.data.planets;
+    if (planetIndex > planets.length) {
+        msg.reply("[오류] 해당 번호의 행성이 없습니다. (총 " + planets.length + "개)");
+        return;
+    }
+    
+    let targetPlanet = planets[planetIndex - 1];
+    let planetId = targetPlanet.id || targetPlanet._id;
+    
+    // 행성 전환 요청
+    let result = apiSwitchPlanet(token, planetId);
+    if (!result.success || result.data.statusCode) {
+        let errMsg = result.data && result.data.message ? result.data.message : "행성 전환 실패";
+        msg.reply("[오류] " + errMsg);
+        return;
+    }
+    
+    msg.reply("[행성 전환 완료]\n\n" + targetPlanet.name + " [" + targetPlanet.coordinate + "]");
 }
 
 function cmdStatus(msg, senderHash) {
@@ -1326,7 +1403,8 @@ function cmdHelp(msg) {
     
     text += "[조회]\n";
     text += "!자원 / !건물 / !함대 / !방어\n";
-    text += "!행성 / !상태 / !랭킹\n\n";
+    text += "!행성 / !상태 / !랭킹\n";
+    text += "!전환 [번호] - 행성 전환\n\n";
     
     text += "[건설]\n";
     text += "!건설 메탈광산\n";

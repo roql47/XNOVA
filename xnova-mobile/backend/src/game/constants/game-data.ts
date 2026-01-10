@@ -38,6 +38,19 @@ export const BUILDING_COSTS = {
     base: { metal: 1000000, crystal: 500000, deuterium: 100000 },
     factor: 2,
   },
+  // 창고 건물
+  metalStorage: {
+    base: { metal: 1000, crystal: 0, deuterium: 0 },
+    factor: 2,
+  },
+  crystalStorage: {
+    base: { metal: 1000, crystal: 500, deuterium: 0 },
+    factor: 2,
+  },
+  deuteriumTank: {
+    base: { metal: 1000, crystal: 1000, deuterium: 0 },
+    factor: 2,
+  },
 };
 
 // 함대 데이터
@@ -451,6 +464,26 @@ export function calculateCombatStats(
   };
 }
 
+// ===== 창고 시스템 =====
+
+// 창고 기본 저장량 (레벨 0일 때)
+export const BASE_STORAGE_CAPACITY = 100000;
+
+// 창고 용량 증가율 (2배씩)
+export const STORAGE_FACTOR = 2;
+
+// 저장 용량 계산 함수: 100000 * 2^레벨
+export function calculateStorageCapacity(storageLevel: number): number {
+  return Math.floor(BASE_STORAGE_CAPACITY * Math.pow(STORAGE_FACTOR, storageLevel));
+}
+
+// 자원별 창고 매핑
+export const STORAGE_MAPPING = {
+  metal: 'metalStorage',
+  crystal: 'crystalStorage',
+  deuterium: 'deuteriumTank',
+};
+
 // 한글 이름 매핑
 export const NAME_MAPPING = {
   // 건물
@@ -463,6 +496,10 @@ export const NAME_MAPPING = {
   shipyard: '조선소',
   researchLab: '연구소',
   nanoFactory: '나노공장',
+  // 창고 건물
+  metalStorage: '메탈 저장소',
+  crystalStorage: '크리스탈 저장소',
+  deuteriumTank: '듀테륨 탱크',
   
   // 함대
   smallCargo: '소형화물선',

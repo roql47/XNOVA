@@ -652,6 +652,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                   key: _resourceBarKey,
                   resources: gameState.resources,
                   production: gameState.production,
+                  storageCapacity: gameState.storageCapacity,
                   energyRatio: gameState.energyRatio,
                 ),
                 Expanded(

@@ -233,6 +233,31 @@ export class GalaxyService {
     return Array.from(systems).sort((a, b) => a - b);
   }
 
+  /**
+   * 좌표로 행성 찾기 (모행성 + 식민지)
+   */
+  private async findPlanetByCoordinate(coordinate: string): Promise<{ 
+    user: UserDocument | null; 
+    planet: PlanetDocument | null; 
+    ownerId: string | null;
+    isColony: boolean;
+  }> {
+    // 1. User 컬렉션에서 모행성 찾기
+    const user = await this.userModel.findOne({ coordinate }).exec();
+    if (user) {
+      return { user, planet: null, ownerId: user._id.toString(), isColony: false };
+    }
+
+    // 2. Planet 컬렉션에서 식민지 찾기
+    const planet = await this.planetModel.findOne({ coordinate }).exec();
+    if (planet) {
+      const owner = await this.userModel.findById(planet.ownerId).exec();
+      return { user: owner, planet, ownerId: planet.ownerId, isColony: true };
+    }
+
+    return { user: null, planet: null, ownerId: null, isColony: false };
+  }
+
   // 정찰 미션 수행
   async spyOnPlanet(attackerId: string, targetCoord: string, probeCount: number) {
     // 공격자 정보 조회
@@ -247,20 +272,28 @@ export class GalaxyService {
       return { success: false, error: `정찰 위성이 부족합니다. (보유: ${availableProbes})` };
     }
 
-    // 대상 행성 조회
-    const target = await this.userModel.findOne({ coordinate: targetCoord }).exec();
-    if (!target) {
+    // 대상 행성 조회 (모행성 + 식민지)
+    const targetResult = await this.findPlanetByCoordinate(targetCoord);
+    if (!targetResult.ownerId) {
       return { success: false, error: '해당 좌표에 행성이 없습니다.' };
     }
 
+    const targetOwner = targetResult.user; // 소유자 (연구 레벨용)
+    const targetPlanet = targetResult.planet; // 식민지 (자원/함대/방어용)
+    const isColony = targetResult.isColony;
+
     // 자기 자신 정찰 불가
-    if (target._id.toString() === attackerId) {
+    if (targetResult.ownerId === attackerId) {
       return { success: false, error: '자신의 행성은 정찰할 수 없습니다.' };
     }
 
-    // 정탐 기술 레벨
+    if (!targetOwner) {
+      return { success: false, error: '대상 행성의 소유자를 찾을 수 없습니다.' };
+    }
+
+    // 정탐 기술 레벨 (소유자 기준)
     const mySpyLevel = attacker.researchLevels?.espionageTech || 0;
-    const targetSpyLevel = target.researchLevels?.espionageTech || 0;
+    const targetSpyLevel = targetOwner.researchLevels?.espionageTech || 0;
 
     // ST 점수 계산 (OGame 공식)
     let stScore: number;
@@ -274,8 +307,9 @@ export class GalaxyService {
       stScore = mySpyLevel;
     }
 
-    // 적 함대 수 계산
-    const targetFleetCount = this.getTotalFleetCount(target.fleet);
+    // 적 함대 수 계산 (식민지면 식민지 함대, 모행성이면 모행성 함대)
+    const targetFleet = isColony ? (targetPlanet?.fleet || {}) : (targetOwner.fleet || {});
+    const targetFleetCount = this.getTotalFleetCount(targetFleet);
 
     // 정찰 위성 파괴 확률 계산
     let targetForce = (targetFleetCount * probeCount) / 4;
@@ -299,14 +333,24 @@ export class GalaxyService {
     }
     // 파괴되지 않은 경우: 정찰 위성 유지 (귀환)
 
-    // 정찰 보고서 생성
-    const report = this.generateSpyReport(target, stScore, probesLost, probesSurvived, targetCoord, mySpyLevel, targetSpyLevel);
+    // 정찰 보고서 생성 (식민지/모행성에 따라 다른 데이터 전달)
+    const report = this.generateSpyReport(
+      targetOwner, 
+      targetPlanet, 
+      isColony,
+      stScore, 
+      probesLost, 
+      probesSurvived, 
+      targetCoord, 
+      mySpyLevel, 
+      targetSpyLevel,
+    );
 
     // 공격자에게 정찰 보고서 메시지 전송
     await this.messageService.createMessage({
       receiverId: attackerId,
       senderName: '함대 사령부',
-      title: `정찰 보고서: ${targetCoord} [${target.playerName}]`,
+      title: `정찰 보고서: ${targetCoord} [${targetOwner.playerName}]${isColony ? ' (식민지)' : ''}`,
       content: this.formatSpyReportContent(report),
       type: 'battle',
       metadata: { type: 'spy', report },
@@ -314,10 +358,10 @@ export class GalaxyService {
 
     // 대상자에게 정찰 알림 전송
     await this.messageService.createMessage({
-      receiverId: target._id.toString(),
+      receiverId: targetResult.ownerId!,
       senderName: '방어 시스템',
       title: `정찰 감지: ${attacker.coordinate}`,
-      content: `적 함대가 ${attacker.coordinate}에서 당신의 행성을 정찰했습니다.\n\n` +
+      content: `적 함대가 ${attacker.coordinate}에서 당신의 ${isColony ? '식민지' : '행성'}(${targetCoord})을 정찰했습니다.\n\n` +
         `정찰 위성 ${probeCount}대가 발견되었습니다.` +
         (probesDestroyed ? `\n방어 시스템에 의해 모든 정찰 위성이 파괴되었습니다.` : ''),
       type: 'battle',
@@ -353,20 +397,29 @@ export class GalaxyService {
     );
   }
 
-  // 실시간 자원 계산 (정찰용)
-  private calculateCurrentResources(target: UserDocument): { metal: number; crystal: number; deuterium: number; energy: number } {
+  // 실시간 자원 계산 (정찰용) - 모행성/식민지 모두 지원
+  private calculateCurrentResourcesForSpy(
+    owner: UserDocument, 
+    planet: PlanetDocument | null, 
+    isColony: boolean
+  ): { metal: number; crystal: number; deuterium: number; energy: number } {
     const now = new Date();
-    const lastUpdate = target.lastResourceUpdate || now;
+    
+    // 식민지면 식민지 데이터, 아니면 모행성 데이터 사용
+    const resources = isColony ? (planet?.resources || {}) : (owner.resources || {});
+    const mines = isColony ? (planet?.mines || {}) : (owner.mines || {});
+    const fleet = isColony ? (planet?.fleet || {}) : (owner.fleet || {});
+    const lastUpdate = isColony ? (planet?.lastResourceUpdate || now) : (owner.lastResourceUpdate || now);
+    const planetTemperature = isColony 
+      ? (planet?.planetInfo?.tempMax ?? 50) 
+      : (owner.planetInfo?.temperature ?? 50);
+
     const elapsedSeconds = (now.getTime() - lastUpdate.getTime()) / 1000;
 
-    const mines = target.mines || {};
-    const fleet = target.fleet || {};
-    
     // 에너지 계산
-    const solarPlantLevel = mines.solarPlant || 0;
-    const fusionLevel = mines.fusionReactor || 0;
-    const satelliteCount = fleet.solarSatellite || 0;
-    const planetTemperature = target.planetInfo?.temperature ?? 50;
+    const solarPlantLevel = (mines as any).solarPlant || 0;
+    const fusionLevel = (mines as any).fusionReactor || 0;
+    const satelliteCount = (fleet as any).solarSatellite || 0;
 
     // 에너지 생산량
     const solarEnergy = solarPlantLevel > 0 ? Math.floor(20 * solarPlantLevel * Math.pow(1.1, solarPlantLevel)) : 0;
@@ -375,9 +428,9 @@ export class GalaxyService {
     const energyProduction = solarEnergy + satelliteEnergy + fusionEnergy;
 
     // 에너지 소비량
-    const metalMineLevel = mines.metalMine || 0;
-    const crystalMineLevel = mines.crystalMine || 0;
-    const deuteriumMineLevel = mines.deuteriumMine || 0;
+    const metalMineLevel = (mines as any).metalMine || 0;
+    const crystalMineLevel = (mines as any).crystalMine || 0;
+    const deuteriumMineLevel = (mines as any).deuteriumMine || 0;
     
     let energyConsumption = 0;
     if (metalMineLevel > 0) energyConsumption += Math.floor(10 * metalMineLevel * Math.pow(1.1, metalMineLevel));
@@ -401,16 +454,18 @@ export class GalaxyService {
     const hoursElapsed = elapsedSeconds / 3600;
     
     return {
-      metal: (target.resources?.metal || 0) + metalProduction * hoursElapsed,
-      crystal: (target.resources?.crystal || 0) + crystalProduction * hoursElapsed,
-      deuterium: (target.resources?.deuterium || 0) + (deuteriumProduction - fusionConsumption) * hoursElapsed,
+      metal: ((resources as any).metal || 0) + metalProduction * hoursElapsed,
+      crystal: ((resources as any).crystal || 0) + crystalProduction * hoursElapsed,
+      deuterium: ((resources as any).deuterium || 0) + (deuteriumProduction - fusionConsumption) * hoursElapsed,
       energy: energyProduction - energyConsumption,
     };
   }
 
-  // 정찰 보고서 생성
+  // 정찰 보고서 생성 - 모행성/식민지 모두 지원
   private generateSpyReport(
-    target: UserDocument,
+    owner: UserDocument,
+    planet: PlanetDocument | null,
+    isColony: boolean,
     stScore: number,
     probesLost: number,
     probesSurvived: number,
@@ -420,7 +475,7 @@ export class GalaxyService {
   ): SpyReport {
     const report: SpyReport = {
       targetCoord,
-      targetName: target.playerName,
+      targetName: owner.playerName + (isColony ? ' (식민지)' : ''),
       probesLost,
       probesSurvived,
       stScore,
@@ -428,9 +483,15 @@ export class GalaxyService {
       targetSpyLevel,
     };
 
+    // 식민지면 식민지 데이터, 아니면 모행성 데이터 사용
+    const targetFleet = isColony ? (planet?.fleet || {}) : (owner.fleet || {});
+    const targetDefense = isColony ? (planet?.defense || {}) : (owner.defense || {});
+    const targetMines = isColony ? (planet?.mines || {}) : (owner.mines || {});
+    const targetFacilities = isColony ? (planet?.facilities || {}) : (owner.facilities || {});
+
     // ST ≤ 1: 자원만 (실시간 계산)
     if (stScore >= 1) {
-      const currentResources = this.calculateCurrentResources(target);
+      const currentResources = this.calculateCurrentResourcesForSpy(owner, planet, isColony);
       report.resources = {
         metal: currentResources.metal,
         crystal: currentResources.crystal,
@@ -441,27 +502,27 @@ export class GalaxyService {
 
     // ST = 2: 자원 + 함대
     if (stScore >= 2) {
-      report.fleet = this.filterNonZero(target.fleet);
+      report.fleet = this.filterNonZero(targetFleet);
     }
 
     // ST 3~4: 자원 + 함대 + 방어시설
     if (stScore >= 3) {
-      report.defense = this.filterNonZero(target.defense);
+      report.defense = this.filterNonZero(targetDefense);
     }
 
     // ST 5~6: 자원 + 함대 + 방어시설 + 건물
     if (stScore >= 5) {
       const buildings = {
-        ...this.filterNonZero(target.mines),
-        ...this.filterNonZero(target.facilities),
+        ...this.filterNonZero(targetMines),
+        ...this.filterNonZero(targetFacilities),
       };
       // 빈 객체라도 섹션 표시 (모든 건물이 0레벨인 경우)
       report.buildings = Object.keys(buildings).length > 0 ? buildings : { _empty: 0 };
     }
 
-    // ST ≥ 7: 모든 정보 + 연구
+    // ST ≥ 7: 모든 정보 + 연구 (연구는 항상 소유자 기준)
     if (stScore >= 7) {
-      const research = this.filterNonZero(target.researchLevels);
+      const research = this.filterNonZero(owner.researchLevels);
       // 빈 객체라도 섹션 표시 (모든 연구가 0레벨인 경우)
       report.research = Object.keys(research).length > 0 ? research : { _empty: 0 };
     }
