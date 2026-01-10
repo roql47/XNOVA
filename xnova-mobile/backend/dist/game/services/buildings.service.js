@@ -311,6 +311,24 @@ let BuildingsService = class BuildingsService {
                 upgradeTime: time,
             });
         }
+        const storageTypes = ['metalStorage', 'crystalStorage', 'deuteriumTank'];
+        for (const key of storageTypes) {
+            const level = facilities[key] || 0;
+            const cost = this.getUpgradeCost(key, level);
+            const time = this.getConstructionTime(key, level, facilities.robotFactory || 0, facilities.nanoFactory || 0);
+            const capacity = (0, game_data_1.calculateStorageCapacity)(level);
+            const nextCapacity = (0, game_data_1.calculateStorageCapacity)(level + 1);
+            buildingsInfo.push({
+                type: key,
+                name: game_data_1.NAME_MAPPING[key],
+                level,
+                category: 'facilities',
+                upgradeCost: cost,
+                upgradeTime: time,
+                production: capacity,
+                nextProduction: nextCapacity,
+            });
+        }
         return {
             buildings: buildingsInfo,
             constructionProgress,

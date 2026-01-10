@@ -4,7 +4,7 @@ import { Model } from 'mongoose';
 import { User, UserDocument } from '../../user/schemas/user.schema';
 import { Planet, PlanetDocument } from '../../planet/schemas/planet.schema';
 import { ResourcesService } from './resources.service';
-import { BUILDING_COSTS, NAME_MAPPING } from '../constants/game-data';
+import { BUILDING_COSTS, NAME_MAPPING, calculateStorageCapacity } from '../constants/game-data';
 
 export interface BuildingInfo {
   type: string;
@@ -373,6 +373,27 @@ export class BuildingsService {
         category: 'facilities',
         upgradeCost: cost,
         upgradeTime: time,
+      });
+    }
+
+    // 창고
+    const storageTypes = ['metalStorage', 'crystalStorage', 'deuteriumTank'];
+    for (const key of storageTypes) {
+      const level = facilities[key] || 0;
+      const cost = this.getUpgradeCost(key, level);
+      const time = this.getConstructionTime(key, level, facilities.robotFactory || 0, facilities.nanoFactory || 0);
+      const capacity = calculateStorageCapacity(level);
+      const nextCapacity = calculateStorageCapacity(level + 1);
+      
+      buildingsInfo.push({
+        type: key,
+        name: NAME_MAPPING[key],
+        level,
+        category: 'facilities',
+        upgradeCost: cost,
+        upgradeTime: time,
+        production: capacity, // 현재 저장 용량
+        nextProduction: nextCapacity, // 다음 레벨 저장 용량
       });
     }
 
