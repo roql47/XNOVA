@@ -1267,11 +1267,35 @@ export class BattleService {
       };
     }
 
-    // 방어자에게 공격 알림
+    // 방어자에게 공격 알림 - 정탐 레벨 차이에 따른 함대 정보 공개
+    const attackerSpyLevel = attacker.researchLevels?.espionageTech || 0;
+    const defenderSpyLevel = target.researchLevels?.espionageTech || 0;
+    const spyDiff = attackerSpyLevel - defenderSpyLevel; // 공격자 - 방어자 (양수면 공격자가 높음)
+
+    let visibleFleet: Record<string, number | string> = {};
+    let fleetVisibility: 'full' | 'composition' | 'hidden' = 'full';
+
+    if (spyDiff >= 3) {
+      // 공격자 정탐이 3 이상 높으면: 함대 정보 전혀 안 보임
+      fleetVisibility = 'hidden';
+      visibleFleet = {};
+    } else if (spyDiff >= 2) {
+      // 공격자 정탐이 2 이상 높으면: 구성만 (수량은 '?')
+      fleetVisibility = 'composition';
+      for (const [shipType, count] of Object.entries(fleet)) {
+        if (count > 0) visibleFleet[shipType] = '?';
+      }
+    } else {
+      // 기본: 전부 보임 (방어자 정탐이 같거나 높음)
+      fleetVisibility = 'full';
+      visibleFleet = { ...fleet };
+    }
+
     target.incomingAttack = {
       targetCoord: attackerCoord, // 출발 좌표 사용
       targetUserId: attackerId,
-      fleet: {}, // 적 함대 정보는 숨김
+      fleet: visibleFleet,
+      fleetVisibility,
       capacity: 0,
       travelTime,
       startTime,
@@ -1385,12 +1409,16 @@ export class BattleService {
           result.incomingAttack = {
             attackerCoord: user.incomingAttack.targetCoord,
             remainingTime: remaining,
+            fleet: user.incomingAttack.fleet || {},
+            fleetVisibility: user.incomingAttack.fleetVisibility || 'full',
           };
         }
       } else {
         result.incomingAttack = {
           attackerCoord: user.incomingAttack.targetCoord,
           remainingTime: remaining,
+          fleet: user.incomingAttack.fleet || {},
+          fleetVisibility: user.incomingAttack.fleetVisibility || 'full',
         };
       }
     }

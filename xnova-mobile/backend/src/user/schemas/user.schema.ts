@@ -298,6 +298,37 @@ export class AttackProgress {
   originPlanetId?: string; // 출발 식민지 ID (null이면 모행성)
 }
 
+// 적 공격 수신 상태 스키마 (정탐 레벨에 따른 함대 정보 가시성 지원)
+@Schema({ _id: false })
+export class IncomingAttackProgress {
+  @Prop()
+  targetCoord: string;
+
+  @Prop()
+  targetUserId: string;
+
+  @Prop({ type: Object })
+  fleet: Record<string, number | string>;  // 숫자 또는 '?' (정탐 차이로 수량 숨김 시)
+
+  @Prop({ type: String, default: 'full' })
+  fleetVisibility?: 'full' | 'composition' | 'hidden';  // 정탐 레벨 차이에 따른 가시성
+
+  @Prop()
+  capacity: number;
+
+  @Prop()
+  travelTime: number;
+
+  @Prop()
+  startTime: Date;
+
+  @Prop()
+  arrivalTime: Date;
+
+  @Prop({ default: false })
+  battleCompleted: boolean;
+}
+
 // 귀환 진행 상태 스키마 (하위 호환성 유지)
 @Schema({ _id: false })
 export class ReturnProgress {
@@ -457,8 +488,8 @@ export class User {
   @Prop({ type: ReturnProgress, default: null })
   pendingReturn: ReturnProgress | null;  // 하위 호환용 (단일 미션)
 
-  @Prop({ type: AttackProgress, default: null })
-  incomingAttack: AttackProgress | null;
+  @Prop({ type: IncomingAttackProgress, default: null })
+  incomingAttack: IncomingAttackProgress | null;
 
   // 다중 함대 미션 지원 (컴퓨터공학 레벨 + 1 = 최대 동시 운용 함대 수)
   @Prop({ type: [FleetMission], default: [] })

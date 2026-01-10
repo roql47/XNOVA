@@ -101,7 +101,7 @@ JWT_SECRET=여기에-매우-긴-랜덤-문자열-입력
 JWT_EXPIRES_IN=15m
 
 # Google OAuth
-GOOGLE_CLIENT_ID=820555705462-qhtlv9mdpd41gnvfh3en3nm4ultbg4ha.apps.googleusercontent.com
+GOOGLE_CLIENT_ID=your_google_client_id_here
 
 # CORS
 CORS_ORIGINS=capacitor://localhost,http://localhost

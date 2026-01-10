@@ -917,13 +917,21 @@ class IncomingAttackInfo {
   final String attackerCoord;
   final double remainingTime;
   final DateTime createdAt;
+  final Map<String, dynamic> fleet;  // 함대 정보 (숫자 또는 '?')
+  final String fleetVisibility;  // 'full', 'composition', 'hidden'
 
-  IncomingAttackInfo({required this.attackerCoord, required this.remainingTime})
-      : createdAt = DateTime.now();
+  IncomingAttackInfo({
+    required this.attackerCoord, 
+    required this.remainingTime,
+    this.fleet = const {},
+    this.fleetVisibility = 'full',
+  }) : createdAt = DateTime.now();
 
   factory IncomingAttackInfo.fromJson(Map<String, dynamic> json) => IncomingAttackInfo(
     attackerCoord: json['attackerCoord'] ?? '',
     remainingTime: (json['remainingTime'] ?? 0).toDouble(),
+    fleet: (json['fleet'] as Map<String, dynamic>?) ?? {},
+    fleetVisibility: json['fleetVisibility'] ?? 'full',
   );
 
   DateTime get finishDateTime => createdAt.add(Duration(seconds: remainingTime.toInt()));

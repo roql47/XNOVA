@@ -64,7 +64,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   final TokenService _tokenService;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
-    serverClientId: '820555705462-qhtlv9mdpd41gnvfh3en3nm4ultbg4ha.apps.googleusercontent.com',
+    serverClientId: '820555705462-hk73umafu7a0auvmrbslhagrp17r32rd.apps.googleusercontent.com',
   );
 
   AuthNotifier(this._apiService, this._tokenService) : super(AuthState());

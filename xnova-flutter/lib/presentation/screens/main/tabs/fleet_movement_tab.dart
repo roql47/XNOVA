@@ -467,6 +467,8 @@ class _FleetMovementTabState extends ConsumerState<FleetMovementTab> {
                 attackerCoord: gameState.battleStatus!.incomingAttack!.attackerCoord,
                 finishTime: gameState.battleStatus!.incomingAttack!.finishDateTime,
                 onComplete: () => ref.read(gameProvider.notifier).processBattle(),
+                fleet: gameState.battleStatus!.incomingAttack!.fleet,
+                fleetVisibility: gameState.battleStatus!.incomingAttack!.fleetVisibility,
               ),
           ],
           
@@ -1237,12 +1239,118 @@ class _IncomingAttackCard extends StatelessWidget {
   final String attackerCoord;
   final DateTime finishTime;
   final VoidCallback onComplete;
+  final Map<String, dynamic> fleet;
+  final String fleetVisibility;
 
   const _IncomingAttackCard({
     required this.attackerCoord,
     required this.finishTime,
     required this.onComplete,
+    this.fleet = const {},
+    this.fleetVisibility = 'full',
   });
+
+  // 함선 타입 한글 이름 변환
+  String _getShipName(String type) {
+    const names = {
+      'smallCargo': '소형 수송선',
+      'largeCargo': '대형 수송선',
+      'lightFighter': '경전투기',
+      'heavyFighter': '중전투기',
+      'cruiser': '순양함',
+      'battleship': '전함',
+      'battlecruiser': '순양전함',
+      'bomber': '폭격기',
+      'destroyer': '구축함',
+      'deathstar': '데스스타',
+      'recycler': '재활용선',
+      'espionageProbe': '정찰 위성',
+      'colonyShip': '식민선',
+    };
+    return names[type] ?? type;
+  }
+
+  Widget _buildFleetInfo() {
+    // 숨김 상태: 함대 정보 전혀 표시 안함
+    if (fleetVisibility == 'hidden') {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        decoration: BoxDecoration(
+          color: AppColors.surface.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.visibility_off, size: 16, color: AppColors.textMuted),
+            const SizedBox(width: 8),
+            const Text(
+              '적 함대 정보 식별 불가 (정탐 기술 격차)',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontStyle: FontStyle.italic),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 함대가 비어있으면 (이전 호환성)
+    if (fleet.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // 구성만 또는 전체 표시
+    final fleetEntries = fleet.entries.where((e) => e.value != 0 && e.value != '0').toList();
+    if (fleetEntries.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.rocket_launch, size: 14, color: AppColors.negative),
+              const SizedBox(width: 6),
+              Text(
+                fleetVisibility == 'composition' ? '적 함대 구성 (수량 불명)' : '적 함대 구성',
+                style: TextStyle(
+                  color: AppColors.negative,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 12,
+            runSpacing: 6,
+            children: fleetEntries.map((entry) {
+              final shipName = _getShipName(entry.key);
+              final countDisplay = entry.value is String ? entry.value : entry.value.toString();
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.negative.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '$shipName: $countDisplay',
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 11,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1282,6 +1390,8 @@ class _IncomingAttackCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 10),
+            _buildFleetInfo(),
+            if (fleet.isNotEmpty || fleetVisibility == 'hidden') const SizedBox(height: 10),
             Row(
               children: [
                 Icon(Icons.schedule, size: 14, color: AppColors.negative),

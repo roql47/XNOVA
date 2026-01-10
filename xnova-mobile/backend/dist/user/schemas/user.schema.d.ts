@@ -108,6 +108,17 @@ export declare class AttackProgress {
     originCoord?: string;
     originPlanetId?: string;
 }
+export declare class IncomingAttackProgress {
+    targetCoord: string;
+    targetUserId: string;
+    fleet: Record<string, number | string>;
+    fleetVisibility?: 'full' | 'composition' | 'hidden';
+    capacity: number;
+    travelTime: number;
+    startTime: Date;
+    arrivalTime: Date;
+    battleCompleted: boolean;
+}
 export declare class ReturnProgress {
     fleet: Record<string, number>;
     loot: Record<string, number>;
@@ -167,7 +178,7 @@ export declare class User {
     defenseProgress: ProgressInfo | null;
     pendingAttack: AttackProgress | null;
     pendingReturn: ReturnProgress | null;
-    incomingAttack: AttackProgress | null;
+    incomingAttack: IncomingAttackProgress | null;
     fleetMissions: FleetMission[];
     lastResourceUpdate: Date;
     lastActivity: Date;
@@ -383,7 +394,7 @@ export declare const UserSchema: import("mongoose").Schema<User, import("mongoos
     }, "id"> & {
         id: string;
     }> | undefined;
-    incomingAttack?: import("mongoose").SchemaDefinitionProperty<AttackProgress | null, User, Document<unknown, {}, User, {
+    incomingAttack?: import("mongoose").SchemaDefinitionProperty<IncomingAttackProgress | null, User, Document<unknown, {}, User, {
         id: string;
     }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
         _id: import("mongoose").Types.ObjectId;

@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserSchema = exports.User = exports.VacationMode = exports.FleetMission = exports.ReturnProgress = exports.AttackProgress = exports.ProgressInfo = exports.Defense = exports.Fleet = exports.ResearchLevels = exports.PlanetInfo = exports.Facilities = exports.Mines = exports.Resources = void 0;
+exports.UserSchema = exports.User = exports.VacationMode = exports.FleetMission = exports.ReturnProgress = exports.IncomingAttackProgress = exports.AttackProgress = exports.ProgressInfo = exports.Defense = exports.Fleet = exports.ResearchLevels = exports.PlanetInfo = exports.Facilities = exports.Mines = exports.Resources = void 0;
 const mongoose_1 = require("@nestjs/mongoose");
 let Resources = class Resources {
     metal;
@@ -495,6 +495,57 @@ __decorate([
 exports.AttackProgress = AttackProgress = __decorate([
     (0, mongoose_1.Schema)({ _id: false })
 ], AttackProgress);
+let IncomingAttackProgress = class IncomingAttackProgress {
+    targetCoord;
+    targetUserId;
+    fleet;
+    fleetVisibility;
+    capacity;
+    travelTime;
+    startTime;
+    arrivalTime;
+    battleCompleted;
+};
+exports.IncomingAttackProgress = IncomingAttackProgress;
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", String)
+], IncomingAttackProgress.prototype, "targetCoord", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", String)
+], IncomingAttackProgress.prototype, "targetUserId", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: Object }),
+    __metadata("design:type", Object)
+], IncomingAttackProgress.prototype, "fleet", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: String, default: 'full' }),
+    __metadata("design:type", String)
+], IncomingAttackProgress.prototype, "fleetVisibility", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", Number)
+], IncomingAttackProgress.prototype, "capacity", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", Number)
+], IncomingAttackProgress.prototype, "travelTime", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", Date)
+], IncomingAttackProgress.prototype, "startTime", void 0);
+__decorate([
+    (0, mongoose_1.Prop)(),
+    __metadata("design:type", Date)
+], IncomingAttackProgress.prototype, "arrivalTime", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: false }),
+    __metadata("design:type", Boolean)
+], IncomingAttackProgress.prototype, "battleCompleted", void 0);
+exports.IncomingAttackProgress = IncomingAttackProgress = __decorate([
+    (0, mongoose_1.Schema)({ _id: false })
+], IncomingAttackProgress);
 let ReturnProgress = class ReturnProgress {
     fleet;
     loot;
@@ -761,7 +812,7 @@ __decorate([
     __metadata("design:type", Object)
 ], User.prototype, "pendingReturn", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ type: AttackProgress, default: null }),
+    (0, mongoose_1.Prop)({ type: IncomingAttackProgress, default: null }),
     __metadata("design:type", Object)
 ], User.prototype, "incomingAttack", void 0);
 __decorate([

@@ -871,10 +871,31 @@ let BattleService = class BattleService {
                 originPlanetId: isHome ? undefined : attackerPlanet?._id.toString(),
             };
         }
+        const attackerSpyLevel = attacker.researchLevels?.espionageTech || 0;
+        const defenderSpyLevel = target.researchLevels?.espionageTech || 0;
+        const spyDiff = attackerSpyLevel - defenderSpyLevel;
+        let visibleFleet = {};
+        let fleetVisibility = 'full';
+        if (spyDiff >= 3) {
+            fleetVisibility = 'hidden';
+            visibleFleet = {};
+        }
+        else if (spyDiff >= 2) {
+            fleetVisibility = 'composition';
+            for (const [shipType, count] of Object.entries(fleet)) {
+                if (count > 0)
+                    visibleFleet[shipType] = '?';
+            }
+        }
+        else {
+            fleetVisibility = 'full';
+            visibleFleet = { ...fleet };
+        }
         target.incomingAttack = {
             targetCoord: attackerCoord,
             targetUserId: attackerId,
-            fleet: {},
+            fleet: visibleFleet,
+            fleetVisibility,
             capacity: 0,
             travelTime,
             startTime,
@@ -973,6 +994,8 @@ let BattleService = class BattleService {
                     result.incomingAttack = {
                         attackerCoord: user.incomingAttack.targetCoord,
                         remainingTime: remaining,
+                        fleet: user.incomingAttack.fleet || {},
+                        fleetVisibility: user.incomingAttack.fleetVisibility || 'full',
                     };
                 }
             }
@@ -980,6 +1003,8 @@ let BattleService = class BattleService {
                 result.incomingAttack = {
                     attackerCoord: user.incomingAttack.targetCoord,
                     remainingTime: remaining,
+                    fleet: user.incomingAttack.fleet || {},
+                    fleetVisibility: user.incomingAttack.fleetVisibility || 'full',
                 };
             }
         }

@@ -468,7 +468,7 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'v0.18',
+                  'v0.19',
                   style: GoogleFonts.orbitron(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -535,7 +535,7 @@ class _SplashScreenState extends State<SplashScreen>
               ),
               const SizedBox(width: 8),
               Text(
-                '2025',
+                '2026',
                 style: GoogleFonts.exo2(
                   fontSize: 11,
                   color: AppColors.textMuted,

@@ -95,13 +95,9 @@ class OverviewTab extends ConsumerWidget {
                 onComplete: () => ref.read(gameProvider.notifier).processBattle(),
               ),
             if (gameState.battleStatus!.incomingAttack != null)
-              _BattleStatusPanel(
-                icon: Icons.warning_amber,
-                title: '적 공격 감지',
-                description: '공격자: ${gameState.battleStatus!.incomingAttack!.attackerCoord}',
-                finishTime: gameState.battleStatus!.incomingAttack!.finishDateTime,
+              _IncomingAttackPanel(
+                incomingAttack: gameState.battleStatus!.incomingAttack!,
                 onComplete: () => ref.read(gameProvider.notifier).processBattle(),
-                isWarning: true,
               ),
           ],
           
@@ -1135,6 +1131,183 @@ class _PlanetInfoPanelState extends ConsumerState<_PlanetInfoPanel> {
           ),
         ),
       ],
+    );
+  }
+}
+
+// 적 공격 알림 패널 (함대 정보 포함)
+class _IncomingAttackPanel extends StatelessWidget {
+  final IncomingAttackInfo incomingAttack;
+  final VoidCallback onComplete;
+
+  const _IncomingAttackPanel({
+    required this.incomingAttack,
+    required this.onComplete,
+  });
+
+  String _getShipName(String type) {
+    const names = {
+      'smallCargo': '소형 수송선',
+      'largeCargo': '대형 수송선',
+      'lightFighter': '경전투기',
+      'heavyFighter': '중전투기',
+      'cruiser': '순양함',
+      'battleship': '전함',
+      'battlecruiser': '순양전함',
+      'bomber': '폭격기',
+      'destroyer': '구축함',
+      'deathstar': '데스스타',
+      'recycler': '재활용선',
+      'espionageProbe': '정찰 위성',
+      'colonyShip': '식민선',
+    };
+    return names[type] ?? type;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.negative.withOpacity(0.15), AppColors.negative.withOpacity(0.05)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.negative.withOpacity(0.4)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.warning_amber, color: AppColors.negative, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  '적 공격 감지',
+                  style: TextStyle(
+                    color: AppColors.negative,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '공격자: ${incomingAttack.attackerCoord}',
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w500,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 10),
+            // 함대 정보 표시
+            _buildFleetInfo(),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Icon(Icons.schedule, size: 14, color: AppColors.negative),
+                const SizedBox(width: 6),
+                ProgressTimer(
+                  finishTime: incomingAttack.finishDateTime,
+                  onComplete: onComplete,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFleetInfo() {
+    final visibility = incomingAttack.fleetVisibility;
+    final fleet = incomingAttack.fleet;
+
+    // 숨김 상태
+    if (visibility == 'hidden') {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        decoration: BoxDecoration(
+          color: AppColors.surface.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.visibility_off, size: 16, color: AppColors.textMuted),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                '적 함대 정보 식별 불가 (정탐 기술 격차)',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 11, fontStyle: FontStyle.italic),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 함대가 비어있으면
+    if (fleet.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final fleetEntries = fleet.entries.where((e) => e.value != 0 && e.value != '0').toList();
+    if (fleetEntries.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.rocket_launch, size: 14, color: AppColors.negative),
+              const SizedBox(width: 6),
+              Text(
+                visibility == 'composition' ? '적 함대 구성 (수량 불명)' : '적 함대 구성',
+                style: TextStyle(
+                  color: AppColors.negative,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 10,
+            runSpacing: 6,
+            children: fleetEntries.map((entry) {
+              final shipName = _getShipName(entry.key);
+              final countDisplay = entry.value is String ? entry.value : entry.value.toString();
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.negative.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '$shipName: $countDisplay',
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 11,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
     );
   }
 }
