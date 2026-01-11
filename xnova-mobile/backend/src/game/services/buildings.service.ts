@@ -72,9 +72,9 @@ export class BuildingsService {
   // 행성 생성 시 필드 수 결정 (랜덤)
   generatePlanetFields(position: number, isHomeWorld: boolean = false): { maxFields: number; temperature: number; planetType: string } {
     if (isHomeWorld) {
-      // 모행성은 기본 163 필드
+      // 모행성은 기본 300 필드
       return {
-        maxFields: 163,
+        maxFields: 300,
         temperature: 50,
         planetType: 'normaltemp'
       };
@@ -140,7 +140,7 @@ export class BuildingsService {
 
   // 최대 필드 수 계산 (기본 + 테라포머 보너스)
   getMaxFields(user: UserDocument): number {
-    const baseFields = user.planetInfo?.maxFields || 163;
+    const baseFields = user.planetInfo?.maxFields || 300;
     const terraformerLevel = user.facilities?.terraformer || 0;
     return baseFields + this.getTerraformerBonus(terraformerLevel);
   }
@@ -235,7 +235,7 @@ export class BuildingsService {
 
   // 식민지 최대 필드 계산
   getColonyMaxFields(planet: PlanetDocument): number {
-    const baseFields = planet.planetInfo?.maxFields || 163;
+    const baseFields = planet.planetInfo?.maxFields || 300;
     const terraformerLevel = planet.facilities?.terraformer || 0;
     return baseFields + this.getTerraformerBonus(terraformerLevel);
   }
@@ -631,6 +631,193 @@ export class BuildingsService {
       await planet.save();
 
       return { message: '건설이 취소되었습니다.', refund };
+    }
+  }
+
+  // 건물 다운그레이드(파괴) 시작 (활성 행성 기준)
+  async startDowngrade(userId: string, buildingType: string) {
+    const result = await this.resourcesService.updateResourcesWithPlanet(userId);
+    if (!result) {
+      throw new BadRequestException('사용자를 찾을 수 없습니다.');
+    }
+
+    const { user, planet } = result;
+    const isHome = this.isHomePlanet(user.activePlanetId, userId);
+
+    // 활성 행성 데이터
+    let mines: any;
+    let facilities: any;
+    let constructionProgress: any;
+
+    if (isHome) {
+      mines = user.mines || {};
+      facilities = user.facilities || {};
+      constructionProgress = user.constructionProgress;
+    } else if (planet) {
+      mines = planet.mines || {};
+      facilities = planet.facilities || {};
+      constructionProgress = planet.constructionProgress;
+    } else {
+      throw new BadRequestException('행성을 찾을 수 없습니다.');
+    }
+
+    // 이미 건설/파괴 진행 중인지 확인
+    if (constructionProgress) {
+      const remainingTime = Math.max(0, (constructionProgress.finishTime.getTime() - Date.now()) / 1000);
+      const actionType = constructionProgress.isDowngrade ? '파괴' : '건설';
+      throw new BadRequestException(`이미 ${NAME_MAPPING[constructionProgress.name] || constructionProgress.name} ${actionType}이 진행 중입니다. 완료까지 ${Math.ceil(remainingTime)}초 남았습니다.`);
+    }
+
+    // 건물 타입 확인
+    const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+    const isFacility = ['robotFactory', 'shipyard', 'researchLab', 'nanoFactory', 'terraformer', 
+                        'allianceDepot', 'missileSilo', 'metalStorage', 'crystalStorage', 'deuteriumTank',
+                        'lunarBase', 'sensorPhalanx', 'jumpGate'].includes(buildingType);
+
+    if (!isMine && !isFacility) {
+      throw new BadRequestException('알 수 없는 건물 유형입니다.');
+    }
+
+    // 현재 레벨 확인
+    const currentLevel = isMine 
+      ? (mines[buildingType] || 0)
+      : (facilities[buildingType] || 0);
+
+    // 레벨 0이면 파괴 불가
+    if (currentLevel <= 0) {
+      throw new BadRequestException('레벨 0인 건물은 파괴할 수 없습니다.');
+    }
+
+    // 파괴 비용 계산 (건설 비용의 25%)
+    const upgradeCost = this.getUpgradeCost(buildingType, currentLevel - 1); // 현재 레벨 건설 비용
+    if (!upgradeCost) {
+      throw new BadRequestException('건물 비용을 계산할 수 없습니다.');
+    }
+    
+    const cost = {
+      metal: Math.floor(upgradeCost.metal * 0.25),
+      crystal: Math.floor(upgradeCost.crystal * 0.25),
+      deuterium: Math.floor((upgradeCost.deuterium || 0) * 0.25),
+    };
+
+    // 자원 확인 및 차감 (활성 행성에서)
+    const hasResources = await this.resourcesService.deductResources(userId, cost);
+    if (!hasResources) {
+      throw new BadRequestException('자원이 부족합니다.');
+    }
+
+    // 파괴 시간 계산 (건설 시간의 50%)
+    const constructionTime = this.getConstructionTime(
+      buildingType,
+      currentLevel - 1,
+      facilities.robotFactory || 0,
+      facilities.nanoFactory || 0,
+    );
+    const downgradeTime = Math.floor(constructionTime * 0.5);
+
+    // 파괴 진행 정보 저장
+    const startTime = new Date();
+    const finishTime = new Date(startTime.getTime() + downgradeTime * 1000);
+
+    const progress = {
+      type: isMine ? 'mine' : 'facility',
+      name: buildingType,
+      startTime,
+      finishTime,
+      isDowngrade: true, // 다운그레이드 표시
+    };
+
+    if (isHome) {
+      user.constructionProgress = progress;
+      await user.save();
+    } else if (planet) {
+      planet.constructionProgress = progress;
+      await planet.save();
+    }
+
+    return {
+      message: `${NAME_MAPPING[buildingType]} 파괴가 시작되었습니다.`,
+      building: buildingType,
+      currentLevel,
+      targetLevel: currentLevel - 1,
+      cost,
+      constructionTime: downgradeTime,
+      finishTime,
+    };
+  }
+
+  // 건설/파괴 완료 처리 (기존 completeConstruction 대체) - 다운그레이드 지원
+  async completeConstructionWithDowngrade(userId: string): Promise<{ completed: boolean; building?: string; newLevel?: number; isDowngrade?: boolean }> {
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) return { completed: false };
+
+    const isHome = this.isHomePlanet(user.activePlanetId, userId);
+
+    if (isHome) {
+      // 모행성
+      if (!user.constructionProgress) return { completed: false };
+      if (user.constructionProgress.finishTime.getTime() > Date.now()) return { completed: false };
+
+      const buildingType = user.constructionProgress.name;
+      const isDowngrade = (user.constructionProgress as any).isDowngrade === true;
+      const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+
+      if (isDowngrade) {
+        // 다운그레이드: 레벨 감소
+        if (isMine) {
+          (user.mines as any)[buildingType] = Math.max(0, ((user.mines as any)[buildingType] || 0) - 1);
+        } else {
+          (user.facilities as any)[buildingType] = Math.max(0, ((user.facilities as any)[buildingType] || 0) - 1);
+        }
+      } else {
+        // 업그레이드: 레벨 증가
+        if (isMine) {
+          (user.mines as any)[buildingType] = ((user.mines as any)[buildingType] || 0) + 1;
+        } else {
+          (user.facilities as any)[buildingType] = ((user.facilities as any)[buildingType] || 0) + 1;
+        }
+      }
+
+      const newLevel = isMine ? (user.mines as any)[buildingType] : (user.facilities as any)[buildingType];
+      user.constructionProgress = null;
+      await user.save();
+
+      return { completed: true, building: buildingType, newLevel, isDowngrade };
+    } else {
+      // 식민지
+      const planet = await this.planetModel.findById(user.activePlanetId).exec();
+      if (!planet || !planet.constructionProgress) return { completed: false };
+      if (planet.constructionProgress.finishTime.getTime() > Date.now()) return { completed: false };
+
+      const buildingType = planet.constructionProgress.name;
+      const isDowngrade = (planet.constructionProgress as any).isDowngrade === true;
+      const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+
+      if (isDowngrade) {
+        // 다운그레이드: 레벨 감소
+        if (isMine) {
+          if (!planet.mines) planet.mines = {} as any;
+          (planet.mines as any)[buildingType] = Math.max(0, ((planet.mines as any)[buildingType] || 0) - 1);
+        } else {
+          if (!planet.facilities) planet.facilities = {} as any;
+          (planet.facilities as any)[buildingType] = Math.max(0, ((planet.facilities as any)[buildingType] || 0) - 1);
+        }
+      } else {
+        // 업그레이드: 레벨 증가
+        if (isMine) {
+          if (!planet.mines) planet.mines = {} as any;
+          (planet.mines as any)[buildingType] = ((planet.mines as any)[buildingType] || 0) + 1;
+        } else {
+          if (!planet.facilities) planet.facilities = {} as any;
+          (planet.facilities as any)[buildingType] = ((planet.facilities as any)[buildingType] || 0) + 1;
+        }
+      }
+
+      const newLevel = isMine ? (planet.mines as any)[buildingType] : (planet.facilities as any)[buildingType];
+      planet.constructionProgress = null;
+      await planet.save();
+
+      return { completed: true, building: buildingType, newLevel, isDowngrade };
     }
   }
 }

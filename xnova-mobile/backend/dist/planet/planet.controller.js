@@ -36,7 +36,7 @@ let PlanetController = class PlanetController {
                 type: p.type || 'planet',
                 planetInfo: {
                     planetName: p.name,
-                    maxFields: p.maxFields || 163,
+                    maxFields: p.maxFields || 300,
                     usedFields: p.usedFields || 0,
                     temperature: p.temperature || 50,
                     planetType: p.planetType || 'normaltemp',

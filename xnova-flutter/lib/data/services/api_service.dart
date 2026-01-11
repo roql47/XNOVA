@@ -68,6 +68,18 @@ class ApiService {
     return ResourcesResponse.fromJson(response.data);
   }
 
+  // 상세 자원 정보 (자원 탭용)
+  Future<Map<String, dynamic>> getDetailedResources() async {
+    final response = await _dio.get('game/resources/detailed');
+    return response.data as Map<String, dynamic>;
+  }
+
+  // 가동률 설정
+  Future<Map<String, dynamic>> setOperationRates(Map<String, int> rates) async {
+    final response = await _dio.post('game/resources/operation-rates', data: rates);
+    return response.data as Map<String, dynamic>;
+  }
+
   // ===== 건물 =====
   Future<BuildingsResponse> getBuildings() async {
     final response = await _dio.get('game/buildings');
@@ -76,6 +88,11 @@ class ApiService {
 
   Future<UpgradeResponse> upgradeBuilding(UpgradeRequest request) async {
     final response = await _dio.post('game/buildings/upgrade', data: request.toJson());
+    return UpgradeResponse.fromJson(response.data);
+  }
+
+  Future<UpgradeResponse> downgradeBuilding(UpgradeRequest request) async {
+    final response = await _dio.post('game/buildings/downgrade', data: request.toJson());
     return UpgradeResponse.fromJson(response.data);
   }
 

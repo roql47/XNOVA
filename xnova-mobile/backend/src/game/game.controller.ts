@@ -31,6 +31,23 @@ export class GameController {
     return this.resourcesService.getResources(req.user.userId);
   }
 
+  @Get('resources/detailed')
+  async getDetailedResources(@Request() req) {
+    return this.resourcesService.getDetailedResources(req.user.userId);
+  }
+
+  @Post('resources/operation-rates')
+  async setOperationRates(@Request() req, @Body() body: {
+    metalMine?: number;
+    crystalMine?: number;
+    deuteriumMine?: number;
+    solarPlant?: number;
+    fusionReactor?: number;
+    solarSatellite?: number;
+  }) {
+    return this.resourcesService.setOperationRates(req.user.userId, body);
+  }
+
   // ===== 건물 =====
   @Get('buildings')
   async getBuildings(@Request() req) {
@@ -42,9 +59,14 @@ export class GameController {
     return this.buildingsService.startUpgrade(req.user.userId, body.buildingType);
   }
 
+  @Post('buildings/downgrade')
+  async downgradeBuilding(@Request() req, @Body() body: { buildingType: string }) {
+    return this.buildingsService.startDowngrade(req.user.userId, body.buildingType);
+  }
+
   @Post('buildings/complete')
   async completeBuilding(@Request() req) {
-    return this.buildingsService.completeConstruction(req.user.userId);
+    return this.buildingsService.completeConstructionWithDowngrade(req.user.userId);
   }
 
   @Post('buildings/cancel')

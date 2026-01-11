@@ -29,6 +29,9 @@ const BUILDING_MAP = {
     "조선소": "shipyard",
     "연구소": "researchLab",
     "나노공장": "nanoFactory",
+    "메탈저장소": "metalStorage",
+    "크리스탈저장소": "crystalStorage",
+    "듀테륨탱크": "deuteriumTank",
     // 축약형
     "메광": "metalMine",
     "크광": "crystalMine",
@@ -37,7 +40,10 @@ const BUILDING_MAP = {
     "핵융": "fusionReactor",
     "로공": "robotFactory",
     "나공": "nanoFactory",
-    "연소": "researchLab"
+    "연소": "researchLab",
+    "메저": "metalStorage",
+    "크저": "crystalStorage",
+    "듀탱": "deuteriumTank"
 };
 
 // 연구 매핑
@@ -396,6 +402,10 @@ function apiCancelBuild(token) {
     return httpPostAuth(CONFIG.API_BASE_URL + "/game/buildings/cancel", {}, token);
 }
 
+function apiDowngradeBuild(token, buildingType) {
+    return httpPostAuth(CONFIG.API_BASE_URL + "/game/buildings/downgrade", { buildingType: buildingType }, token);
+}
+
 // 연구 API
 function apiStartResearch(token, researchType) {
     return httpPostAuth(CONFIG.API_BASE_URL + "/game/research/start", { researchType: researchType }, token);
@@ -515,6 +525,10 @@ function onMessage(msg) {
                 break;
             case "건설취소":
                 cmdBuildCancel(msg, senderHash);
+                break;
+            case "파괴":
+            case "destroy":
+                cmdDestroy(msg, senderHash, args);
                 break;
             case "연구확인":
                 cmdResearchComplete(msg, senderHash);
@@ -1196,6 +1210,33 @@ function cmdBuildCancel(msg, senderHash) {
     msg.reply("[건설 취소됨] " + (result.data.message || "취소되었습니다."));
 }
 
+function cmdDestroy(msg, senderHash, args) {
+    let token = getValidToken(senderHash);
+    if (!token) {
+        msg.reply("[오류] 먼저 계정을 연동하세요. (!연동)");
+        return;
+    }
+    
+    if (args.length < 1) {
+        msg.reply("[건물 파괴]\n!파괴 [건물명]\n\n건물명:\n메탈광산(메광), 크리스탈광산(크광)\n듀테륨광산(듀광), 태양광발전소(태발)\n핵융합로(핵융), 로봇공장(로공)\n조선소, 연구소(연소), 나노공장(나공)\n메탈저장소(메저), 크리스탈저장소(크저), 듀테륨탱크(듀탱)\n\n※ 비용: 건설비의 25%, 시간: 건설시간의 50%");
+        return;
+    }
+    
+    let buildingType = toCode(args[0], BUILDING_MAP);
+    
+    let result = apiDowngradeBuild(token, buildingType);
+    if (!result.success || result.data.error || result.data.statusCode) {
+        let errMsg = result.data && result.data.message ? result.data.message : "건물 파괴 실패";
+        msg.reply("[오류] " + errMsg);
+        return;
+    }
+    
+    let buildTime = result.data.constructionTime || 0;
+    msg.reply("[파괴 시작] " + (result.data.message || "파괴가 시작되었습니다.") + "\n" +
+              "Lv." + result.data.currentLevel + " → Lv." + result.data.targetLevel + "\n" +
+              "완료시간: " + formatTime(buildTime));
+}
+
 // ==================== 연구 명령어 ====================
 
 function cmdResearchStart(msg, senderHash, args) {
@@ -1408,7 +1449,8 @@ function cmdHelp(msg) {
     
     text += "[건설]\n";
     text += "!건설 메탈광산\n";
-    text += "!건설확인 / !건설취소\n\n";
+    text += "!건설확인 / !건설취소\n";
+    text += "!파괴 메탈광산 (다운그레이드)\n\n";
     
     text += "[연구]\n";
     text += "!연구 에너지공학\n";

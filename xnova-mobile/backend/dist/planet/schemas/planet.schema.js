@@ -282,7 +282,7 @@ let PlanetInfo = class PlanetInfo {
 };
 exports.PlanetInfo = PlanetInfo;
 __decorate([
-    (0, mongoose_1.Prop)({ default: 163 }),
+    (0, mongoose_1.Prop)({ default: 300 }),
     __metadata("design:type", Number)
 ], PlanetInfo.prototype, "maxFields", void 0);
 __decorate([

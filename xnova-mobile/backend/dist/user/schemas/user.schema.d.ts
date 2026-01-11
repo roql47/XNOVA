@@ -13,6 +13,14 @@ export declare class Mines {
     solarPlant: number;
     fusionReactor: number;
 }
+export declare class OperationRates {
+    metalMine: number;
+    crystalMine: number;
+    deuteriumMine: number;
+    solarPlant: number;
+    fusionReactor: number;
+    solarSatellite: number;
+}
 export declare class Facilities {
     robotFactory: number;
     shipyard: number;
@@ -167,6 +175,7 @@ export declare class User {
     vacationMode: VacationMode;
     resources: Resources;
     mines: Mines;
+    operationRates: OperationRates;
     facilities: Facilities;
     planetInfo: PlanetInfo;
     researchLevels: ResearchLevels;
@@ -287,6 +296,15 @@ export declare const UserSchema: import("mongoose").Schema<User, import("mongoos
         id: string;
     }> | undefined;
     mines?: import("mongoose").SchemaDefinitionProperty<Mines, User, Document<unknown, {}, User, {
+        id: string;
+    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
+        _id: import("mongoose").Types.ObjectId;
+    } & {
+        __v: number;
+    }, "id"> & {
+        id: string;
+    }> | undefined;
+    operationRates?: import("mongoose").SchemaDefinitionProperty<OperationRates, User, Document<unknown, {}, User, {
         id: string;
     }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
         _id: import("mongoose").Types.ObjectId;

@@ -276,6 +276,7 @@ final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
 enum MainTab {
   overview,
   buildings,
+  resources,  // 자원 탭 추가
   research,
   shipyard,
   defense,
@@ -700,6 +701,29 @@ class GameNotifier extends StateNotifier<GameState> {
     }
   }
 
+  // 상세 자원 정보 조회 (자원 탭용)
+  Future<Map<String, dynamic>?> getDetailedResources() async {
+    try {
+      return await _apiService.getDetailedResources();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // 가동률 설정
+  Future<bool> setOperationRates(Map<String, int> rates) async {
+    try {
+      final result = await _apiService.setOperationRates(rates);
+      if (result['success'] == true) {
+        await loadResources(); // 자원 정보 새로고침
+        return true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   Future<void> loadBuildings() async {
     try {
       final response = await _apiService.getBuildings();
@@ -722,6 +746,16 @@ class GameNotifier extends StateNotifier<GameState> {
       await loadResources();
     } catch (e) {
       state = state.copyWith(error: '건물 업그레이드에 실패했습니다.');
+    }
+  }
+
+  Future<void> downgradeBuilding(String buildingType) async {
+    try {
+      await _apiService.downgradeBuilding(UpgradeRequest(buildingType: buildingType));
+      await loadBuildings();
+      await loadResources();
+    } catch (e) {
+      state = state.copyWith(error: '건물 파괴에 실패했습니다.');
     }
   }
 

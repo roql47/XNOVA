@@ -41,12 +41,12 @@ export class UserService {
     const posIndex = Math.max(0, Math.min(14, position - 1));
 
     if (isHomeWorld) {
-      // 모행성은 기본 163 필드, 지름 = sqrt(163) × 1000 ≈ 12,767 km
+      // 모행성은 기본 300 필드, 지름 = sqrt(300) × 1000 ≈ 17,320 km
       return {
-        maxFields: 163,
+        maxFields: 300,
         temperature: 50,
         planetType: 'normaltemp',
-        diameter: Math.floor(Math.sqrt(163) * 1000)  // ~12,767 km
+        diameter: Math.floor(Math.sqrt(300) * 1000)  // ~17,320 km
       };
     }
 

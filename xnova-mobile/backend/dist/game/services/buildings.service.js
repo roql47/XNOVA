@@ -64,7 +64,7 @@ let BuildingsService = class BuildingsService {
     generatePlanetFields(position, isHomeWorld = false) {
         if (isHomeWorld) {
             return {
-                maxFields: 163,
+                maxFields: 300,
                 temperature: 50,
                 planetType: 'normaltemp'
             };
@@ -112,7 +112,7 @@ let BuildingsService = class BuildingsService {
         return terraformerLevel * 5;
     }
     getMaxFields(user) {
-        const baseFields = user.planetInfo?.maxFields || 163;
+        const baseFields = user.planetInfo?.maxFields || 300;
         const terraformerLevel = user.facilities?.terraformer || 0;
         return baseFields + this.getTerraformerBonus(terraformerLevel);
     }
@@ -183,7 +183,7 @@ let BuildingsService = class BuildingsService {
         return usedFields;
     }
     getColonyMaxFields(planet) {
-        const baseFields = planet.planetInfo?.maxFields || 163;
+        const baseFields = planet.planetInfo?.maxFields || 300;
         const terraformerLevel = planet.facilities?.terraformer || 0;
         return baseFields + this.getTerraformerBonus(terraformerLevel);
     }
@@ -520,6 +520,162 @@ let BuildingsService = class BuildingsService {
             planet.constructionProgress = null;
             await planet.save();
             return { message: '건설이 취소되었습니다.', refund };
+        }
+    }
+    async startDowngrade(userId, buildingType) {
+        const result = await this.resourcesService.updateResourcesWithPlanet(userId);
+        if (!result) {
+            throw new common_1.BadRequestException('사용자를 찾을 수 없습니다.');
+        }
+        const { user, planet } = result;
+        const isHome = this.isHomePlanet(user.activePlanetId, userId);
+        let mines;
+        let facilities;
+        let constructionProgress;
+        if (isHome) {
+            mines = user.mines || {};
+            facilities = user.facilities || {};
+            constructionProgress = user.constructionProgress;
+        }
+        else if (planet) {
+            mines = planet.mines || {};
+            facilities = planet.facilities || {};
+            constructionProgress = planet.constructionProgress;
+        }
+        else {
+            throw new common_1.BadRequestException('행성을 찾을 수 없습니다.');
+        }
+        if (constructionProgress) {
+            const remainingTime = Math.max(0, (constructionProgress.finishTime.getTime() - Date.now()) / 1000);
+            const actionType = constructionProgress.isDowngrade ? '파괴' : '건설';
+            throw new common_1.BadRequestException(`이미 ${game_data_1.NAME_MAPPING[constructionProgress.name] || constructionProgress.name} ${actionType}이 진행 중입니다. 완료까지 ${Math.ceil(remainingTime)}초 남았습니다.`);
+        }
+        const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+        const isFacility = ['robotFactory', 'shipyard', 'researchLab', 'nanoFactory', 'terraformer',
+            'allianceDepot', 'missileSilo', 'metalStorage', 'crystalStorage', 'deuteriumTank',
+            'lunarBase', 'sensorPhalanx', 'jumpGate'].includes(buildingType);
+        if (!isMine && !isFacility) {
+            throw new common_1.BadRequestException('알 수 없는 건물 유형입니다.');
+        }
+        const currentLevel = isMine
+            ? (mines[buildingType] || 0)
+            : (facilities[buildingType] || 0);
+        if (currentLevel <= 0) {
+            throw new common_1.BadRequestException('레벨 0인 건물은 파괴할 수 없습니다.');
+        }
+        const upgradeCost = this.getUpgradeCost(buildingType, currentLevel - 1);
+        if (!upgradeCost) {
+            throw new common_1.BadRequestException('건물 비용을 계산할 수 없습니다.');
+        }
+        const cost = {
+            metal: Math.floor(upgradeCost.metal * 0.25),
+            crystal: Math.floor(upgradeCost.crystal * 0.25),
+            deuterium: Math.floor((upgradeCost.deuterium || 0) * 0.25),
+        };
+        const hasResources = await this.resourcesService.deductResources(userId, cost);
+        if (!hasResources) {
+            throw new common_1.BadRequestException('자원이 부족합니다.');
+        }
+        const constructionTime = this.getConstructionTime(buildingType, currentLevel - 1, facilities.robotFactory || 0, facilities.nanoFactory || 0);
+        const downgradeTime = Math.floor(constructionTime * 0.5);
+        const startTime = new Date();
+        const finishTime = new Date(startTime.getTime() + downgradeTime * 1000);
+        const progress = {
+            type: isMine ? 'mine' : 'facility',
+            name: buildingType,
+            startTime,
+            finishTime,
+            isDowngrade: true,
+        };
+        if (isHome) {
+            user.constructionProgress = progress;
+            await user.save();
+        }
+        else if (planet) {
+            planet.constructionProgress = progress;
+            await planet.save();
+        }
+        return {
+            message: `${game_data_1.NAME_MAPPING[buildingType]} 파괴가 시작되었습니다.`,
+            building: buildingType,
+            currentLevel,
+            targetLevel: currentLevel - 1,
+            cost,
+            constructionTime: downgradeTime,
+            finishTime,
+        };
+    }
+    async completeConstructionWithDowngrade(userId) {
+        const user = await this.userModel.findById(userId).exec();
+        if (!user)
+            return { completed: false };
+        const isHome = this.isHomePlanet(user.activePlanetId, userId);
+        if (isHome) {
+            if (!user.constructionProgress)
+                return { completed: false };
+            if (user.constructionProgress.finishTime.getTime() > Date.now())
+                return { completed: false };
+            const buildingType = user.constructionProgress.name;
+            const isDowngrade = user.constructionProgress.isDowngrade === true;
+            const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+            if (isDowngrade) {
+                if (isMine) {
+                    user.mines[buildingType] = Math.max(0, (user.mines[buildingType] || 0) - 1);
+                }
+                else {
+                    user.facilities[buildingType] = Math.max(0, (user.facilities[buildingType] || 0) - 1);
+                }
+            }
+            else {
+                if (isMine) {
+                    user.mines[buildingType] = (user.mines[buildingType] || 0) + 1;
+                }
+                else {
+                    user.facilities[buildingType] = (user.facilities[buildingType] || 0) + 1;
+                }
+            }
+            const newLevel = isMine ? user.mines[buildingType] : user.facilities[buildingType];
+            user.constructionProgress = null;
+            await user.save();
+            return { completed: true, building: buildingType, newLevel, isDowngrade };
+        }
+        else {
+            const planet = await this.planetModel.findById(user.activePlanetId).exec();
+            if (!planet || !planet.constructionProgress)
+                return { completed: false };
+            if (planet.constructionProgress.finishTime.getTime() > Date.now())
+                return { completed: false };
+            const buildingType = planet.constructionProgress.name;
+            const isDowngrade = planet.constructionProgress.isDowngrade === true;
+            const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+            if (isDowngrade) {
+                if (isMine) {
+                    if (!planet.mines)
+                        planet.mines = {};
+                    planet.mines[buildingType] = Math.max(0, (planet.mines[buildingType] || 0) - 1);
+                }
+                else {
+                    if (!planet.facilities)
+                        planet.facilities = {};
+                    planet.facilities[buildingType] = Math.max(0, (planet.facilities[buildingType] || 0) - 1);
+                }
+            }
+            else {
+                if (isMine) {
+                    if (!planet.mines)
+                        planet.mines = {};
+                    planet.mines[buildingType] = (planet.mines[buildingType] || 0) + 1;
+                }
+                else {
+                    if (!planet.facilities)
+                        planet.facilities = {};
+                    planet.facilities[buildingType] = (planet.facilities[buildingType] || 0) + 1;
+                }
+            }
+            const newLevel = isMine ? planet.mines[buildingType] : planet.facilities[buildingType];
+            planet.constructionProgress = null;
+            await planet.save();
+            return { completed: true, building: buildingType, newLevel, isDowngrade };
         }
     }
 };

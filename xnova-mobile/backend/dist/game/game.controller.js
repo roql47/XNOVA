@@ -45,14 +45,23 @@ let GameController = class GameController {
     async getResources(req) {
         return this.resourcesService.getResources(req.user.userId);
     }
+    async getDetailedResources(req) {
+        return this.resourcesService.getDetailedResources(req.user.userId);
+    }
+    async setOperationRates(req, body) {
+        return this.resourcesService.setOperationRates(req.user.userId, body);
+    }
     async getBuildings(req) {
         return this.buildingsService.getBuildings(req.user.userId);
     }
     async upgradeBuilding(req, body) {
         return this.buildingsService.startUpgrade(req.user.userId, body.buildingType);
     }
+    async downgradeBuilding(req, body) {
+        return this.buildingsService.startDowngrade(req.user.userId, body.buildingType);
+    }
     async completeBuilding(req) {
-        return this.buildingsService.completeConstruction(req.user.userId);
+        return this.buildingsService.completeConstructionWithDowngrade(req.user.userId);
     }
     async cancelBuilding(req) {
         return this.buildingsService.cancelConstruction(req.user.userId);
@@ -176,6 +185,21 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], GameController.prototype, "getResources", null);
 __decorate([
+    (0, common_1.Get)('resources/detailed'),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "getDetailedResources", null);
+__decorate([
+    (0, common_1.Post)('resources/operation-rates'),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "setOperationRates", null);
+__decorate([
     (0, common_1.Get)('buildings'),
     __param(0, (0, common_1.Request)()),
     __metadata("design:type", Function),
@@ -190,6 +214,14 @@ __decorate([
     __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", Promise)
 ], GameController.prototype, "upgradeBuilding", null);
+__decorate([
+    (0, common_1.Post)('buildings/downgrade'),
+    __param(0, (0, common_1.Request)()),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "downgradeBuilding", null);
 __decorate([
     (0, common_1.Post)('buildings/complete'),
     __param(0, (0, common_1.Request)()),

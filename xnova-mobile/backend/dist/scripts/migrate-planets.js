@@ -95,7 +95,7 @@ async function migrate() {
                     interplanetaryMissile: user.defense?.interplanetaryMissile || 0,
                 },
                 planetInfo: {
-                    maxFields: user.planetInfo?.maxFields || 163,
+                    maxFields: user.planetInfo?.maxFields || 300,
                     usedFields: user.planetInfo?.usedFields || 0,
                     tempMin: (user.planetInfo?.temperature || 50) - 40,
                     tempMax: user.planetInfo?.temperature || 50,

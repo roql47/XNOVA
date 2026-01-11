@@ -384,4 +384,247 @@ export class ResourcesService {
     await user.save();
     return true;
   }
+
+  // 가동률 설정 (활성 행성 기준)
+  async setOperationRates(
+    userId: string, 
+    rates: { metalMine?: number; crystalMine?: number; deuteriumMine?: number; solarPlant?: number; fusionReactor?: number; solarSatellite?: number }
+  ): Promise<any> {
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) return null;
+
+    // 가동률 유효성 검사 (0~100)
+    const validateRate = (rate: number | undefined) => {
+      if (rate === undefined) return undefined;
+      return Math.max(0, Math.min(100, Math.round(rate / 10) * 10)); // 10% 단위로 반올림
+    };
+
+    if (!user.operationRates) {
+      user.operationRates = {
+        metalMine: 100,
+        crystalMine: 100,
+        deuteriumMine: 100,
+        solarPlant: 100,
+        fusionReactor: 100,
+        solarSatellite: 100,
+      };
+    }
+
+    if (rates.metalMine !== undefined) user.operationRates.metalMine = validateRate(rates.metalMine)!;
+    if (rates.crystalMine !== undefined) user.operationRates.crystalMine = validateRate(rates.crystalMine)!;
+    if (rates.deuteriumMine !== undefined) user.operationRates.deuteriumMine = validateRate(rates.deuteriumMine)!;
+    if (rates.solarPlant !== undefined) user.operationRates.solarPlant = validateRate(rates.solarPlant)!;
+    if (rates.fusionReactor !== undefined) user.operationRates.fusionReactor = validateRate(rates.fusionReactor)!;
+    if (rates.solarSatellite !== undefined) user.operationRates.solarSatellite = validateRate(rates.solarSatellite)!;
+
+    user.markModified('operationRates');
+    await user.save();
+
+    return { success: true, operationRates: user.operationRates };
+  }
+
+  // 상세 자원 정보 조회 (자원 탭용)
+  async getDetailedResources(userId: string): Promise<any> {
+    const result = await this.updateResourcesWithPlanet(userId);
+    if (!result) return null;
+
+    const { user, planet } = result;
+    const isHome = this.isHomePlanet(user.activePlanetId, userId);
+
+    // 활성 행성의 데이터 사용
+    const mines: any = isHome ? user.mines : (planet?.mines || {});
+    const facilities: any = isHome ? user.facilities : (planet?.facilities || {});
+    const fleet: any = isHome ? user.fleet : (planet?.fleet || {});
+    const resources: any = isHome ? user.resources : (planet?.resources || { metal: 0, crystal: 0, deuterium: 0, energy: 0 });
+    const temperature = isHome ? (user.planetInfo?.temperature ?? 50) : (planet?.planetInfo?.tempMax ?? 50);
+    
+    // 가동률 (현재는 모행성만 지원)
+    const operationRates = user.operationRates || {
+      metalMine: 100,
+      crystalMine: 100,
+      deuteriumMine: 100,
+      solarPlant: 100,
+      fusionReactor: 100,
+      solarSatellite: 100,
+    };
+
+    const satelliteCount = fleet?.solarSatellite || 0;
+    const fusionLevel = mines?.fusionReactor || 0;
+    
+    // 가동률 적용 전 기본 생산량
+    const baseMetalProduction = this.getResourceProduction(mines?.metalMine || 0, 'metal');
+    const baseCrystalProduction = this.getResourceProduction(mines?.crystalMine || 0, 'crystal');
+    const baseDeuteriumProduction = this.getResourceProduction(mines?.deuteriumMine || 0, 'deuterium');
+    
+    // 기본 에너지 생산량
+    const baseSolarEnergy = this.getEnergyProduction(mines?.solarPlant || 0);
+    const baseSatelliteEnergy = this.getSatelliteEnergy(satelliteCount, temperature);
+    const baseFusionEnergy = this.getFusionEnergyProduction(fusionLevel);
+    
+    // 기본 에너지 소비량
+    const baseMetalConsumption = this.getEnergyConsumption(mines?.metalMine || 0, 'metal');
+    const baseCrystalConsumption = this.getEnergyConsumption(mines?.crystalMine || 0, 'crystal');
+    const baseDeuteriumConsumption = this.getEnergyConsumption(mines?.deuteriumMine || 0, 'deuterium');
+    
+    // 가동률 적용 생산량
+    const metalProduction = Math.floor(baseMetalProduction * (operationRates.metalMine / 100));
+    const crystalProduction = Math.floor(baseCrystalProduction * (operationRates.crystalMine / 100));
+    const deuteriumProduction = Math.floor(baseDeuteriumProduction * (operationRates.deuteriumMine / 100));
+    
+    // 가동률 적용 에너지 생산
+    const solarEnergy = Math.floor(baseSolarEnergy * (operationRates.solarPlant / 100));
+    const satelliteEnergy = Math.floor(baseSatelliteEnergy * (operationRates.solarSatellite / 100));
+    const fusionEnergy = Math.floor(baseFusionEnergy * (operationRates.fusionReactor / 100));
+    
+    // 가동률 적용 에너지 소비
+    const metalEnergyConsumption = Math.floor(baseMetalConsumption * (operationRates.metalMine / 100));
+    const crystalEnergyConsumption = Math.floor(baseCrystalConsumption * (operationRates.crystalMine / 100));
+    const deuteriumEnergyConsumption = Math.floor(baseDeuteriumConsumption * (operationRates.deuteriumMine / 100));
+    
+    const energyProduction = solarEnergy + satelliteEnergy + fusionEnergy;
+    const energyConsumption = metalEnergyConsumption + crystalEnergyConsumption + deuteriumEnergyConsumption;
+    
+    // 에너지 효율 (부족하면 생산량 감소)
+    let energyRatio = 1.0;
+    if (energyProduction < energyConsumption && energyConsumption > 0) {
+      energyRatio = Math.max(0, energyProduction / energyConsumption);
+    }
+
+    // 핵융합로 듀테륨 소비 (가동률 적용)
+    const fusionDeuteriumConsumption = Math.floor(this.getFusionDeuteriumConsumption(fusionLevel) * (operationRates.fusionReactor / 100));
+
+    // 기본 수입 (서버 설정)
+    const basicIncome = { metal: 30, crystal: 15, deuterium: 0 };
+
+    // 최종 시간당 생산량 (가동률 + 에너지효율 적용 + 기본수입)
+    const finalMetalProduction = Math.floor(metalProduction * energyRatio) + basicIncome.metal;
+    const finalCrystalProduction = Math.floor(crystalProduction * energyRatio) + basicIncome.crystal;
+    const finalDeuteriumProduction = Math.floor(deuteriumProduction * energyRatio) - fusionDeuteriumConsumption + basicIncome.deuterium;
+
+    // 창고 용량
+    const metalStorageCapacity = calculateStorageCapacity(facilities?.metalStorage || 0);
+    const crystalStorageCapacity = calculateStorageCapacity(facilities?.crystalStorage || 0);
+    const deuteriumStorageCapacity = calculateStorageCapacity(facilities?.deuteriumTank || 0);
+
+    // 시설별 상세 정보
+    const productionDetails = [
+      {
+        name: '메탈 광산',
+        type: 'metalMine',
+        level: mines?.metalMine || 0,
+        metal: Math.floor(baseMetalProduction * (operationRates.metalMine / 100) * energyRatio),
+        crystal: 0,
+        deuterium: 0,
+        energy: -metalEnergyConsumption,
+        operationRate: operationRates.metalMine,
+      },
+      {
+        name: '크리스탈 광산',
+        type: 'crystalMine',
+        level: mines?.crystalMine || 0,
+        metal: 0,
+        crystal: Math.floor(baseCrystalProduction * (operationRates.crystalMine / 100) * energyRatio),
+        deuterium: 0,
+        energy: -crystalEnergyConsumption,
+        operationRate: operationRates.crystalMine,
+      },
+      {
+        name: '듀테륨 합성기',
+        type: 'deuteriumMine',
+        level: mines?.deuteriumMine || 0,
+        metal: 0,
+        crystal: 0,
+        deuterium: Math.floor(baseDeuteriumProduction * (operationRates.deuteriumMine / 100) * energyRatio),
+        energy: -deuteriumEnergyConsumption,
+        operationRate: operationRates.deuteriumMine,
+      },
+      {
+        name: '태양열 발전소',
+        type: 'solarPlant',
+        level: mines?.solarPlant || 0,
+        metal: 0,
+        crystal: 0,
+        deuterium: 0,
+        energy: solarEnergy,
+        operationRate: operationRates.solarPlant,
+      },
+      {
+        name: '핵융합 발전소',
+        type: 'fusionReactor',
+        level: fusionLevel,
+        metal: 0,
+        crystal: 0,
+        deuterium: -fusionDeuteriumConsumption,
+        energy: fusionEnergy,
+        operationRate: operationRates.fusionReactor,
+      },
+      {
+        name: '태양광 위성',
+        type: 'solarSatellite',
+        level: satelliteCount,
+        metal: 0,
+        crystal: 0,
+        deuterium: 0,
+        energy: satelliteEnergy,
+        operationRate: operationRates.solarSatellite,
+      },
+    ];
+
+    return {
+      // 현재 자원
+      resources: {
+        metal: Math.floor(resources?.metal || 0),
+        crystal: Math.floor(resources?.crystal || 0),
+        deuterium: Math.floor(resources?.deuterium || 0),
+        energy: energyProduction - energyConsumption,
+      },
+      // 시간당 생산량 (최종)
+      production: {
+        metal: finalMetalProduction,
+        crystal: finalCrystalProduction,
+        deuterium: finalDeuteriumProduction,
+        energyProduction,
+        energyConsumption,
+      },
+      // 기본 수입
+      basicIncome,
+      // 시설별 생산량
+      productionDetails,
+      // 가동률
+      operationRates,
+      // 에너지 효율 (%)
+      energyRatio: Math.round(energyRatio * 100),
+      // 저장소 용량
+      storageCapacity: {
+        metal: metalStorageCapacity,
+        crystal: crystalStorageCapacity,
+        deuterium: deuteriumStorageCapacity,
+      },
+      // 저장소 상태 (%)
+      storageStatus: {
+        metal: Math.min(100, Math.round(((resources?.metal || 0) / metalStorageCapacity) * 100)),
+        crystal: Math.min(100, Math.round(((resources?.crystal || 0) / crystalStorageCapacity) * 100)),
+        deuterium: Math.min(100, Math.round(((resources?.deuterium || 0) / deuteriumStorageCapacity) * 100)),
+      },
+      // 예상 생산량
+      forecast: {
+        daily: {
+          metal: finalMetalProduction * 24,
+          crystal: finalCrystalProduction * 24,
+          deuterium: finalDeuteriumProduction * 24,
+        },
+        weekly: {
+          metal: finalMetalProduction * 24 * 7,
+          crystal: finalCrystalProduction * 24 * 7,
+          deuterium: finalDeuteriumProduction * 24 * 7,
+        },
+        monthly: {
+          metal: finalMetalProduction * 24 * 30,
+          crystal: finalCrystalProduction * 24 * 30,
+          deuterium: finalDeuteriumProduction * 24 * 30,
+        },
+      },
+      isHomePlanet: isHome,
+    };
+  }
 }

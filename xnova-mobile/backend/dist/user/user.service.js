@@ -75,10 +75,10 @@ let UserService = class UserService {
         const posIndex = Math.max(0, Math.min(14, position - 1));
         if (isHomeWorld) {
             return {
-                maxFields: 163,
+                maxFields: 300,
                 temperature: 50,
                 planetType: 'normaltemp',
-                diameter: Math.floor(Math.sqrt(163) * 1000)
+                diameter: Math.floor(Math.sqrt(300) * 1000)
             };
         }
         const minFields = PLANET_FIELD_RANGES.min[posIndex];

@@ -60,4 +60,13 @@ export declare class ResourcesService {
         crystal?: number;
         deuterium?: number;
     }): Promise<boolean>;
+    setOperationRates(userId: string, rates: {
+        metalMine?: number;
+        crystalMine?: number;
+        deuteriumMine?: number;
+        solarPlant?: number;
+        fusionReactor?: number;
+        solarSatellite?: number;
+    }): Promise<any>;
+    getDetailedResources(userId: string): Promise<any>;
 }

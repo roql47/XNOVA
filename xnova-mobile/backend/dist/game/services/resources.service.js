@@ -328,6 +328,204 @@ let ResourcesService = class ResourcesService {
         await user.save();
         return true;
     }
+    async setOperationRates(userId, rates) {
+        const user = await this.userModel.findById(userId).exec();
+        if (!user)
+            return null;
+        const validateRate = (rate) => {
+            if (rate === undefined)
+                return undefined;
+            return Math.max(0, Math.min(100, Math.round(rate / 10) * 10));
+        };
+        if (!user.operationRates) {
+            user.operationRates = {
+                metalMine: 100,
+                crystalMine: 100,
+                deuteriumMine: 100,
+                solarPlant: 100,
+                fusionReactor: 100,
+                solarSatellite: 100,
+            };
+        }
+        if (rates.metalMine !== undefined)
+            user.operationRates.metalMine = validateRate(rates.metalMine);
+        if (rates.crystalMine !== undefined)
+            user.operationRates.crystalMine = validateRate(rates.crystalMine);
+        if (rates.deuteriumMine !== undefined)
+            user.operationRates.deuteriumMine = validateRate(rates.deuteriumMine);
+        if (rates.solarPlant !== undefined)
+            user.operationRates.solarPlant = validateRate(rates.solarPlant);
+        if (rates.fusionReactor !== undefined)
+            user.operationRates.fusionReactor = validateRate(rates.fusionReactor);
+        if (rates.solarSatellite !== undefined)
+            user.operationRates.solarSatellite = validateRate(rates.solarSatellite);
+        user.markModified('operationRates');
+        await user.save();
+        return { success: true, operationRates: user.operationRates };
+    }
+    async getDetailedResources(userId) {
+        const result = await this.updateResourcesWithPlanet(userId);
+        if (!result)
+            return null;
+        const { user, planet } = result;
+        const isHome = this.isHomePlanet(user.activePlanetId, userId);
+        const mines = isHome ? user.mines : (planet?.mines || {});
+        const facilities = isHome ? user.facilities : (planet?.facilities || {});
+        const fleet = isHome ? user.fleet : (planet?.fleet || {});
+        const resources = isHome ? user.resources : (planet?.resources || { metal: 0, crystal: 0, deuterium: 0, energy: 0 });
+        const temperature = isHome ? (user.planetInfo?.temperature ?? 50) : (planet?.planetInfo?.tempMax ?? 50);
+        const operationRates = user.operationRates || {
+            metalMine: 100,
+            crystalMine: 100,
+            deuteriumMine: 100,
+            solarPlant: 100,
+            fusionReactor: 100,
+            solarSatellite: 100,
+        };
+        const satelliteCount = fleet?.solarSatellite || 0;
+        const fusionLevel = mines?.fusionReactor || 0;
+        const baseMetalProduction = this.getResourceProduction(mines?.metalMine || 0, 'metal');
+        const baseCrystalProduction = this.getResourceProduction(mines?.crystalMine || 0, 'crystal');
+        const baseDeuteriumProduction = this.getResourceProduction(mines?.deuteriumMine || 0, 'deuterium');
+        const baseSolarEnergy = this.getEnergyProduction(mines?.solarPlant || 0);
+        const baseSatelliteEnergy = this.getSatelliteEnergy(satelliteCount, temperature);
+        const baseFusionEnergy = this.getFusionEnergyProduction(fusionLevel);
+        const baseMetalConsumption = this.getEnergyConsumption(mines?.metalMine || 0, 'metal');
+        const baseCrystalConsumption = this.getEnergyConsumption(mines?.crystalMine || 0, 'crystal');
+        const baseDeuteriumConsumption = this.getEnergyConsumption(mines?.deuteriumMine || 0, 'deuterium');
+        const metalProduction = Math.floor(baseMetalProduction * (operationRates.metalMine / 100));
+        const crystalProduction = Math.floor(baseCrystalProduction * (operationRates.crystalMine / 100));
+        const deuteriumProduction = Math.floor(baseDeuteriumProduction * (operationRates.deuteriumMine / 100));
+        const solarEnergy = Math.floor(baseSolarEnergy * (operationRates.solarPlant / 100));
+        const satelliteEnergy = Math.floor(baseSatelliteEnergy * (operationRates.solarSatellite / 100));
+        const fusionEnergy = Math.floor(baseFusionEnergy * (operationRates.fusionReactor / 100));
+        const metalEnergyConsumption = Math.floor(baseMetalConsumption * (operationRates.metalMine / 100));
+        const crystalEnergyConsumption = Math.floor(baseCrystalConsumption * (operationRates.crystalMine / 100));
+        const deuteriumEnergyConsumption = Math.floor(baseDeuteriumConsumption * (operationRates.deuteriumMine / 100));
+        const energyProduction = solarEnergy + satelliteEnergy + fusionEnergy;
+        const energyConsumption = metalEnergyConsumption + crystalEnergyConsumption + deuteriumEnergyConsumption;
+        let energyRatio = 1.0;
+        if (energyProduction < energyConsumption && energyConsumption > 0) {
+            energyRatio = Math.max(0, energyProduction / energyConsumption);
+        }
+        const fusionDeuteriumConsumption = Math.floor(this.getFusionDeuteriumConsumption(fusionLevel) * (operationRates.fusionReactor / 100));
+        const basicIncome = { metal: 30, crystal: 15, deuterium: 0 };
+        const finalMetalProduction = Math.floor(metalProduction * energyRatio) + basicIncome.metal;
+        const finalCrystalProduction = Math.floor(crystalProduction * energyRatio) + basicIncome.crystal;
+        const finalDeuteriumProduction = Math.floor(deuteriumProduction * energyRatio) - fusionDeuteriumConsumption + basicIncome.deuterium;
+        const metalStorageCapacity = (0, game_data_1.calculateStorageCapacity)(facilities?.metalStorage || 0);
+        const crystalStorageCapacity = (0, game_data_1.calculateStorageCapacity)(facilities?.crystalStorage || 0);
+        const deuteriumStorageCapacity = (0, game_data_1.calculateStorageCapacity)(facilities?.deuteriumTank || 0);
+        const productionDetails = [
+            {
+                name: '메탈 광산',
+                type: 'metalMine',
+                level: mines?.metalMine || 0,
+                metal: Math.floor(baseMetalProduction * (operationRates.metalMine / 100) * energyRatio),
+                crystal: 0,
+                deuterium: 0,
+                energy: -metalEnergyConsumption,
+                operationRate: operationRates.metalMine,
+            },
+            {
+                name: '크리스탈 광산',
+                type: 'crystalMine',
+                level: mines?.crystalMine || 0,
+                metal: 0,
+                crystal: Math.floor(baseCrystalProduction * (operationRates.crystalMine / 100) * energyRatio),
+                deuterium: 0,
+                energy: -crystalEnergyConsumption,
+                operationRate: operationRates.crystalMine,
+            },
+            {
+                name: '듀테륨 합성기',
+                type: 'deuteriumMine',
+                level: mines?.deuteriumMine || 0,
+                metal: 0,
+                crystal: 0,
+                deuterium: Math.floor(baseDeuteriumProduction * (operationRates.deuteriumMine / 100) * energyRatio),
+                energy: -deuteriumEnergyConsumption,
+                operationRate: operationRates.deuteriumMine,
+            },
+            {
+                name: '태양열 발전소',
+                type: 'solarPlant',
+                level: mines?.solarPlant || 0,
+                metal: 0,
+                crystal: 0,
+                deuterium: 0,
+                energy: solarEnergy,
+                operationRate: operationRates.solarPlant,
+            },
+            {
+                name: '핵융합 발전소',
+                type: 'fusionReactor',
+                level: fusionLevel,
+                metal: 0,
+                crystal: 0,
+                deuterium: -fusionDeuteriumConsumption,
+                energy: fusionEnergy,
+                operationRate: operationRates.fusionReactor,
+            },
+            {
+                name: '태양광 위성',
+                type: 'solarSatellite',
+                level: satelliteCount,
+                metal: 0,
+                crystal: 0,
+                deuterium: 0,
+                energy: satelliteEnergy,
+                operationRate: operationRates.solarSatellite,
+            },
+        ];
+        return {
+            resources: {
+                metal: Math.floor(resources?.metal || 0),
+                crystal: Math.floor(resources?.crystal || 0),
+                deuterium: Math.floor(resources?.deuterium || 0),
+                energy: energyProduction - energyConsumption,
+            },
+            production: {
+                metal: finalMetalProduction,
+                crystal: finalCrystalProduction,
+                deuterium: finalDeuteriumProduction,
+                energyProduction,
+                energyConsumption,
+            },
+            basicIncome,
+            productionDetails,
+            operationRates,
+            energyRatio: Math.round(energyRatio * 100),
+            storageCapacity: {
+                metal: metalStorageCapacity,
+                crystal: crystalStorageCapacity,
+                deuterium: deuteriumStorageCapacity,
+            },
+            storageStatus: {
+                metal: Math.min(100, Math.round(((resources?.metal || 0) / metalStorageCapacity) * 100)),
+                crystal: Math.min(100, Math.round(((resources?.crystal || 0) / crystalStorageCapacity) * 100)),
+                deuterium: Math.min(100, Math.round(((resources?.deuterium || 0) / deuteriumStorageCapacity) * 100)),
+            },
+            forecast: {
+                daily: {
+                    metal: finalMetalProduction * 24,
+                    crystal: finalCrystalProduction * 24,
+                    deuterium: finalDeuteriumProduction * 24,
+                },
+                weekly: {
+                    metal: finalMetalProduction * 24 * 7,
+                    crystal: finalCrystalProduction * 24 * 7,
+                    deuterium: finalDeuteriumProduction * 24 * 7,
+                },
+                monthly: {
+                    metal: finalMetalProduction * 24 * 30,
+                    crystal: finalCrystalProduction * 24 * 30,
+                    deuterium: finalDeuteriumProduction * 24 * 30,
+                },
+            },
+            isHomePlanet: isHome,
+        };
+    }
 };
 exports.ResourcesService = ResourcesService;
 exports.ResourcesService = ResourcesService = __decorate([

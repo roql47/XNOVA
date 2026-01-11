@@ -38,6 +38,28 @@ export class Mines {
   fusionReactor: number;
 }
 
+// 가동률 스키마 (0~100%)
+@Schema({ _id: false })
+export class OperationRates {
+  @Prop({ default: 100 })
+  metalMine: number;
+
+  @Prop({ default: 100 })
+  crystalMine: number;
+
+  @Prop({ default: 100 })
+  deuteriumMine: number;
+
+  @Prop({ default: 100 })
+  solarPlant: number;
+
+  @Prop({ default: 100 })
+  fusionReactor: number;
+
+  @Prop({ default: 100 })
+  solarSatellite: number;
+}
+
 // 시설 스키마
 @Schema({ _id: false })
 export class Facilities {
@@ -85,7 +107,7 @@ export class Facilities {
 // 행성 정보 스키마
 @Schema({ _id: false })
 export class PlanetInfo {
-  @Prop({ default: 163 })
+  @Prop({ default: 300 })
   maxFields: number;
 
   @Prop({ default: 0 })
@@ -454,6 +476,9 @@ export class User {
 
   @Prop({ type: Mines, default: () => ({}) })
   mines: Mines;
+
+  @Prop({ type: OperationRates, default: () => ({}) })
+  operationRates: OperationRates;
 
   @Prop({ type: Facilities, default: () => ({}) })
   facilities: Facilities;

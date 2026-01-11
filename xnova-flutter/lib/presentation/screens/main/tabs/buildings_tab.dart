@@ -37,6 +37,7 @@ class BuildingsTab extends ConsumerWidget {
               resources: gameState.resources,
               isConstructing: gameState.constructionProgress != null,
               onUpgrade: () => ref.read(gameProvider.notifier).upgradeBuilding(building.type),
+              onDowngrade: () => ref.read(gameProvider.notifier).downgradeBuilding(building.type),
             )),
           ],
           
@@ -48,6 +49,7 @@ class BuildingsTab extends ConsumerWidget {
               resources: gameState.resources,
               isConstructing: gameState.constructionProgress != null,
               onUpgrade: () => ref.read(gameProvider.notifier).upgradeBuilding(building.type),
+              onDowngrade: () => ref.read(gameProvider.notifier).downgradeBuilding(building.type),
             )),
           ],
         ],
@@ -219,12 +221,14 @@ class _BuildingCard extends StatefulWidget {
   final GameResources resources;
   final bool isConstructing;
   final VoidCallback onUpgrade;
+  final VoidCallback onDowngrade;
 
   const _BuildingCard({
     required this.building,
     required this.resources,
     required this.isConstructing,
     required this.onUpgrade,
+    required this.onDowngrade,
   });
 
   @override
@@ -396,16 +400,108 @@ class _BuildingCardState extends State<_BuildingCard> {
                       ],
                     ),
                   ),
-                  GameButton(
-                    text: '업그레이드',
-                    onPressed: (!widget.isConstructing && canAfford) ? widget.onUpgrade : null,
-                    icon: Icons.arrow_upward,
+                  Column(
+                    children: [
+                      GameButton(
+                        text: '업그레이드',
+                        onPressed: (!widget.isConstructing && canAfford) ? widget.onUpgrade : null,
+                        icon: Icons.arrow_upward,
+                      ),
+                      if (widget.building.level > 0) ...[
+                        const SizedBox(height: 6),
+                        GestureDetector(
+                          onTap: widget.isConstructing ? null : () => _showDowngradeDialog(context),
+                          child: Text(
+                            '파괴 (Lv.${widget.building.level} → ${widget.building.level - 1})',
+                            style: TextStyle(
+                              color: widget.isConstructing ? AppColors.textMuted : AppColors.negative,
+                              fontSize: 10,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showDowngradeDialog(BuildContext context) {
+    final cost = widget.building.upgradeCost;
+    final downgradeCost = cost != null ? {
+      'metal': (cost.metal * 0.25).floor(),
+      'crystal': (cost.crystal * 0.25).floor(),
+      'deuterium': (cost.deuterium * 0.25).floor(),
+    } : {'metal': 0, 'crystal': 0, 'deuterium': 0};
+    
+    final canAffordDowngrade = 
+      widget.resources.metal >= downgradeCost['metal']! &&
+      widget.resources.crystal >= downgradeCost['crystal']! &&
+      widget.resources.deuterium >= downgradeCost['deuterium']!;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.panelBackground,
+        title: Text(
+          '${widget.building.name} 파괴',
+          style: const TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Lv.${widget.building.level} → Lv.${widget.building.level - 1}',
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '파괴 비용 (건설 비용의 25%):',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'M: ${_formatAmount(downgradeCost['metal']!)}  C: ${_formatAmount(downgradeCost['crystal']!)}  D: ${_formatAmount(downgradeCost['deuterium']!)}',
+              style: TextStyle(
+                color: canAffordDowngrade ? AppColors.textSecondary : AppColors.negative,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '소요 시간: 건설 시간의 50%',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '⚠️ 파괴 시 행성 필드 1칸이 회복됩니다.',
+              style: TextStyle(color: AppColors.warning, fontSize: 11),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소', style: TextStyle(color: AppColors.textMuted)),
+          ),
+          TextButton(
+            onPressed: canAffordDowngrade ? () {
+              Navigator.pop(context);
+              widget.onDowngrade();
+            } : null,
+            child: Text(
+              '파괴',
+              style: TextStyle(color: canAffordDowngrade ? AppColors.negative : AppColors.textMuted),
+            ),
+          ),
+        ],
       ),
     );
   }

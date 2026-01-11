@@ -114,4 +114,4 @@ npx pm2 restart xnova-backend
 
 
 
-
+// cd ~/XNOVA && git fetch origin && git reset --hard origin/main && pm2 restart xnova-backend //

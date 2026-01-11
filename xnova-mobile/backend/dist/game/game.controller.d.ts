@@ -44,6 +44,15 @@ export declare class GameController {
         activePlanetId: string | null;
         isHomePlanet: boolean;
     } | null>;
+    getDetailedResources(req: any): Promise<any>;
+    setOperationRates(req: any, body: {
+        metalMine?: number;
+        crystalMine?: number;
+        deuteriumMine?: number;
+        solarPlant?: number;
+        fusionReactor?: number;
+        solarSatellite?: number;
+    }): Promise<any>;
     getBuildings(req: any): Promise<{
         buildings: import("./services/buildings.service").BuildingInfo[];
         constructionProgress: any;
@@ -71,10 +80,26 @@ export declare class GameController {
         constructionTime: number;
         finishTime: Date;
     }>;
+    downgradeBuilding(req: any, body: {
+        buildingType: string;
+    }): Promise<{
+        message: string;
+        building: string;
+        currentLevel: any;
+        targetLevel: number;
+        cost: {
+            metal: number;
+            crystal: number;
+            deuterium: number;
+        };
+        constructionTime: number;
+        finishTime: Date;
+    }>;
     completeBuilding(req: any): Promise<{
         completed: boolean;
         building?: string;
         newLevel?: number;
+        isDowngrade?: boolean;
     }>;
     cancelBuilding(req: any): Promise<{
         message: string;

@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserSchema = exports.User = exports.VacationMode = exports.FleetMission = exports.ReturnProgress = exports.IncomingAttackProgress = exports.AttackProgress = exports.ProgressInfo = exports.Defense = exports.Fleet = exports.ResearchLevels = exports.PlanetInfo = exports.Facilities = exports.Mines = exports.Resources = void 0;
+exports.UserSchema = exports.User = exports.VacationMode = exports.FleetMission = exports.ReturnProgress = exports.IncomingAttackProgress = exports.AttackProgress = exports.ProgressInfo = exports.Defense = exports.Fleet = exports.ResearchLevels = exports.PlanetInfo = exports.Facilities = exports.OperationRates = exports.Mines = exports.Resources = void 0;
 const mongoose_1 = require("@nestjs/mongoose");
 let Resources = class Resources {
     metal;
@@ -68,6 +68,42 @@ __decorate([
 exports.Mines = Mines = __decorate([
     (0, mongoose_1.Schema)({ _id: false })
 ], Mines);
+let OperationRates = class OperationRates {
+    metalMine;
+    crystalMine;
+    deuteriumMine;
+    solarPlant;
+    fusionReactor;
+    solarSatellite;
+};
+exports.OperationRates = OperationRates;
+__decorate([
+    (0, mongoose_1.Prop)({ default: 100 }),
+    __metadata("design:type", Number)
+], OperationRates.prototype, "metalMine", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 100 }),
+    __metadata("design:type", Number)
+], OperationRates.prototype, "crystalMine", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 100 }),
+    __metadata("design:type", Number)
+], OperationRates.prototype, "deuteriumMine", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 100 }),
+    __metadata("design:type", Number)
+], OperationRates.prototype, "solarPlant", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 100 }),
+    __metadata("design:type", Number)
+], OperationRates.prototype, "fusionReactor", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 100 }),
+    __metadata("design:type", Number)
+], OperationRates.prototype, "solarSatellite", void 0);
+exports.OperationRates = OperationRates = __decorate([
+    (0, mongoose_1.Schema)({ _id: false })
+], OperationRates);
 let Facilities = class Facilities {
     robotFactory;
     shipyard;
@@ -150,7 +186,7 @@ let PlanetInfo = class PlanetInfo {
 };
 exports.PlanetInfo = PlanetInfo;
 __decorate([
-    (0, mongoose_1.Prop)({ default: 163 }),
+    (0, mongoose_1.Prop)({ default: 300 }),
     __metadata("design:type", Number)
 ], PlanetInfo.prototype, "maxFields", void 0);
 __decorate([
@@ -706,6 +742,7 @@ let User = class User {
     vacationMode;
     resources;
     mines;
+    operationRates;
     facilities;
     planetInfo;
     researchLevels;
@@ -767,6 +804,10 @@ __decorate([
     (0, mongoose_1.Prop)({ type: Mines, default: () => ({}) }),
     __metadata("design:type", Mines)
 ], User.prototype, "mines", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: OperationRates, default: () => ({}) }),
+    __metadata("design:type", OperationRates)
+], User.prototype, "operationRates", void 0);
 __decorate([
     (0, mongoose_1.Prop)({ type: Facilities, default: () => ({}) }),
     __metadata("design:type", Facilities)

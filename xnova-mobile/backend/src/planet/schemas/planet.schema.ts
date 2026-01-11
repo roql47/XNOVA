@@ -165,7 +165,7 @@ export class PlanetDefense {
 // 행성 정보 스키마
 @Schema({ _id: false })
 export class PlanetInfo {
-  @Prop({ default: 163 })
+  @Prop({ default: 300 })
   maxFields: number;
 
   @Prop({ default: 0 })

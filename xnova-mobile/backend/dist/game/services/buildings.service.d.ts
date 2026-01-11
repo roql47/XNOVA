@@ -92,4 +92,23 @@ export declare class BuildingsService {
             deuterium: number;
         };
     }>;
+    startDowngrade(userId: string, buildingType: string): Promise<{
+        message: string;
+        building: string;
+        currentLevel: any;
+        targetLevel: number;
+        cost: {
+            metal: number;
+            crystal: number;
+            deuterium: number;
+        };
+        constructionTime: number;
+        finishTime: Date;
+    }>;
+    completeConstructionWithDowngrade(userId: string): Promise<{
+        completed: boolean;
+        building?: string;
+        newLevel?: number;
+        isDowngrade?: boolean;
+    }>;
 }

@@ -10,6 +10,7 @@ import '../../widgets/guide_steps_data.dart';
 import '../settings/settings_screen.dart';
 import 'tabs/overview_tab.dart';
 import 'tabs/buildings_tab.dart';
+import 'tabs/resources_tab.dart';
 import 'tabs/research_tab.dart';
 import 'tabs/fleet_tab.dart';
 import 'tabs/defense_tab.dart';
@@ -26,6 +27,7 @@ extension MainTabExtension on MainTab {
     switch (this) {
       case MainTab.overview: return Icons.dashboard_outlined;
       case MainTab.buildings: return Icons.apartment_outlined;
+      case MainTab.resources: return Icons.trending_up_outlined;
       case MainTab.research: return Icons.science_outlined;
       case MainTab.shipyard: return Icons.rocket_launch_outlined;
       case MainTab.defense: return Icons.shield_outlined;
@@ -42,6 +44,7 @@ extension MainTabExtension on MainTab {
     switch (this) {
       case MainTab.overview: return '홈';
       case MainTab.buildings: return '건물';
+      case MainTab.resources: return '자원';
       case MainTab.research: return '연구';
       case MainTab.shipyard: return '조선소';
       case MainTab.defense: return '방어';
@@ -1039,6 +1042,8 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
         return const OverviewTab();
       case MainTab.buildings:
         return const BuildingsTab();
+      case MainTab.resources:
+        return const ResourcesTab();
       case MainTab.research:
         return const ResearchTab();
       case MainTab.shipyard:
