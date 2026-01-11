@@ -200,6 +200,14 @@ export class ResourcesService {
     await user.save();
   }
 
+  // 식민지 자원 업데이트 (planetId로 직접 호출)
+  async updateColonyResourcesById(planetId: string): Promise<void> {
+    const planet = await this.planetModel.findById(planetId).exec();
+    if (planet) {
+      await this.updateColonyResources(planet);
+    }
+  }
+
   // 식민지 자원 업데이트
   private async updateColonyResources(planet: PlanetDocument): Promise<void> {
     const now = new Date();

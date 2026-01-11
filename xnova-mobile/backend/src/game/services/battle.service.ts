@@ -1717,20 +1717,48 @@ export class BattleService {
       return null;
     }
 
-    const target = await this.userModel.findById(pa.targetUserId).exec();
-    if (!target) {
+    // 공격 대상 좌표로 실제 행성 찾기 (모행성 또는 식민지)
+    const targetCoord = pa.targetCoord || '';
+    const targetResult = await this.findPlanetByCoordinate(targetCoord);
+    if (!targetResult.ownerId) {
+      return null;
+    }
+
+    const targetOwner = targetResult.user;
+    const targetPlanet = targetResult.planet; // 식민지인 경우에만 값이 있음
+    const isTargetColony = !!targetPlanet;
+
+    if (!targetOwner) {
       return null;
     }
 
     // 자원 업데이트 (둘 다 업데이트)
     await this.resourcesService.updateResources(attackerId);
-    await this.resourcesService.updateResources(target._id.toString());
+    if (isTargetColony) {
+      await this.resourcesService.updateColonyResources(targetOwner._id.toString(), targetPlanet._id.toString());
+    } else {
+      await this.resourcesService.updateResources(targetOwner._id.toString());
+    }
     
     // 업데이트된 데이터 다시 로드
     const updatedAttacker = await this.userModel.findById(attackerId).exec();
-    const updatedTarget = await this.userModel.findById(target._id.toString()).exec();
+    const updatedTargetOwner = await this.userModel.findById(targetOwner._id.toString()).exec();
+    const updatedTargetPlanet = isTargetColony ? await this.planetModel.findById(targetPlanet._id.toString()).exec() : null;
     
-    if (!updatedAttacker || !updatedTarget || !updatedAttacker.pendingAttack) return null;
+    if (!updatedAttacker || !updatedTargetOwner || !updatedAttacker.pendingAttack) return null;
+
+    // 실제 타겟 데이터 결정 (식민지면 식민지, 아니면 모행성)
+    const targetData = isTargetColony && updatedTargetPlanet ? {
+      resources: updatedTargetPlanet.resources,
+      fleet: updatedTargetPlanet.fleet || {},
+      defense: updatedTargetPlanet.defense || {},
+      coordinate: updatedTargetPlanet.coordinate,
+    } : {
+      resources: updatedTargetOwner.resources,
+      fleet: updatedTargetOwner.fleet || {},
+      defense: updatedTargetOwner.defense || {},
+      coordinate: updatedTargetOwner.coordinate,
+    };
 
     // 전투 시뮬레이션
     const attackerResearch = {
@@ -1740,13 +1768,13 @@ export class BattleService {
     };
 
     const defenderResearch = {
-      weaponsTech: updatedTarget.researchLevels.weaponsTech || 0,
-      shieldTech: updatedTarget.researchLevels.shieldTech || 0,
-      armorTech: updatedTarget.researchLevels.armorTech || 0,
+      weaponsTech: updatedTargetOwner.researchLevels.weaponsTech || 0,
+      shieldTech: updatedTargetOwner.researchLevels.shieldTech || 0,
+      armorTech: updatedTargetOwner.researchLevels.armorTech || 0,
     };
 
     const defenderFleet: Record<string, number> = {};
-    const targetFleetObj = (updatedTarget.fleet as any).toObject ? (updatedTarget.fleet as any).toObject() : updatedTarget.fleet;
+    const targetFleetObj = (targetData.fleet as any).toObject ? (targetData.fleet as any).toObject() : targetData.fleet;
     for (const key in targetFleetObj) {
       if (FLEET_DATA[key]) {
         defenderFleet[key] = (targetFleetObj as any)[key] || 0;
@@ -1754,7 +1782,7 @@ export class BattleService {
     }
 
     const defenderDefense: Record<string, number> = {};
-    const targetDefenseObj = (updatedTarget.defense as any).toObject ? (updatedTarget.defense as any).toObject() : updatedTarget.defense;
+    const targetDefenseObj = (targetData.defense as any).toObject ? (targetData.defense as any).toObject() : targetData.defense;
     for (const key in targetDefenseObj) {
       if (DEFENSE_DATA[key]) {
         defenderDefense[key] = (targetDefenseObj as any)[key] || 0;
@@ -1781,9 +1809,9 @@ export class BattleService {
         fleet: { ...updatedAttacker.pendingAttack.fleet },
       }],
       defenders: [{
-        name: updatedTarget.playerName,
-        id: updatedTarget._id.toString(),
-        coordinate: updatedTarget.coordinate,
+        name: updatedTargetOwner.playerName,
+        id: updatedTargetOwner._id.toString(),
+        coordinate: targetData.coordinate,
         weaponsTech: defenderResearch.weaponsTech,
         shieldTech: defenderResearch.shieldTech,
         armorTech: defenderResearch.armorTech,
@@ -1792,45 +1820,60 @@ export class BattleService {
       }],
     };
 
-    // 약탈량 계산
+    // 생존 함대의 화물 용량 계산 (약탈은 생존한 함대 기준)
+    let survivingCapacity = 0;
+    for (const type in battleResult.survivingAttackerFleet) {
+      const count = battleResult.survivingAttackerFleet[type] || 0;
+      const fleetData = FLEET_DATA[type];
+      if (fleetData && count > 0) {
+        survivingCapacity += (fleetData.stats?.cargo || 0) * count;
+      }
+    }
+
+    // 약탈량 계산 (생존 함대 화물 용량 기준, 실제 타겟 행성의 자원 사용)
     const loot = this.calculateLoot(
       {
-        metal: updatedTarget.resources.metal,
-        crystal: updatedTarget.resources.crystal,
-        deuterium: updatedTarget.resources.deuterium,
+        metal: targetData.resources.metal,
+        crystal: targetData.resources.crystal,
+        deuterium: targetData.resources.deuterium,
       },
       battleResult,
-      updatedAttacker.pendingAttack.capacity,
+      survivingCapacity,
     );
 
     battleResult.loot = loot;
 
-    // 결과 적용
+    // 결과 적용 (식민지/모행성 구분)
+    const actualTarget = isTargetColony && updatedTargetPlanet ? updatedTargetPlanet : updatedTargetOwner;
+    
     if (battleResult.attackerWon) {
-      // 방어자 함대 및 방어시설 갱신
+      // 방어자 함대 갱신
       for (const key in battleResult.survivingDefenderFleet) {
         if (FLEET_DATA[key]) {
-          (updatedTarget.fleet as any)[key] = battleResult.survivingDefenderFleet[key];
+          (actualTarget.fleet as any)[key] = battleResult.survivingDefenderFleet[key];
         }
+      }
+      // 방어자 방어시설 갱신 (복구된 방어시설 포함)
+      for (const key in battleResult.survivingDefenderDefense) {
         if (DEFENSE_DATA[key]) {
-          (updatedTarget.defense as any)[key] = battleResult.survivingDefenderDefense[key];
+          (actualTarget.defense as any)[key] = battleResult.survivingDefenderDefense[key];
         }
       }
 
       // 자원 약탈
-      updatedTarget.resources.metal = Math.max(0, updatedTarget.resources.metal - loot.metal);
-      updatedTarget.resources.crystal = Math.max(0, updatedTarget.resources.crystal - loot.crystal);
-      updatedTarget.resources.deuterium = Math.max(0, updatedTarget.resources.deuterium - loot.deuterium);
+      actualTarget.resources.metal = Math.max(0, actualTarget.resources.metal - loot.metal);
+      actualTarget.resources.crystal = Math.max(0, actualTarget.resources.crystal - loot.crystal);
+      actualTarget.resources.deuterium = Math.max(0, actualTarget.resources.deuterium - loot.deuterium);
     } else {
       // 방어자 함대 및 방어시설 갱신
       for (const key in battleResult.survivingDefenderFleet) {
         if (FLEET_DATA[key]) {
-          (updatedTarget.fleet as any)[key] = battleResult.survivingDefenderFleet[key];
+          (actualTarget.fleet as any)[key] = battleResult.survivingDefenderFleet[key];
         }
       }
       for (const key in battleResult.survivingDefenderDefense) {
         if (DEFENSE_DATA[key]) {
-          (updatedTarget.defense as any)[key] = battleResult.survivingDefenderDefense[key];
+          (actualTarget.defense as any)[key] = battleResult.survivingDefenderDefense[key];
         }
       }
     }
@@ -1842,7 +1885,7 @@ export class BattleService {
     // 데브리 생성
     if (battleResult.debris.metal > 0 || battleResult.debris.crystal > 0) {
       await this.galaxyService.updateDebris(
-        updatedTarget.coordinate,
+        targetData.coordinate,
         battleResult.debris.metal,
         battleResult.debris.crystal,
       );
@@ -1853,7 +1896,7 @@ export class BattleService {
 
     // fleetMissions 배열에서 해당 미션 처리
     const attackMission = updatedAttacker.fleetMissions?.find(
-      (m: any) => m.missionType === 'attack' && m.phase === 'outbound' && m.targetCoord === updatedTarget.coordinate
+      (m: any) => m.missionType === 'attack' && m.phase === 'outbound' && m.targetCoord === targetData.coordinate
     );
     const currentMissionId = (attackMission as any)?.missionId;
 
@@ -1872,16 +1915,22 @@ export class BattleService {
     // 하위 호환성 동기화
     this.syncLegacyFields(updatedAttacker);
 
-    // 방어자 공격 알림 제거
-    updatedTarget.incomingAttack = null;
-    updatedTarget.markModified('incomingAttack');
+    // 방어자 공격 알림 제거 (항상 소유자에게)
+    updatedTargetOwner.incomingAttack = null;
+    updatedTargetOwner.markModified('incomingAttack');
     
     // 명시적인 함대/방어시설/자원 업데이트 알림
-    updatedTarget.markModified('fleet');
-    updatedTarget.markModified('defense');
-    updatedTarget.markModified('resources');
+    actualTarget.markModified('fleet');
+    actualTarget.markModified('defense');
+    actualTarget.markModified('resources');
 
-    await updatedTarget.save();
+    // 타겟 저장 (식민지면 식민지, 모행성이면 모행성)
+    if (isTargetColony && updatedTargetPlanet) {
+      await updatedTargetPlanet.save();
+      await updatedTargetOwner.save(); // incomingAttack 초기화
+    } else {
+      await updatedTargetOwner.save();
+    }
     await updatedAttacker.save();
 
     // 메시지 생성 (실패해도 전투 결과는 유지되도록 try-catch)
@@ -1917,7 +1966,7 @@ export class BattleService {
       await this.messageService.createMessage({
         receiverId: attackerId,
         senderName: '전투 지휘부',
-        title: `전투 보고서 [${updatedTarget.coordinate}] (방어자 손실: ${defenderTotalLoss.toLocaleString()}, 공격자 손실: ${attackerTotalLoss.toLocaleString()})`,
+        title: `전투 보고서 [${targetData.coordinate}] (방어자 손실: ${defenderTotalLoss.toLocaleString()}, 공격자 손실: ${attackerTotalLoss.toLocaleString()})`,
         content: attackerContent,
         type: 'battle',
         metadata: { 
@@ -1929,8 +1978,8 @@ export class BattleService {
           resultType: attackerResultText,
           isAttacker: true,
           defender: { 
-            playerName: updatedTarget.playerName, 
-            coordinate: updatedTarget.coordinate,
+            playerName: updatedTargetOwner.playerName, 
+            coordinate: targetData.coordinate,
           },
         },
       });
@@ -1943,7 +1992,7 @@ export class BattleService {
           : '패배';
 
       await this.messageService.createMessage({
-        receiverId: updatedTarget._id.toString(),
+        receiverId: updatedTargetOwner._id.toString(),
         senderName: '방어 사령부',
         title: `전투 보고서 [${updatedAttacker.coordinate}] (방어자 손실: ${defenderTotalLoss.toLocaleString()}, 공격자 손실: ${attackerTotalLoss.toLocaleString()})`,
         content: htmlReport,
@@ -1974,9 +2023,9 @@ export class BattleService {
         playerName: updatedAttacker.playerName,
       },
       defender: {
-        id: updatedTarget._id.toString(),
-        coordinate: updatedTarget.coordinate,
-        playerName: updatedTarget.playerName,
+        id: updatedTargetOwner._id.toString(),
+        coordinate: targetData.coordinate,
+        playerName: updatedTargetOwner.playerName,
       },
     };
   }
