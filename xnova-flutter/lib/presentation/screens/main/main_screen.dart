@@ -749,28 +749,6 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
               ),
             ),
           ),
-          const SizedBox(width: 6),
-          // 카카오톡 오픈채팅 링크
-          GestureDetector(
-            onTap: () async {
-              final url = Uri.parse('https://open.kakao.com/o/gMWx3zph');
-              if (await canLaunchUrl(url)) {
-                await launchUrl(url, mode: LaunchMode.externalApplication);
-              }
-            },
-            child: Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEE500),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Icon(
-                Icons.chat_bubble,
-                size: 14,
-                color: Color(0xFF3C1E1E),
-              ),
-            ),
-          ),
           const SizedBox(width: 8),
           // 행성 선택 버튼
           Expanded(
@@ -992,6 +970,30 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // 카카오톡 오픈채팅
+                ListTile(
+                  dense: true,
+                  visualDensity: const VisualDensity(vertical: -2),
+                  leading: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE500),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Icon(Icons.chat_bubble, color: Color(0xFF3C1E1E), size: 12),
+                  ),
+                  title: const Text(
+                    '카카오톡 오픈채팅',
+                    style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                  ),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final url = Uri.parse('https://open.kakao.com/o/gMWx3zph');
+                    if (await canLaunchUrl(url)) {
+                      await launchUrl(url, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                ),
                 // 도움말 버튼
                 ListTile(
                   dense: true,

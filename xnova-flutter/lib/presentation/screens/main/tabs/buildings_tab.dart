@@ -299,7 +299,40 @@ class _BuildingCardState extends State<_BuildingCard> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    if (widget.building.level > 0) ...[
+                      const SizedBox(width: 4),
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert, size: 16, color: AppColors.textMuted),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        color: AppColors.panelBackground,
+                        onSelected: (value) {
+                          if (value == 'destroy') {
+                            _showDowngradeDialog(context);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          PopupMenuItem<String>(
+                            value: 'destroy',
+                            enabled: !widget.isConstructing,
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_outline, size: 16, color: widget.isConstructing ? AppColors.textMuted : AppColors.negative),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '파괴 (Lv.${widget.building.level} → ${widget.building.level - 1})',
+                                  style: TextStyle(
+                                    color: widget.isConstructing ? AppColors.textMuted : AppColors.negative,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    const SizedBox(width: 4),
                     Icon(
                       _isExpanded ? Icons.expand_less : Icons.expand_more,
                       size: 16,
@@ -400,28 +433,10 @@ class _BuildingCardState extends State<_BuildingCard> {
                       ],
                     ),
                   ),
-                  Column(
-                    children: [
-                      GameButton(
-                        text: '업그레이드',
-                        onPressed: (!widget.isConstructing && canAfford) ? widget.onUpgrade : null,
-                        icon: Icons.arrow_upward,
-                      ),
-                      if (widget.building.level > 0) ...[
-                        const SizedBox(height: 6),
-                        GestureDetector(
-                          onTap: widget.isConstructing ? null : () => _showDowngradeDialog(context),
-                          child: Text(
-                            '파괴 (Lv.${widget.building.level} → ${widget.building.level - 1})',
-                            style: TextStyle(
-                              color: widget.isConstructing ? AppColors.textMuted : AppColors.negative,
-                              fontSize: 10,
-                              decoration: TextDecoration.underline,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+                  GameButton(
+                    text: '업그레이드',
+                    onPressed: (!widget.isConstructing && canAfford) ? widget.onUpgrade : null,
+                    icon: Icons.arrow_upward,
                   ),
                 ],
               ),

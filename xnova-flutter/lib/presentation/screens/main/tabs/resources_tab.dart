@@ -101,11 +101,7 @@ class _ResourcesTabState extends ConsumerState<ResourcesTab> {
           children: [
             _buildProductionTable(),
             const SizedBox(height: 20),
-            _buildStorageCapacity(),
-            const SizedBox(height: 20),
             _buildForecast(),
-            const SizedBox(height: 20),
-            _buildStorageStatus(),
             const SizedBox(height: 80), // 하단 여백
           ],
         ),
@@ -335,46 +331,7 @@ class _ResourcesTabState extends ConsumerState<ResourcesTab> {
     );
   }
 
-  // 섹션 2: 저장소 용량
-  Widget _buildStorageCapacity() {
-    final storage = _detailedResources!['storageCapacity'] as Map<String, dynamic>;
-
-    return _buildSection(
-      title: '저장소 용량',
-      icon: Icons.warehouse_outlined,
-      child: Row(
-        children: [
-          _buildStorageItem('메탈', storage['metal'] as int, AppColors.resourceMetal),
-          const SizedBox(width: 12),
-          _buildStorageItem('크리스탈', storage['crystal'] as int, AppColors.resourceCrystal),
-          const SizedBox(width: 12),
-          _buildStorageItem('듀테륨', storage['deuterium'] as int, AppColors.resourceDeuterium),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStorageItem(String name, int capacity, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.panelBackground,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withOpacity(0.3)),
-        ),
-        child: Column(
-          children: [
-            Text(name, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text(_formatNumber(capacity), style: const TextStyle(color: AppColors.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // 섹션 3: 예상 생산량
+  // 섹션 2: 예상 생산량
   Widget _buildForecast() {
     final forecast = _detailedResources!['forecast'] as Map<String, dynamic>;
     final daily = forecast['daily'] as Map<String, dynamic>;
@@ -434,91 +391,6 @@ class _ResourcesTabState extends ConsumerState<ResourcesTab> {
           style: TextStyle(color: value >= 0 ? AppColors.textPrimary : AppColors.negative, fontSize: 11),
         ),
       ],
-    );
-  }
-
-  // 섹션 4: 저장소 상태
-  Widget _buildStorageStatus() {
-    final resources = _detailedResources!['resources'] as Map<String, dynamic>;
-    final storage = _detailedResources!['storageCapacity'] as Map<String, dynamic>;
-    final status = _detailedResources!['storageStatus'] as Map<String, dynamic>;
-
-    return _buildSection(
-      title: '저장소 상태',
-      icon: Icons.storage_outlined,
-      child: Column(
-        children: [
-          _buildStorageBar('메탈', resources['metal'] as int, storage['metal'] as int, status['metal'] as int, AppColors.resourceMetal),
-          const SizedBox(height: 12),
-          _buildStorageBar('크리스탈', resources['crystal'] as int, storage['crystal'] as int, status['crystal'] as int, AppColors.resourceCrystal),
-          const SizedBox(height: 12),
-          _buildStorageBar('듀테륨', resources['deuterium'] as int, storage['deuterium'] as int, status['deuterium'] as int, AppColors.resourceDeuterium),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStorageBar(String name, int current, int max, int percent, Color baseColor) {
-    Color barColor;
-    if (percent >= 100) {
-      barColor = AppColors.negative;
-    } else if (percent >= 80) {
-      barColor = AppColors.warning;
-    } else {
-      barColor = AppColors.positive;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.panelBackground,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(name, style: TextStyle(color: baseColor, fontSize: 12, fontWeight: FontWeight.bold)),
-              Text(
-                '${_formatNumber(current)} / ${_formatNumber(max)}',
-                style: TextStyle(color: percent >= 100 ? AppColors.negative : AppColors.textSecondary, fontSize: 11),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Stack(
-            children: [
-              Container(
-                height: 12,
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-              FractionallySizedBox(
-                widthFactor: (percent.clamp(0, 100)) / 100,
-                child: Container(
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: barColor,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              '$percent%${percent >= 100 ? ' (초과!)' : ''}',
-              style: TextStyle(color: barColor, fontSize: 10, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
