@@ -72,6 +72,7 @@ export declare class ProgressInfo {
     singleUnitBuildTime?: number;
     startTime: Date;
     finishTime: Date;
+    isDowngrade?: boolean;
 }
 export declare class Planet {
     ownerId: string;

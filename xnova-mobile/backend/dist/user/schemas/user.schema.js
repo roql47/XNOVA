@@ -440,6 +440,7 @@ let ProgressInfo = class ProgressInfo {
     quantity;
     startTime;
     finishTime;
+    isDowngrade;
 };
 exports.ProgressInfo = ProgressInfo;
 __decorate([
@@ -462,6 +463,10 @@ __decorate([
     (0, mongoose_1.Prop)(),
     __metadata("design:type", Date)
 ], ProgressInfo.prototype, "finishTime", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: false }),
+    __metadata("design:type", Boolean)
+], ProgressInfo.prototype, "isDowngrade", void 0);
 exports.ProgressInfo = ProgressInfo = __decorate([
     (0, mongoose_1.Schema)({ _id: false })
 ], ProgressInfo);

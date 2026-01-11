@@ -278,6 +278,9 @@ export class ProgressInfo {
 
   @Prop()
   finishTime: Date;
+
+  @Prop({ default: false })
+  isDowngrade?: boolean;
 }
 
 // 공격 진행 상태 스키마 (하위 호환성 유지)

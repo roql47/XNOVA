@@ -207,6 +207,9 @@ export class ProgressInfo {
 
   @Prop()
   finishTime: Date;
+
+  @Prop({ default: false })
+  isDowngrade?: boolean;
 }
 
 @Schema({ timestamps: true })

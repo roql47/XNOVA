@@ -97,6 +97,7 @@ export declare class ProgressInfo {
     quantity?: number;
     startTime: Date;
     finishTime: Date;
+    isDowngrade?: boolean;
 }
 export declare class AttackProgress {
     targetCoord: string;
