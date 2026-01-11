@@ -11,9 +11,6 @@ const Map<String, String> buildingNames = {
   'shipyard': '조선소',
   'researchLab': '연구소',
   'nanoFactory': '나노공장',
-  'metalStorage': '메탈저장고',
-  'crystalStorage': '크리스탈저장고',
-  'deuteriumStorage': '듀테륨저장고',
 };
 
 // 건물 이미지 경로
@@ -27,9 +24,6 @@ const Map<String, String> buildingImages = {
   'shipyard': 'assets/images/shipyard.webp',
   'researchLab': 'assets/images/research_rab.webp',
   'nanoFactory': 'assets/images/nanite_factory.webp',
-  'metalStorage': 'assets/images/metal_storage.webp',
-  'crystalStorage': 'assets/images/crystal_storage.webp',
-  'deuteriumStorage': 'assets/images/deuterium_tank.webp',
 };
 
 // 연구 한글 이름

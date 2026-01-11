@@ -542,15 +542,6 @@ class _BuildingCardState extends State<_BuildingCard> {
       case 'shipyard':
         assetPath = 'assets/images/shipyard.webp';
         break;
-      case 'metalStorage':
-        assetPath = 'assets/images/metal_storage.webp';
-        break;
-      case 'crystalStorage':
-        assetPath = 'assets/images/crystal_storage.webp';
-        break;
-      case 'deuteriumTank':
-        assetPath = 'assets/images/deuterium_tank.webp';
-        break;
       case 'researchLaboratory':
       case 'researchLab':
         assetPath = 'assets/images/research_rab.webp';

@@ -10,10 +10,6 @@ class GameConstants {
     'shipyard': '조선소',
     'researchLab': '연구소',
     'nanoFactory': '나노공장',
-    // 창고 건물
-    'metalStorage': '메탈 저장소',
-    'crystalStorage': '크리스탈 저장소',
-    'deuteriumTank': '듀테륨 탱크',
     
     // 함대
     'smallCargo': '소형화물선',
@@ -264,28 +260,5 @@ class GameConstants {
     }
 
     return totalConsumption > 0 ? totalConsumption : 1;
-  }
-
-  // ===== 창고 시스템 =====
-  
-  // 창고 기본 저장량
-  static const int baseStorageCapacity = 100000;
-  
-  // 창고 용량 증가율 (2배씩)
-  static const double storageFactor = 2.0;
-  
-  // 저장 용량 계산: 100000 * 2^레벨
-  static int calculateStorageCapacity(int storageLevel) {
-    return (baseStorageCapacity * 
-      (storageLevel > 0 ? _pow(storageFactor, storageLevel) : 1.0)).floor();
-  }
-  
-  // 거듭제곱 헬퍼 함수
-  static double _pow(double base, int exp) {
-    double result = 1.0;
-    for (int i = 0; i < exp; i++) {
-      result *= base;
-    }
-    return result;
   }
 }

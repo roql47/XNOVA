@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../providers/providers.dart';
 import '../../../data/models/models.dart';
@@ -655,7 +656,6 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
                   key: _resourceBarKey,
                   resources: gameState.resources,
                   production: gameState.production,
-                  storageCapacity: gameState.storageCapacity,
                   energyRatio: gameState.energyRatio,
                 ),
                 Expanded(
@@ -749,7 +749,29 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 6),
+          // 카카오톡 오픈채팅 링크
+          GestureDetector(
+            onTap: () async {
+              final url = Uri.parse('https://open.kakao.com/o/gMWx3zph');
+              if (await canLaunchUrl(url)) {
+                await launchUrl(url, mode: LaunchMode.externalApplication);
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEE500),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: const Icon(
+                Icons.chat_bubble,
+                size: 14,
+                color: Color(0xFF3C1E1E),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           // 행성 선택 버튼
           Expanded(
             child: GestureDetector(

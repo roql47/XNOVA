@@ -22,9 +22,8 @@ const resources_service_1 = require("./resources.service");
 const game_data_1 = require("../constants/game-data");
 const FIELD_CONSUMING_BUILDINGS = [
     'metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor',
-    'robotFactory', 'nanoFactory', 'shipyard', 'metalStorage', 'crystalStorage',
-    'deuteriumTank', 'researchLab', 'terraformer', 'allianceDepot', 'missileSilo',
-    'lunarBase', 'sensorPhalanx', 'jumpGate'
+    'robotFactory', 'nanoFactory', 'shipyard', 'researchLab', 'terraformer',
+    'allianceDepot', 'missileSilo', 'lunarBase', 'sensorPhalanx', 'jumpGate'
 ];
 const PLANET_FIELD_RANGES = {
     min: [40, 50, 55, 100, 95, 80, 115, 120, 125, 75, 80, 85, 60, 40, 50],
@@ -99,9 +98,6 @@ let BuildingsService = class BuildingsService {
             usedFields += user.facilities.terraformer || 0;
             usedFields += user.facilities.allianceDepot || 0;
             usedFields += user.facilities.missileSilo || 0;
-            usedFields += user.facilities.metalStorage || 0;
-            usedFields += user.facilities.crystalStorage || 0;
-            usedFields += user.facilities.deuteriumTank || 0;
             usedFields += user.facilities.lunarBase || 0;
             usedFields += user.facilities.sensorPhalanx || 0;
             usedFields += user.facilities.jumpGate || 0;
@@ -176,9 +172,6 @@ let BuildingsService = class BuildingsService {
             usedFields += planet.facilities.terraformer || 0;
             usedFields += planet.facilities.allianceDepot || 0;
             usedFields += planet.facilities.missileSilo || 0;
-            usedFields += planet.facilities.metalStorage || 0;
-            usedFields += planet.facilities.crystalStorage || 0;
-            usedFields += planet.facilities.deuteriumTank || 0;
         }
         return usedFields;
     }
@@ -311,24 +304,6 @@ let BuildingsService = class BuildingsService {
                 upgradeTime: time,
             });
         }
-        const storageTypes = ['metalStorage', 'crystalStorage', 'deuteriumTank'];
-        for (const key of storageTypes) {
-            const level = facilities[key] || 0;
-            const cost = this.getUpgradeCost(key, level);
-            const time = this.getConstructionTime(key, level, facilities.robotFactory || 0, facilities.nanoFactory || 0);
-            const capacity = (0, game_data_1.calculateStorageCapacity)(level);
-            const nextCapacity = (0, game_data_1.calculateStorageCapacity)(level + 1);
-            buildingsInfo.push({
-                type: key,
-                name: game_data_1.NAME_MAPPING[key],
-                level,
-                category: 'facilities',
-                upgradeCost: cost,
-                upgradeTime: time,
-                production: capacity,
-                nextProduction: nextCapacity,
-            });
-        }
         return {
             buildings: buildingsInfo,
             constructionProgress,
@@ -371,8 +346,7 @@ let BuildingsService = class BuildingsService {
         }
         const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
         const isFacility = ['robotFactory', 'shipyard', 'researchLab', 'nanoFactory', 'terraformer',
-            'allianceDepot', 'missileSilo', 'metalStorage', 'crystalStorage', 'deuteriumTank',
-            'lunarBase', 'sensorPhalanx', 'jumpGate'].includes(buildingType);
+            'allianceDepot', 'missileSilo', 'lunarBase', 'sensorPhalanx', 'jumpGate'].includes(buildingType);
         if (!isMine && !isFacility) {
             throw new common_1.BadRequestException('알 수 없는 건물 유형입니다.');
         }
@@ -552,8 +526,7 @@ let BuildingsService = class BuildingsService {
         }
         const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
         const isFacility = ['robotFactory', 'shipyard', 'researchLab', 'nanoFactory', 'terraformer',
-            'allianceDepot', 'missileSilo', 'metalStorage', 'crystalStorage', 'deuteriumTank',
-            'lunarBase', 'sensorPhalanx', 'jumpGate'].includes(buildingType);
+            'allianceDepot', 'missileSilo', 'lunarBase', 'sensorPhalanx', 'jumpGate'].includes(buildingType);
         if (!isMine && !isFacility) {
             throw new common_1.BadRequestException('알 수 없는 건물 유형입니다.');
         }

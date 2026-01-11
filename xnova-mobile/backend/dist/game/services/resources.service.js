@@ -18,7 +18,6 @@ const mongoose_1 = require("@nestjs/mongoose");
 const mongoose_2 = require("mongoose");
 const user_schema_1 = require("../../user/schemas/user.schema");
 const planet_schema_1 = require("../../planet/schemas/planet.schema");
-const game_data_1 = require("../constants/game-data");
 let ResourcesService = class ResourcesService {
     userModel;
     planetModel;
@@ -166,15 +165,9 @@ let ResourcesService = class ResourcesService {
         const fusionDeuteriumConsumption = this.getFusionDeuteriumConsumption(fusionLevel) * (operationRates.fusionReactor / 100);
         const netDeuteriumProduction = deuteriumProduction - fusionDeuteriumConsumption;
         const hoursElapsed = elapsedSeconds / 3600;
-        const metalStorageCapacity = (0, game_data_1.calculateStorageCapacity)(facilities?.metalStorage || 0);
-        const crystalStorageCapacity = (0, game_data_1.calculateStorageCapacity)(facilities?.crystalStorage || 0);
-        const deuteriumStorageCapacity = (0, game_data_1.calculateStorageCapacity)(facilities?.deuteriumTank || 0);
-        const newMetal = user.resources.metal + metalProduction * hoursElapsed;
-        const newCrystal = user.resources.crystal + crystalProduction * hoursElapsed;
-        const newDeuterium = user.resources.deuterium + netDeuteriumProduction * hoursElapsed;
-        user.resources.metal = Math.max(user.resources.metal, Math.min(newMetal, metalStorageCapacity));
-        user.resources.crystal = Math.max(user.resources.crystal, Math.min(newCrystal, crystalStorageCapacity));
-        user.resources.deuterium = Math.max(user.resources.deuterium, Math.min(newDeuterium, deuteriumStorageCapacity));
+        user.resources.metal += metalProduction * hoursElapsed;
+        user.resources.crystal += crystalProduction * hoursElapsed;
+        user.resources.deuterium += netDeuteriumProduction * hoursElapsed;
         user.resources.energy = energyProduction - energyConsumption;
         user.lastResourceUpdate = now;
         await user.save();
@@ -209,15 +202,9 @@ let ResourcesService = class ResourcesService {
         const deuteriumProduction = this.getResourceProduction(mines?.deuteriumMine || 0, 'deuterium') * energyRatio;
         const netDeuteriumProduction = deuteriumProduction - fusionDeuteriumConsumption;
         const hoursElapsed = elapsedSeconds / 3600;
-        const metalStorageCapacity = (0, game_data_1.calculateStorageCapacity)(facilities?.metalStorage || 0);
-        const crystalStorageCapacity = (0, game_data_1.calculateStorageCapacity)(facilities?.crystalStorage || 0);
-        const deuteriumStorageCapacity = (0, game_data_1.calculateStorageCapacity)(facilities?.deuteriumTank || 0);
-        const newMetal = planet.resources.metal + metalProduction * hoursElapsed;
-        const newCrystal = planet.resources.crystal + crystalProduction * hoursElapsed;
-        const newDeuterium = planet.resources.deuterium + netDeuteriumProduction * hoursElapsed;
-        planet.resources.metal = Math.max(planet.resources.metal, Math.min(newMetal, metalStorageCapacity));
-        planet.resources.crystal = Math.max(planet.resources.crystal, Math.min(newCrystal, crystalStorageCapacity));
-        planet.resources.deuterium = Math.max(planet.resources.deuterium, Math.min(newDeuterium, deuteriumStorageCapacity));
+        planet.resources.metal += metalProduction * hoursElapsed;
+        planet.resources.crystal += crystalProduction * hoursElapsed;
+        planet.resources.deuterium += netDeuteriumProduction * hoursElapsed;
         planet.resources.energy = energyProduction - energyConsumption;
         planet.lastResourceUpdate = now;
         await planet.save();
@@ -269,9 +256,6 @@ let ResourcesService = class ResourcesService {
         const deuteriumProduction = Math.floor(baseDeuteriumProduction * (operationRates.deuteriumMine / 100) * energyRatio);
         const fusionDeuteriumConsumption = Math.floor(this.getFusionDeuteriumConsumption(fusionLevel) * (operationRates.fusionReactor / 100));
         const basicIncome = { metal: 30, crystal: 15, deuterium: 0 };
-        const metalStorageCapacity = (0, game_data_1.calculateStorageCapacity)(facilities?.metalStorage || 0);
-        const crystalStorageCapacity = (0, game_data_1.calculateStorageCapacity)(facilities?.crystalStorage || 0);
-        const deuteriumStorageCapacity = (0, game_data_1.calculateStorageCapacity)(facilities?.deuteriumTank || 0);
         return {
             resources: {
                 metal: Math.floor(resources?.metal || 0),
@@ -285,14 +269,6 @@ let ResourcesService = class ResourcesService {
                 deuterium: deuteriumProduction - fusionDeuteriumConsumption + basicIncome.deuterium,
                 energyProduction,
                 energyConsumption,
-            },
-            storage: {
-                metalCapacity: metalStorageCapacity,
-                crystalCapacity: crystalStorageCapacity,
-                deuteriumCapacity: deuteriumStorageCapacity,
-                metalLevel: facilities?.metalStorage || 0,
-                crystalLevel: facilities?.crystalStorage || 0,
-                deuteriumLevel: facilities?.deuteriumTank || 0,
             },
             energyRatio: Math.round(energyRatio * 100),
             activePlanetId: user.activePlanetId,
@@ -451,9 +427,6 @@ let ResourcesService = class ResourcesService {
         const finalMetalProduction = Math.floor(metalProduction * energyRatio) + basicIncome.metal;
         const finalCrystalProduction = Math.floor(crystalProduction * energyRatio) + basicIncome.crystal;
         const finalDeuteriumProduction = Math.floor(deuteriumProduction * energyRatio) - fusionDeuteriumConsumption + basicIncome.deuterium;
-        const metalStorageCapacity = (0, game_data_1.calculateStorageCapacity)(facilities?.metalStorage || 0);
-        const crystalStorageCapacity = (0, game_data_1.calculateStorageCapacity)(facilities?.crystalStorage || 0);
-        const deuteriumStorageCapacity = (0, game_data_1.calculateStorageCapacity)(facilities?.deuteriumTank || 0);
         const productionDetails = [
             {
                 name: '메탈 광산',
@@ -534,16 +507,6 @@ let ResourcesService = class ResourcesService {
             productionDetails,
             operationRates,
             energyRatio: Math.round(energyRatio * 100),
-            storageCapacity: {
-                metal: metalStorageCapacity,
-                crystal: crystalStorageCapacity,
-                deuterium: deuteriumStorageCapacity,
-            },
-            storageStatus: {
-                metal: Math.min(100, Math.round(((resources?.metal || 0) / metalStorageCapacity) * 100)),
-                crystal: Math.min(100, Math.round(((resources?.crystal || 0) / crystalStorageCapacity) * 100)),
-                deuterium: Math.min(100, Math.round(((resources?.deuterium || 0) / deuteriumStorageCapacity) * 100)),
-            },
             forecast: {
                 daily: {
                     metal: finalMetalProduction * 24,

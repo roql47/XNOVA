@@ -39,6 +39,9 @@ dependencies:
   
   # Google Sign-In
   google_sign_in: ^6.2.1
+  
+  # URL Launcher
+  url_launcher: ^6.2.4
 
 dev_dependencies:
   flutter_test:

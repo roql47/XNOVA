@@ -67,30 +67,6 @@ export declare const BUILDING_COSTS: {
         };
         factor: number;
     };
-    metalStorage: {
-        base: {
-            metal: number;
-            crystal: number;
-            deuterium: number;
-        };
-        factor: number;
-    };
-    crystalStorage: {
-        base: {
-            metal: number;
-            crystal: number;
-            deuterium: number;
-        };
-        factor: number;
-    };
-    deuteriumTank: {
-        base: {
-            metal: number;
-            crystal: number;
-            deuterium: number;
-        };
-        factor: number;
-    };
 };
 export declare const FLEET_DATA: {
     smallCargo: {
@@ -968,14 +944,6 @@ export declare function calculateCombatStats(baseAttack: number, baseShield: num
     shield: number;
     hull: number;
 };
-export declare const BASE_STORAGE_CAPACITY = 100000;
-export declare const STORAGE_FACTOR = 2;
-export declare function calculateStorageCapacity(storageLevel: number): number;
-export declare const STORAGE_MAPPING: {
-    metal: string;
-    crystal: string;
-    deuterium: string;
-};
 export declare const NAME_MAPPING: {
     metalMine: string;
     crystalMine: string;
@@ -986,9 +954,6 @@ export declare const NAME_MAPPING: {
     shipyard: string;
     researchLab: string;
     nanoFactory: string;
-    metalStorage: string;
-    crystalStorage: string;
-    deuteriumTank: string;
     smallCargo: string;
     largeCargo: string;
     lightFighter: string;

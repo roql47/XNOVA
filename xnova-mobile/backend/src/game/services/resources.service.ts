@@ -3,7 +3,6 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../../user/schemas/user.schema';
 import { Planet, PlanetDocument } from '../../planet/schemas/planet.schema';
-import { calculateStorageCapacity } from '../constants/game-data';
 
 @Injectable()
 export class ResourcesService {
@@ -191,20 +190,10 @@ export class ResourcesService {
 
     const hoursElapsed = elapsedSeconds / 3600;
     
-    // 창고 용량 계산
-    const metalStorageCapacity = calculateStorageCapacity(facilities?.metalStorage || 0);
-    const crystalStorageCapacity = calculateStorageCapacity(facilities?.crystalStorage || 0);
-    const deuteriumStorageCapacity = calculateStorageCapacity(facilities?.deuteriumTank || 0);
-    
-    // 자원 생산 (창고 용량 제한 적용 - 생산으로 얻는 자원만)
-    const newMetal = user.resources.metal + metalProduction * hoursElapsed;
-    const newCrystal = user.resources.crystal + crystalProduction * hoursElapsed;
-    const newDeuterium = user.resources.deuterium + netDeuteriumProduction * hoursElapsed;
-    
-    // 생산으로 얻는 자원은 창고 용량까지만 증가 (이미 초과된 경우 유지)
-    user.resources.metal = Math.max(user.resources.metal, Math.min(newMetal, metalStorageCapacity));
-    user.resources.crystal = Math.max(user.resources.crystal, Math.min(newCrystal, crystalStorageCapacity));
-    user.resources.deuterium = Math.max(user.resources.deuterium, Math.min(newDeuterium, deuteriumStorageCapacity));
+    // 자원 생산 (무제한 저장)
+    user.resources.metal += metalProduction * hoursElapsed;
+    user.resources.crystal += crystalProduction * hoursElapsed;
+    user.resources.deuterium += netDeuteriumProduction * hoursElapsed;
     user.resources.energy = energyProduction - energyConsumption;
     user.lastResourceUpdate = now;
 
@@ -251,20 +240,10 @@ export class ResourcesService {
 
     const hoursElapsed = elapsedSeconds / 3600;
     
-    // 창고 용량 계산
-    const metalStorageCapacity = calculateStorageCapacity(facilities?.metalStorage || 0);
-    const crystalStorageCapacity = calculateStorageCapacity(facilities?.crystalStorage || 0);
-    const deuteriumStorageCapacity = calculateStorageCapacity(facilities?.deuteriumTank || 0);
-    
-    // 자원 생산 (창고 용량 제한 적용 - 생산으로 얻는 자원만)
-    const newMetal = planet.resources.metal + metalProduction * hoursElapsed;
-    const newCrystal = planet.resources.crystal + crystalProduction * hoursElapsed;
-    const newDeuterium = planet.resources.deuterium + netDeuteriumProduction * hoursElapsed;
-    
-    // 생산으로 얻는 자원은 창고 용량까지만 증가 (이미 초과된 경우 유지)
-    planet.resources.metal = Math.max(planet.resources.metal, Math.min(newMetal, metalStorageCapacity));
-    planet.resources.crystal = Math.max(planet.resources.crystal, Math.min(newCrystal, crystalStorageCapacity));
-    planet.resources.deuterium = Math.max(planet.resources.deuterium, Math.min(newDeuterium, deuteriumStorageCapacity));
+    // 자원 생산 (무제한 저장)
+    planet.resources.metal += metalProduction * hoursElapsed;
+    planet.resources.crystal += crystalProduction * hoursElapsed;
+    planet.resources.deuterium += netDeuteriumProduction * hoursElapsed;
     planet.resources.energy = energyProduction - energyConsumption;
     planet.lastResourceUpdate = now;
 
@@ -340,11 +319,6 @@ export class ResourcesService {
     // 기본 수입
     const basicIncome = { metal: 30, crystal: 15, deuterium: 0 };
 
-    // 창고 용량 계산
-    const metalStorageCapacity = calculateStorageCapacity(facilities?.metalStorage || 0);
-    const crystalStorageCapacity = calculateStorageCapacity(facilities?.crystalStorage || 0);
-    const deuteriumStorageCapacity = calculateStorageCapacity(facilities?.deuteriumTank || 0);
-
     return {
       resources: {
         metal: Math.floor(resources?.metal || 0),
@@ -358,14 +332,6 @@ export class ResourcesService {
         deuterium: deuteriumProduction - fusionDeuteriumConsumption + basicIncome.deuterium,
         energyProduction,
         energyConsumption,
-      },
-      storage: {
-        metalCapacity: metalStorageCapacity,
-        crystalCapacity: crystalStorageCapacity,
-        deuteriumCapacity: deuteriumStorageCapacity,
-        metalLevel: facilities?.metalStorage || 0,
-        crystalLevel: facilities?.crystalStorage || 0,
-        deuteriumLevel: facilities?.deuteriumTank || 0,
       },
       energyRatio: Math.round(energyRatio * 100),
       activePlanetId: user.activePlanetId,
@@ -561,11 +527,6 @@ export class ResourcesService {
     const finalCrystalProduction = Math.floor(crystalProduction * energyRatio) + basicIncome.crystal;
     const finalDeuteriumProduction = Math.floor(deuteriumProduction * energyRatio) - fusionDeuteriumConsumption + basicIncome.deuterium;
 
-    // 창고 용량
-    const metalStorageCapacity = calculateStorageCapacity(facilities?.metalStorage || 0);
-    const crystalStorageCapacity = calculateStorageCapacity(facilities?.crystalStorage || 0);
-    const deuteriumStorageCapacity = calculateStorageCapacity(facilities?.deuteriumTank || 0);
-
     // 시설별 상세 정보
     const productionDetails = [
       {
@@ -654,18 +615,6 @@ export class ResourcesService {
       operationRates,
       // 에너지 효율 (%)
       energyRatio: Math.round(energyRatio * 100),
-      // 저장소 용량
-      storageCapacity: {
-        metal: metalStorageCapacity,
-        crystal: crystalStorageCapacity,
-        deuterium: deuteriumStorageCapacity,
-      },
-      // 저장소 상태 (%)
-      storageStatus: {
-        metal: Math.min(100, Math.round(((resources?.metal || 0) / metalStorageCapacity) * 100)),
-        crystal: Math.min(100, Math.round(((resources?.crystal || 0) / crystalStorageCapacity) * 100)),
-        deuterium: Math.min(100, Math.round(((resources?.deuterium || 0) / deuteriumStorageCapacity) * 100)),
-      },
       // 예상 생산량
       forecast: {
         daily: {
