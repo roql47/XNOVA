@@ -172,6 +172,12 @@ let ResourcesService = class ResourcesService {
         user.lastResourceUpdate = now;
         await user.save();
     }
+    async updateColonyResourcesById(planetId) {
+        const planet = await this.planetModel.findById(planetId).exec();
+        if (planet) {
+            await this.updateColonyResources(planet);
+        }
+    }
     async updateColonyResources(planet) {
         const now = new Date();
         const lastUpdate = planet.lastResourceUpdate || now;

@@ -1224,35 +1224,59 @@ let BattleService = class BattleService {
         if (arrivalTime.getTime() > Date.now()) {
             return null;
         }
-        const target = await this.userModel.findById(pa.targetUserId).exec();
-        if (!target) {
+        const targetCoord = pa.targetCoord || '';
+        const targetResult = await this.findPlanetByCoordinate(targetCoord);
+        if (!targetResult.ownerId) {
+            return null;
+        }
+        const targetOwner = targetResult.user;
+        const targetPlanet = targetResult.planet;
+        const isTargetColony = !!targetPlanet;
+        if (!targetOwner) {
             return null;
         }
         await this.resourcesService.updateResources(attackerId);
-        await this.resourcesService.updateResources(target._id.toString());
+        if (isTargetColony) {
+            await this.resourcesService.updateColonyResourcesById(targetPlanet._id.toString());
+        }
+        else {
+            await this.resourcesService.updateResources(targetOwner._id.toString());
+        }
         const updatedAttacker = await this.userModel.findById(attackerId).exec();
-        const updatedTarget = await this.userModel.findById(target._id.toString()).exec();
-        if (!updatedAttacker || !updatedTarget || !updatedAttacker.pendingAttack)
+        const updatedTargetOwner = await this.userModel.findById(targetOwner._id.toString()).exec();
+        const updatedTargetPlanet = isTargetColony ? await this.planetModel.findById(targetPlanet._id.toString()).exec() : null;
+        if (!updatedAttacker || !updatedTargetOwner || !updatedAttacker.pendingAttack)
             return null;
+        const targetData = isTargetColony && updatedTargetPlanet ? {
+            resources: updatedTargetPlanet.resources,
+            fleet: updatedTargetPlanet.fleet || {},
+            defense: updatedTargetPlanet.defense || {},
+            coordinate: updatedTargetPlanet.coordinate,
+        } : {
+            resources: updatedTargetOwner.resources,
+            fleet: updatedTargetOwner.fleet || {},
+            defense: updatedTargetOwner.defense || {},
+            coordinate: updatedTargetOwner.coordinate,
+        };
         const attackerResearch = {
             weaponsTech: updatedAttacker.researchLevels.weaponsTech || 0,
             shieldTech: updatedAttacker.researchLevels.shieldTech || 0,
             armorTech: updatedAttacker.researchLevels.armorTech || 0,
         };
         const defenderResearch = {
-            weaponsTech: updatedTarget.researchLevels.weaponsTech || 0,
-            shieldTech: updatedTarget.researchLevels.shieldTech || 0,
-            armorTech: updatedTarget.researchLevels.armorTech || 0,
+            weaponsTech: updatedTargetOwner.researchLevels.weaponsTech || 0,
+            shieldTech: updatedTargetOwner.researchLevels.shieldTech || 0,
+            armorTech: updatedTargetOwner.researchLevels.armorTech || 0,
         };
         const defenderFleet = {};
-        const targetFleetObj = updatedTarget.fleet.toObject ? updatedTarget.fleet.toObject() : updatedTarget.fleet;
+        const targetFleetObj = targetData.fleet.toObject ? targetData.fleet.toObject() : targetData.fleet;
         for (const key in targetFleetObj) {
             if (game_data_1.FLEET_DATA[key]) {
                 defenderFleet[key] = targetFleetObj[key] || 0;
             }
         }
         const defenderDefense = {};
-        const targetDefenseObj = updatedTarget.defense.toObject ? updatedTarget.defense.toObject() : updatedTarget.defense;
+        const targetDefenseObj = targetData.defense.toObject ? targetData.defense.toObject() : targetData.defense;
         for (const key in targetDefenseObj) {
             if (game_data_1.DEFENSE_DATA[key]) {
                 defenderDefense[key] = targetDefenseObj[key] || 0;
@@ -1270,9 +1294,9 @@ let BattleService = class BattleService {
                     fleet: { ...updatedAttacker.pendingAttack.fleet },
                 }],
             defenders: [{
-                    name: updatedTarget.playerName,
-                    id: updatedTarget._id.toString(),
-                    coordinate: updatedTarget.coordinate,
+                    name: updatedTargetOwner.playerName,
+                    id: updatedTargetOwner._id.toString(),
+                    coordinate: targetData.coordinate,
                     weaponsTech: defenderResearch.weaponsTech,
                     shieldTech: defenderResearch.shieldTech,
                     armorTech: defenderResearch.armorTech,
@@ -1280,44 +1304,55 @@ let BattleService = class BattleService {
                     defense: defenderDefense,
                 }],
         };
+        let survivingCapacity = 0;
+        for (const type in battleResult.survivingAttackerFleet) {
+            const count = battleResult.survivingAttackerFleet[type] || 0;
+            const fleetData = game_data_1.FLEET_DATA[type];
+            if (fleetData && count > 0) {
+                survivingCapacity += (fleetData.stats?.cargo || 0) * count;
+            }
+        }
         const loot = this.calculateLoot({
-            metal: updatedTarget.resources.metal,
-            crystal: updatedTarget.resources.crystal,
-            deuterium: updatedTarget.resources.deuterium,
-        }, battleResult, updatedAttacker.pendingAttack.capacity);
+            metal: targetData.resources.metal,
+            crystal: targetData.resources.crystal,
+            deuterium: targetData.resources.deuterium,
+        }, battleResult, survivingCapacity);
         battleResult.loot = loot;
+        const actualTarget = isTargetColony && updatedTargetPlanet ? updatedTargetPlanet : updatedTargetOwner;
         if (battleResult.attackerWon) {
             for (const key in battleResult.survivingDefenderFleet) {
                 if (game_data_1.FLEET_DATA[key]) {
-                    updatedTarget.fleet[key] = battleResult.survivingDefenderFleet[key];
-                }
-                if (game_data_1.DEFENSE_DATA[key]) {
-                    updatedTarget.defense[key] = battleResult.survivingDefenderDefense[key];
-                }
-            }
-            updatedTarget.resources.metal = Math.max(0, updatedTarget.resources.metal - loot.metal);
-            updatedTarget.resources.crystal = Math.max(0, updatedTarget.resources.crystal - loot.crystal);
-            updatedTarget.resources.deuterium = Math.max(0, updatedTarget.resources.deuterium - loot.deuterium);
-        }
-        else {
-            for (const key in battleResult.survivingDefenderFleet) {
-                if (game_data_1.FLEET_DATA[key]) {
-                    updatedTarget.fleet[key] = battleResult.survivingDefenderFleet[key];
+                    actualTarget.fleet[key] = battleResult.survivingDefenderFleet[key];
                 }
             }
             for (const key in battleResult.survivingDefenderDefense) {
                 if (game_data_1.DEFENSE_DATA[key]) {
-                    updatedTarget.defense[key] = battleResult.survivingDefenderDefense[key];
+                    actualTarget.defense[key] = battleResult.survivingDefenderDefense[key];
+                }
+            }
+            actualTarget.resources.metal = Math.max(0, actualTarget.resources.metal - loot.metal);
+            actualTarget.resources.crystal = Math.max(0, actualTarget.resources.crystal - loot.crystal);
+            actualTarget.resources.deuterium = Math.max(0, actualTarget.resources.deuterium - loot.deuterium);
+        }
+        else {
+            for (const key in battleResult.survivingDefenderFleet) {
+                if (game_data_1.FLEET_DATA[key]) {
+                    actualTarget.fleet[key] = battleResult.survivingDefenderFleet[key];
+                }
+            }
+            for (const key in battleResult.survivingDefenderDefense) {
+                if (game_data_1.DEFENSE_DATA[key]) {
+                    actualTarget.defense[key] = battleResult.survivingDefenderDefense[key];
                 }
             }
         }
         const travelTime = updatedAttacker.pendingAttack.travelTime || 0;
         const returnTime = new Date(Date.now() + travelTime * 1000);
         if (battleResult.debris.metal > 0 || battleResult.debris.crystal > 0) {
-            await this.galaxyService.updateDebris(updatedTarget.coordinate, battleResult.debris.metal, battleResult.debris.crystal);
+            await this.galaxyService.updateDebris(targetData.coordinate, battleResult.debris.metal, battleResult.debris.crystal);
         }
         const hasSurvivingFleet = Object.values(battleResult.survivingAttackerFleet).some(count => count > 0);
-        const attackMission = updatedAttacker.fleetMissions?.find((m) => m.missionType === 'attack' && m.phase === 'outbound' && m.targetCoord === updatedTarget.coordinate);
+        const attackMission = updatedAttacker.fleetMissions?.find((m) => m.missionType === 'attack' && m.phase === 'outbound' && m.targetCoord === targetData.coordinate);
         const currentMissionId = attackMission?.missionId;
         if (hasSurvivingFleet) {
             if (currentMissionId) {
@@ -1330,12 +1365,18 @@ let BattleService = class BattleService {
             }
         }
         this.syncLegacyFields(updatedAttacker);
-        updatedTarget.incomingAttack = null;
-        updatedTarget.markModified('incomingAttack');
-        updatedTarget.markModified('fleet');
-        updatedTarget.markModified('defense');
-        updatedTarget.markModified('resources');
-        await updatedTarget.save();
+        updatedTargetOwner.incomingAttack = null;
+        updatedTargetOwner.markModified('incomingAttack');
+        actualTarget.markModified('fleet');
+        actualTarget.markModified('defense');
+        actualTarget.markModified('resources');
+        if (isTargetColony && updatedTargetPlanet) {
+            await updatedTargetPlanet.save();
+            await updatedTargetOwner.save();
+        }
+        else {
+            await updatedTargetOwner.save();
+        }
         await updatedAttacker.save();
         try {
             const htmlReport = this.battleReportService.generateBattleReport(battleResult, loot, battleResult.restoredDefenses);
@@ -1355,7 +1396,7 @@ let BattleService = class BattleService {
             await this.messageService.createMessage({
                 receiverId: attackerId,
                 senderName: '전투 지휘부',
-                title: `전투 보고서 [${updatedTarget.coordinate}] (방어자 손실: ${defenderTotalLoss.toLocaleString()}, 공격자 손실: ${attackerTotalLoss.toLocaleString()})`,
+                title: `전투 보고서 [${targetData.coordinate}] (방어자 손실: ${defenderTotalLoss.toLocaleString()}, 공격자 손실: ${attackerTotalLoss.toLocaleString()})`,
                 content: attackerContent,
                 type: 'battle',
                 metadata: {
@@ -1363,8 +1404,8 @@ let BattleService = class BattleService {
                     resultType: attackerResultText,
                     isAttacker: true,
                     defender: {
-                        playerName: updatedTarget.playerName,
-                        coordinate: updatedTarget.coordinate,
+                        playerName: updatedTargetOwner.playerName,
+                        coordinate: targetData.coordinate,
                     },
                 },
             });
@@ -1374,7 +1415,7 @@ let BattleService = class BattleService {
                     ? '무승부'
                     : '패배';
             await this.messageService.createMessage({
-                receiverId: updatedTarget._id.toString(),
+                receiverId: updatedTargetOwner._id.toString(),
                 senderName: '방어 사령부',
                 title: `전투 보고서 [${updatedAttacker.coordinate}] (방어자 손실: ${defenderTotalLoss.toLocaleString()}, 공격자 손실: ${attackerTotalLoss.toLocaleString()})`,
                 content: htmlReport,
@@ -1401,9 +1442,9 @@ let BattleService = class BattleService {
                 playerName: updatedAttacker.playerName,
             },
             defender: {
-                id: updatedTarget._id.toString(),
-                coordinate: updatedTarget.coordinate,
-                playerName: updatedTarget.playerName,
+                id: updatedTargetOwner._id.toString(),
+                coordinate: targetData.coordinate,
+                playerName: updatedTargetOwner.playerName,
             },
         };
     }

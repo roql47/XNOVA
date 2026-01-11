@@ -18,6 +18,7 @@ export declare class ResourcesService {
         planet?: PlanetDocument;
     } | null>;
     private updateHomePlanetResources;
+    updateColonyResourcesById(planetId: string): Promise<void>;
     private updateColonyResources;
     getResources(userId: string): Promise<{
         resources: {

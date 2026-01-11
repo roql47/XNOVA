@@ -1735,7 +1735,7 @@ export class BattleService {
     // 자원 업데이트 (둘 다 업데이트)
     await this.resourcesService.updateResources(attackerId);
     if (isTargetColony) {
-      await this.resourcesService.updateColonyResources(targetOwner._id.toString(), targetPlanet._id.toString());
+      await this.resourcesService.updateColonyResourcesById(targetPlanet._id.toString());
     } else {
       await this.resourcesService.updateResources(targetOwner._id.toString());
     }
