@@ -249,6 +249,7 @@ class ProgressInfo {
   final int? quantity;
   final String startTime;
   final String finishTime;
+  final bool isDowngrade;
 
   ProgressInfo({
     required this.type,
@@ -256,6 +257,7 @@ class ProgressInfo {
     this.quantity,
     required this.startTime,
     required this.finishTime,
+    this.isDowngrade = false,
   });
 
   factory ProgressInfo.fromJson(Map<String, dynamic>? json) {
@@ -266,6 +268,7 @@ class ProgressInfo {
       quantity: json['quantity'],
       startTime: json['startTime'] ?? '',
       finishTime: json['finishTime'] ?? '',
+      isDowngrade: json['isDowngrade'] ?? false,
     );
   }
   

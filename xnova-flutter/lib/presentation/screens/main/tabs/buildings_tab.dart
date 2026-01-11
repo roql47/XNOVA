@@ -107,9 +107,15 @@ class _ConstructionProgressCard extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 12),
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.accent.withOpacity(0.08),
+          color: progress.isDowngrade 
+              ? AppColors.negative.withOpacity(0.08)
+              : AppColors.accent.withOpacity(0.08),
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.accent.withOpacity(0.2)),
+          border: Border.all(
+            color: progress.isDowngrade 
+                ? AppColors.negative.withOpacity(0.2)
+                : AppColors.accent.withOpacity(0.2),
+          ),
         ),
         padding: const EdgeInsets.all(14),
         child: Row(
@@ -120,7 +126,10 @@ class _ConstructionProgressCard extends StatelessWidget {
               height: 50,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.accent, width: 2),
+                border: Border.all(
+                  color: progress.isDowngrade ? AppColors.negative : AppColors.accent, 
+                  width: 2,
+                ),
               ),
               child: ClipOval(
                 child: imagePath != null
@@ -129,12 +138,20 @@ class _ConstructionProgressCard extends StatelessWidget {
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
                           color: AppColors.surface,
-                          child: const Icon(Icons.construction, color: AppColors.accent, size: 24),
+                          child: Icon(
+                            progress.isDowngrade ? Icons.delete_outline : Icons.construction, 
+                            color: progress.isDowngrade ? AppColors.negative : AppColors.accent, 
+                            size: 24,
+                          ),
                         ),
                       )
                     : Container(
                         color: AppColors.surface,
-                        child: const Icon(Icons.construction, color: AppColors.accent, size: 24),
+                        child: Icon(
+                          progress.isDowngrade ? Icons.delete_outline : Icons.construction, 
+                          color: progress.isDowngrade ? AppColors.negative : AppColors.accent, 
+                          size: 24,
+                        ),
                       ),
               ),
             ),
@@ -149,13 +166,15 @@ class _ConstructionProgressCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: AppColors.accent.withOpacity(0.2),
+                          color: progress.isDowngrade 
+                              ? AppColors.negative.withOpacity(0.2)
+                              : AppColors.accent.withOpacity(0.2),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: const Text(
-                          '건설 중',
+                        child: Text(
+                          progress.isDowngrade ? '파괴 중' : '건설 중',
                           style: TextStyle(
-                            color: AppColors.accent,
+                            color: progress.isDowngrade ? AppColors.negative : AppColors.accent,
                             fontWeight: FontWeight.w600,
                             fontSize: 10,
                           ),
