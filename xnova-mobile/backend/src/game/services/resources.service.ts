@@ -137,30 +137,56 @@ export class ResourcesService {
     const facilities = user.facilities;
     const fleet = user.fleet;
     
+    // 가동률 적용
+    const operationRates = user.operationRates || {
+      metalMine: 100,
+      crystalMine: 100,
+      deuteriumMine: 100,
+      solarPlant: 100,
+      fusionReactor: 100,
+      solarSatellite: 100,
+    };
+    
     const satelliteCount = fleet?.solarSatellite || 0;
     const planetTemperature = user.planetInfo?.temperature ?? 50;
     const fusionLevel = mines?.fusionReactor || 0;
 
-    const solarEnergy = this.getEnergyProduction(mines?.solarPlant || 0);
-    const satelliteEnergy = this.getSatelliteEnergy(satelliteCount, planetTemperature);
-    const fusionEnergy = this.getFusionEnergyProduction(fusionLevel);
+    // 가동률 적용 에너지 생산
+    const baseSolarEnergy = this.getEnergyProduction(mines?.solarPlant || 0);
+    const baseSatelliteEnergy = this.getSatelliteEnergy(satelliteCount, planetTemperature);
+    const baseFusionEnergy = this.getFusionEnergyProduction(fusionLevel);
+    
+    const solarEnergy = Math.floor(baseSolarEnergy * (operationRates.solarPlant / 100));
+    const satelliteEnergy = Math.floor(baseSatelliteEnergy * (operationRates.solarSatellite / 100));
+    const fusionEnergy = Math.floor(baseFusionEnergy * (operationRates.fusionReactor / 100));
     const energyProduction = solarEnergy + satelliteEnergy + fusionEnergy;
 
-    let energyConsumption = 0;
-    energyConsumption += this.getEnergyConsumption(mines?.metalMine || 0, 'metal');
-    energyConsumption += this.getEnergyConsumption(mines?.crystalMine || 0, 'crystal');
-    energyConsumption += this.getEnergyConsumption(mines?.deuteriumMine || 0, 'deuterium');
+    // 가동률 적용 에너지 소비
+    const baseMetalConsumption = this.getEnergyConsumption(mines?.metalMine || 0, 'metal');
+    const baseCrystalConsumption = this.getEnergyConsumption(mines?.crystalMine || 0, 'crystal');
+    const baseDeuteriumConsumption = this.getEnergyConsumption(mines?.deuteriumMine || 0, 'deuterium');
+    
+    const metalEnergyConsumption = Math.floor(baseMetalConsumption * (operationRates.metalMine / 100));
+    const crystalEnergyConsumption = Math.floor(baseCrystalConsumption * (operationRates.crystalMine / 100));
+    const deuteriumEnergyConsumption = Math.floor(baseDeuteriumConsumption * (operationRates.deuteriumMine / 100));
+    const energyConsumption = metalEnergyConsumption + crystalEnergyConsumption + deuteriumEnergyConsumption;
 
     let energyRatio = 1.0;
-    if (energyProduction < energyConsumption) {
-      energyRatio = Math.max(0.1, energyProduction / energyConsumption);
+    if (energyProduction < energyConsumption && energyConsumption > 0) {
+      energyRatio = Math.max(0, energyProduction / energyConsumption);
     }
 
-    const fusionDeuteriumConsumption = this.getFusionDeuteriumConsumption(fusionLevel);
-
-    const metalProduction = this.getResourceProduction(mines?.metalMine || 0, 'metal') * energyRatio;
-    const crystalProduction = this.getResourceProduction(mines?.crystalMine || 0, 'crystal') * energyRatio;
-    const deuteriumProduction = this.getResourceProduction(mines?.deuteriumMine || 0, 'deuterium') * energyRatio;
+    // 가동률 적용 자원 생산량
+    const baseMetalProduction = this.getResourceProduction(mines?.metalMine || 0, 'metal');
+    const baseCrystalProduction = this.getResourceProduction(mines?.crystalMine || 0, 'crystal');
+    const baseDeuteriumProduction = this.getResourceProduction(mines?.deuteriumMine || 0, 'deuterium');
+    
+    const metalProduction = baseMetalProduction * (operationRates.metalMine / 100) * energyRatio;
+    const crystalProduction = baseCrystalProduction * (operationRates.crystalMine / 100) * energyRatio;
+    const deuteriumProduction = baseDeuteriumProduction * (operationRates.deuteriumMine / 100) * energyRatio;
+    
+    // 핵융합로 듀테륨 소비 (가동률 적용)
+    const fusionDeuteriumConsumption = this.getFusionDeuteriumConsumption(fusionLevel) * (operationRates.fusionReactor / 100);
     const netDeuteriumProduction = deuteriumProduction - fusionDeuteriumConsumption;
 
     const hoursElapsed = elapsedSeconds / 3600;
@@ -260,25 +286,59 @@ export class ResourcesService {
     const resources: any = isHome ? user.resources : (planet?.resources || { metal: 0, crystal: 0, deuterium: 0, energy: 0 });
     const temperature = isHome ? (user.planetInfo?.temperature ?? 50) : (planet?.planetInfo?.tempMax ?? 50);
     
+    // 가동률 (현재는 모행성만 지원)
+    const operationRates = user.operationRates || {
+      metalMine: 100,
+      crystalMine: 100,
+      deuteriumMine: 100,
+      solarPlant: 100,
+      fusionReactor: 100,
+      solarSatellite: 100,
+    };
+
     const satelliteCount = fleet?.solarSatellite || 0;
     const fusionLevel = mines?.fusionReactor || 0;
     
-    const solarEnergy = this.getEnergyProduction(mines?.solarPlant || 0);
-    const satelliteEnergy = this.getSatelliteEnergy(satelliteCount, temperature);
-    const fusionEnergy = this.getFusionEnergyProduction(fusionLevel);
+    // 가동률 적용 에너지 생산
+    const baseSolarEnergy = this.getEnergyProduction(mines?.solarPlant || 0);
+    const baseSatelliteEnergy = this.getSatelliteEnergy(satelliteCount, temperature);
+    const baseFusionEnergy = this.getFusionEnergyProduction(fusionLevel);
     
-    let energyConsumption = 0;
-    energyConsumption += this.getEnergyConsumption(mines?.metalMine || 0, 'metal');
-    energyConsumption += this.getEnergyConsumption(mines?.crystalMine || 0, 'crystal');
-    energyConsumption += this.getEnergyConsumption(mines?.deuteriumMine || 0, 'deuterium');
+    const solarEnergy = Math.floor(baseSolarEnergy * (operationRates.solarPlant / 100));
+    const satelliteEnergy = Math.floor(baseSatelliteEnergy * (operationRates.solarSatellite / 100));
+    const fusionEnergy = Math.floor(baseFusionEnergy * (operationRates.fusionReactor / 100));
+    
+    // 가동률 적용 에너지 소비
+    const baseMetalConsumption = this.getEnergyConsumption(mines?.metalMine || 0, 'metal');
+    const baseCrystalConsumption = this.getEnergyConsumption(mines?.crystalMine || 0, 'crystal');
+    const baseDeuteriumConsumption = this.getEnergyConsumption(mines?.deuteriumMine || 0, 'deuterium');
+    
+    const metalEnergyConsumption = Math.floor(baseMetalConsumption * (operationRates.metalMine / 100));
+    const crystalEnergyConsumption = Math.floor(baseCrystalConsumption * (operationRates.crystalMine / 100));
+    const deuteriumEnergyConsumption = Math.floor(baseDeuteriumConsumption * (operationRates.deuteriumMine / 100));
+    
+    const energyProduction = solarEnergy + satelliteEnergy + fusionEnergy;
+    const energyConsumption = metalEnergyConsumption + crystalEnergyConsumption + deuteriumEnergyConsumption;
 
     let energyRatio = 1.0;
-    const energyProduction = solarEnergy + satelliteEnergy + fusionEnergy;
-    if (energyProduction < energyConsumption) {
-      energyRatio = Math.max(0.1, energyProduction / energyConsumption);
+    if (energyProduction < energyConsumption && energyConsumption > 0) {
+      energyRatio = Math.max(0, energyProduction / energyConsumption);
     }
 
-    const fusionDeuteriumConsumption = this.getFusionDeuteriumConsumption(fusionLevel);
+    // 가동률 적용 자원 생산량
+    const baseMetalProduction = this.getResourceProduction(mines?.metalMine || 0, 'metal');
+    const baseCrystalProduction = this.getResourceProduction(mines?.crystalMine || 0, 'crystal');
+    const baseDeuteriumProduction = this.getResourceProduction(mines?.deuteriumMine || 0, 'deuterium');
+    
+    const metalProduction = Math.floor(baseMetalProduction * (operationRates.metalMine / 100) * energyRatio);
+    const crystalProduction = Math.floor(baseCrystalProduction * (operationRates.crystalMine / 100) * energyRatio);
+    const deuteriumProduction = Math.floor(baseDeuteriumProduction * (operationRates.deuteriumMine / 100) * energyRatio);
+    
+    // 핵융합로 듀테륨 소비 (가동률 적용)
+    const fusionDeuteriumConsumption = Math.floor(this.getFusionDeuteriumConsumption(fusionLevel) * (operationRates.fusionReactor / 100));
+
+    // 기본 수입
+    const basicIncome = { metal: 30, crystal: 15, deuterium: 0 };
 
     // 창고 용량 계산
     const metalStorageCapacity = calculateStorageCapacity(facilities?.metalStorage || 0);
@@ -293,9 +353,9 @@ export class ResourcesService {
         energy: energyProduction - energyConsumption,
       },
       production: {
-        metal: Math.floor(this.getResourceProduction(mines?.metalMine || 0, 'metal') * energyRatio),
-        crystal: Math.floor(this.getResourceProduction(mines?.crystalMine || 0, 'crystal') * energyRatio),
-        deuterium: Math.floor((this.getResourceProduction(mines?.deuteriumMine || 0, 'deuterium') * energyRatio) - fusionDeuteriumConsumption),
+        metal: metalProduction + basicIncome.metal,
+        crystal: crystalProduction + basicIncome.crystal,
+        deuterium: deuteriumProduction - fusionDeuteriumConsumption + basicIncome.deuterium,
         energyProduction,
         energyConsumption,
       },
