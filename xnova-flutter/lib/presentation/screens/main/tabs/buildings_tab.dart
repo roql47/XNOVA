@@ -300,36 +300,43 @@ class _BuildingCardState extends State<_BuildingCard> {
                       ),
                     ),
                     if (widget.building.level > 0) ...[
-                      const SizedBox(width: 4),
-                      PopupMenuButton<String>(
-                        icon: const Icon(Icons.more_vert, size: 16, color: AppColors.textMuted),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        color: AppColors.panelBackground,
-                        onSelected: (value) {
-                          if (value == 'destroy') {
-                            _showDowngradeDialog(context);
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          PopupMenuItem<String>(
-                            value: 'destroy',
-                            enabled: !widget.isConstructing,
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete_outline, size: 16, color: widget.isConstructing ? AppColors.textMuted : AppColors.negative),
-                                const SizedBox(width: 8),
-                                Text(
-                                  '파괴 (Lv.${widget.building.level} → ${widget.building.level - 1})',
-                                  style: TextStyle(
-                                    color: widget.isConstructing ? AppColors.textMuted : AppColors.negative,
-                                    fontSize: 12,
+                      const SizedBox(width: 2),
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: PopupMenuButton<String>(
+                          iconSize: 14,
+                          padding: EdgeInsets.zero,
+                          splashRadius: 12,
+                          color: AppColors.panelBackground,
+                          onSelected: (value) {
+                            if (value == 'destroy') {
+                              _showDowngradeDialog(context);
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            PopupMenuItem<String>(
+                              value: 'destroy',
+                              enabled: !widget.isConstructing,
+                              height: 36,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.delete_outline, size: 14, color: widget.isConstructing ? AppColors.textMuted : AppColors.negative),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '파괴 (Lv.${widget.building.level} → ${widget.building.level - 1})',
+                                    style: TextStyle(
+                                      color: widget.isConstructing ? AppColors.textMuted : AppColors.negative,
+                                      fontSize: 11,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                          child: const Icon(Icons.more_vert, size: 14, color: AppColors.textMuted),
+                        ),
                       ),
                     ],
                     const SizedBox(width: 4),
