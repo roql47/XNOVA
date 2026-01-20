@@ -237,69 +237,85 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     showModalBottomSheet(
       context: parentContext,
       backgroundColor: AppColors.panelBackground,
+      isScrollControlled: true,  // 높이 제어 가능하게
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (sheetContext) => Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  '행성 선택',
-                  style: TextStyle(
-                    color: AppColors.textPrimary,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+      builder: (sheetContext) {
+        // 화면 높이의 최대 60%로 제한
+        final maxHeight = MediaQuery.of(sheetContext).size.height * 0.6;
+        
+        return Container(
+          constraints: BoxConstraints(maxHeight: maxHeight),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '행성 선택',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.settings, color: AppColors.textMuted, size: 20),
-                  onPressed: () {
-                    Navigator.pop(sheetContext);
-                    _showPlanetManagement(parentContext);
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            if (gameState.myPlanets.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(20),
-                child: Center(
-                  child: Text(
-                    '행성 정보를 불러오는 중...',
-                    style: TextStyle(color: AppColors.textMuted),
+                  IconButton(
+                    icon: const Icon(Icons.settings, color: AppColors.textMuted, size: 20),
+                    onPressed: () {
+                      Navigator.pop(sheetContext);
+                      _showPlanetManagement(parentContext);
+                    },
                   ),
-                ),
-              )
-            else
-              ...gameState.myPlanets.map((planet) => _PlanetListItem(
-                planet: planet,
-                isActive: planet.id == gameState.activePlanetId,
-                onTap: () async {
-                  Navigator.pop(sheetContext);
-                  if (planet.id != gameState.activePlanetId) {
-                    final success = await ref.read(gameProvider.notifier).switchPlanet(planet.id);
-                    if (success && mounted) {
-                      scaffoldMessenger.showSnackBar(
-                        SnackBar(
-                          content: Text('${planet.name}으로 전환했습니다.'),
-                          backgroundColor: AppColors.positive,
-                        ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (gameState.myPlanets.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Center(
+                    child: Text(
+                      '행성 정보를 불러오는 중...',
+                      style: TextStyle(color: AppColors.textMuted),
+                    ),
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: gameState.myPlanets.length,
+                    itemBuilder: (context, index) {
+                      final planet = gameState.myPlanets[index];
+                      return _PlanetListItem(
+                        planet: planet,
+                        isActive: planet.id == gameState.activePlanetId,
+                        onTap: () async {
+                          Navigator.pop(sheetContext);
+                          if (planet.id != gameState.activePlanetId) {
+                            final success = await ref.read(gameProvider.notifier).switchPlanet(planet.id);
+                            if (success && mounted) {
+                              scaffoldMessenger.showSnackBar(
+                                SnackBar(
+                                  content: Text('${planet.name}으로 전환했습니다.'),
+                                  backgroundColor: AppColors.positive,
+                                ),
+                              );
+                            }
+                          }
+                        },
                       );
-                    }
-                  }
-                },
-              )),
-            SizedBox(height: MediaQuery.of(sheetContext).padding.bottom),
-          ],
-        ),
-      ),
+                    },
+                  ),
+                ),
+              SizedBox(height: MediaQuery.of(sheetContext).padding.bottom),
+            ],
+          ),
+        );
+      },
     );
   }
 
