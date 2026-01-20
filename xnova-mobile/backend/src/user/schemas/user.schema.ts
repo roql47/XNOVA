@@ -327,10 +327,13 @@ export class AttackProgress {
 @Schema({ _id: false })
 export class IncomingAttackProgress {
   @Prop()
-  targetCoord: string;
+  targetCoord: string;  // 공격자 출발 좌표
 
   @Prop()
   targetUserId: string;
+
+  @Prop({ type: String, default: null })
+  defendingCoord?: string;  // 공격받는 행성 좌표 (내 모행성 또는 식민지)
 
   @Prop({ type: Object })
   fleet: Record<string, number | string>;  // 숫자 또는 '?' (정탐 차이로 수량 숨김 시)

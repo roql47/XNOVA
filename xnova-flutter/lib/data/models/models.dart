@@ -595,6 +595,8 @@ class PlanetInfo {
   final String? playerName;
   final String? playerId;
   final bool isOwnPlanet;
+  final bool isColony;  // 식민지 여부
+  final String? ownerName;  // 식민지인 경우 소유자 이름
   final bool hasDebris;
   final Map<String, dynamic>? debrisAmount;
   final bool hasMoon;
@@ -606,6 +608,8 @@ class PlanetInfo {
     this.playerName,
     this.playerId,
     this.isOwnPlanet = false,
+    this.isColony = false,
+    this.ownerName,
     this.hasDebris = false,
     this.debrisAmount,
     this.hasMoon = false,
@@ -618,6 +622,8 @@ class PlanetInfo {
     playerName: json['playerName'],
     playerId: json['playerId'],
     isOwnPlanet: json['isOwnPlanet'] ?? false,
+    isColony: json['isColony'] ?? false,
+    ownerName: json['ownerName'],
     hasDebris: json['hasDebris'] ?? false,
     debrisAmount: json['debrisAmount'],
     hasMoon: json['hasMoon'] ?? false,

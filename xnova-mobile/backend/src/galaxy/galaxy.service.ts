@@ -13,6 +13,8 @@ export interface PlanetInfo {
   playerName: string | null;
   playerId: string | null;
   isOwnPlanet: boolean;
+  isColony: boolean;  // 식민지 여부
+  ownerName?: string | null;  // 식민지인 경우 소유자 이름 (모행성인 경우 null)
   hasDebris: boolean;
   debrisAmount?: { metal: number; crystal: number };
   hasMoon: boolean;
@@ -105,6 +107,8 @@ export class GalaxyService {
           playerName: player.playerName,
           playerId: player._id.toString(),
           isOwnPlanet: player._id.toString() === currentUserId,
+          isColony: false,
+          ownerName: null,
           hasDebris: !!debris && (debris.metal > 0 || debris.crystal > 0),
           debrisAmount: debris ? { metal: debris.metal, crystal: debris.crystal } : undefined,
           hasMoon: false,
@@ -122,6 +126,8 @@ export class GalaxyService {
           playerName: ownerName || colony.name || '식민지',
           playerId: ownerId,
           isOwnPlanet: ownerId === currentUserId,
+          isColony: true,
+          ownerName: ownerName || null,  // 식민지 소유자 이름
           hasDebris: !!debris && (debris.metal > 0 || debris.crystal > 0),
           debrisAmount: debris ? { metal: debris.metal, crystal: debris.crystal } : undefined,
           hasMoon: false,
@@ -135,6 +141,8 @@ export class GalaxyService {
           playerName: null,
           playerId: null,
           isOwnPlanet: false,
+          isColony: false,
+          ownerName: null,
           hasDebris: !!debris && (debris.metal > 0 || debris.crystal > 0),
           debrisAmount: debris ? { metal: debris.metal, crystal: debris.crystal } : undefined,
           hasMoon: false,

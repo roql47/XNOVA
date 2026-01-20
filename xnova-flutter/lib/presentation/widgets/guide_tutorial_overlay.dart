@@ -227,24 +227,43 @@ class _GuideTutorialOverlayState extends State<GuideTutorialOverlay>
     final screenSize = MediaQuery.of(context).size;
     final padding = MediaQuery.of(context).padding;
 
+    // 사용 가능한 영역 계산 (상단 패딩 + 하단 컨트롤 버튼 영역 제외)
+    final topSafeArea = padding.top + 50; // 스킵 버튼 영역
+    final bottomSafeArea = padding.bottom + 100; // 하단 컨트롤 버튼 영역
+    final availableHeight = screenSize.height - topSafeArea - bottomSafeArea;
+    
+    // 툴팁 최대 높이 (화면의 50% 또는 가용 높이의 60% 중 작은 값)
+    final maxTooltipHeight = (availableHeight * 0.6).clamp(200.0, screenSize.height * 0.5);
+
     // 툴팁 위치 계산
     double top;
     if (targetRect != null) {
       final targetCenter = targetRect.center.dy;
       final screenCenter = screenSize.height / 2;
+      
       if (targetCenter < screenCenter) {
+        // 타겟이 상단에 있으면 타겟 아래에 표시
         top = targetRect.bottom + 20;
+        // 화면 하단을 벗어나지 않도록 조정
+        if (top + maxTooltipHeight > screenSize.height - bottomSafeArea) {
+          top = screenSize.height - bottomSafeArea - maxTooltipHeight - 10;
+        }
       } else {
-        top = padding.top + 60;
+        // 타겟이 하단에 있으면 타겟 위에 표시
+        top = topSafeArea + 10;
       }
     } else {
-      top = screenSize.height * 0.25;
+      // 타겟이 없으면 화면 중앙 상단에 표시
+      top = topSafeArea + 10;
     }
+    
+    // 최소 top 값 보장
+    top = top.clamp(topSafeArea, screenSize.height - bottomSafeArea - 150);
 
     return Positioned(
       top: top,
-      left: 24,
-      right: 24,
+      left: 16,
+      right: 16,
       child: AnimatedBuilder(
         animation: _animationController,
         builder: (context, child) {
@@ -256,10 +275,15 @@ class _GuideTutorialOverlayState extends State<GuideTutorialOverlay>
             ),
           );
         },
-        child: _TooltipContent(
-          step: step,
-          currentStep: _currentStep,
-          totalSteps: widget.steps.length,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: maxTooltipHeight,
+          ),
+          child: _TooltipContent(
+            step: step,
+            currentStep: _currentStep,
+            totalSteps: widget.steps.length,
+          ),
         ),
       ),
     );
@@ -466,7 +490,6 @@ class _TooltipContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: const Color(0xFF141A24), // AppColors.panelBackground
         borderRadius: BorderRadius.circular(16),
@@ -482,70 +505,77 @@ class _TooltipContent extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 스텝 번호와 아이콘
-          Row(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          physics: const BouncingScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0x2600C896), // AppColors.accent.withOpacity(0.15)
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${currentStep + 1} / $totalSteps',
-                  style: const TextStyle(
-                    color: Color(0xFF00C896), // AppColors.accent
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+              // 스텝 번호와 아이콘
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0x2600C896), // AppColors.accent.withOpacity(0.15)
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${currentStep + 1} / $totalSteps',
+                      style: const TextStyle(
+                        color: Color(0xFF00C896), // AppColors.accent
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
+                  const Spacer(),
+                  if (step.icon != null)
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0x1A00C896), // AppColors.accent.withOpacity(0.1)
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        step.icon,
+                        color: const Color(0xFF00C896), // AppColors.accent
+                        size: 20,
+                      ),
+                    ),
+                ],
+              ),
+
+              const SizedBox(height: 14),
+
+              // 제목
+              Text(
+                step.title,
+                style: const TextStyle(
+                  color: Color(0xFFE8ECF0), // AppColors.textPrimary
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.5,
                 ),
               ),
-              const Spacer(),
-              if (step.icon != null)
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0x1A00C896), // AppColors.accent.withOpacity(0.1)
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    step.icon,
-                    color: const Color(0xFF00C896), // AppColors.accent
-                    size: 20,
-                  ),
+
+              const SizedBox(height: 10),
+
+              // 설명
+              Text(
+                step.description,
+                style: const TextStyle(
+                  color: Color(0xFF7A8A9A), // AppColors.textSecondary
+                  fontSize: 13,
+                  height: 1.5,
                 ),
+              ),
             ],
           ),
-
-          const SizedBox(height: 16),
-
-          // 제목
-          Text(
-            step.title,
-            style: const TextStyle(
-              color: Color(0xFFE8ECF0), // AppColors.textPrimary
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.5,
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // 설명
-          Text(
-            step.description,
-            style: const TextStyle(
-              color: Color(0xFF7A8A9A), // AppColors.textSecondary
-              fontSize: 14,
-              height: 1.6,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

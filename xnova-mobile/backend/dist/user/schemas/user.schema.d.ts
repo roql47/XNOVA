@@ -120,6 +120,7 @@ export declare class AttackProgress {
 export declare class IncomingAttackProgress {
     targetCoord: string;
     targetUserId: string;
+    defendingCoord?: string;
     fleet: Record<string, number | string>;
     fleetVisibility?: 'full' | 'composition' | 'hidden';
     capacity: number;

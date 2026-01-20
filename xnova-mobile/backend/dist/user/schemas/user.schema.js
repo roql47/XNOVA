@@ -539,6 +539,7 @@ exports.AttackProgress = AttackProgress = __decorate([
 let IncomingAttackProgress = class IncomingAttackProgress {
     targetCoord;
     targetUserId;
+    defendingCoord;
     fleet;
     fleetVisibility;
     capacity;
@@ -556,6 +557,10 @@ __decorate([
     (0, mongoose_1.Prop)(),
     __metadata("design:type", String)
 ], IncomingAttackProgress.prototype, "targetUserId", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: String, default: null }),
+    __metadata("design:type", String)
+], IncomingAttackProgress.prototype, "defendingCoord", void 0);
 __decorate([
     (0, mongoose_1.Prop)({ type: Object }),
     __metadata("design:type", Object)

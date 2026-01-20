@@ -151,6 +151,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       print('🔵 Google Sign-In 시작...');
       
+      // 기존 세션 정리 (캐시된 토큰 문제 방지)
+      try {
+        await _googleSignIn.signOut();
+        print('🔵 기존 Google 세션 정리 완료');
+      } catch (e) {
+        print('🟡 기존 세션 정리 중 에러 (무시): $e');
+      }
+      
       // 구글 로그인 실행
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       print('🔵 Google Sign-In 결과: $googleUser');

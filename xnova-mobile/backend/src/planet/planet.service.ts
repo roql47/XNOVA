@@ -279,14 +279,18 @@ export class PlanetService {
     const planets: any[] = [];
 
     // 1. 모행성 추가 (User 스키마에서)
+    const homeUsedFields = this.calculateUsedFieldsForUser(user);
+    const homeTerraformerBonus = (user.facilities?.terraformer || 0) * 5;
+    const homeMaxFields = (user.planetInfo?.maxFields || 300) + homeTerraformerBonus;
+    
     planets.push({
       id: `home_${userId}`, // 모행성 ID (특별 식별자)
       name: user.playerName || '모행성',
       coordinate: user.coordinate,
       isHomePlanet: true,
       type: 'planet',
-      maxFields: user.planetInfo?.maxFields || 300,
-      usedFields: user.planetInfo?.usedFields || 0,
+      maxFields: homeMaxFields,
+      usedFields: homeUsedFields,
       temperature: user.planetInfo?.temperature || 50,
       planetType: user.planetInfo?.planetType || 'normaltemp',
       resources: user.resources,
@@ -295,14 +299,18 @@ export class PlanetService {
     // 2. 식민지 추가 (Planet 컬렉션에서)
     const colonies = await this.planetModel.find({ ownerId: userId, isHomeworld: false }).exec();
     for (const colony of colonies) {
+      const colonyUsedFields = this.calculateUsedFieldsForPlanet(colony);
+      const colonyTerraformerBonus = (colony.facilities?.terraformer || 0) * 5;
+      const colonyMaxFields = (colony.planetInfo?.maxFields || 300) + colonyTerraformerBonus;
+      
       planets.push({
         id: colony._id.toString(),
         name: colony.name || '식민지',
         coordinate: colony.coordinate,
         isHomePlanet: false,
         type: colony.type || 'planet',
-        maxFields: colony.planetInfo?.maxFields || 300,
-        usedFields: colony.planetInfo?.usedFields || 0,
+        maxFields: colonyMaxFields,
+        usedFields: colonyUsedFields,
         temperature: colony.planetInfo?.tempMax || 50,
         planetType: colony.planetInfo?.planetType || 'normaltemp',
         resources: colony.resources,
@@ -316,6 +324,65 @@ export class PlanetService {
     }
 
     return { activePlanetId, planets };
+  }
+
+  /**
+   * 모행성 사용 필드 계산
+   */
+  private calculateUsedFieldsForUser(user: any): number {
+    let usedFields = 0;
+
+    // 광산 레벨 합산
+    if (user.mines) {
+      usedFields += user.mines.metalMine || 0;
+      usedFields += user.mines.crystalMine || 0;
+      usedFields += user.mines.deuteriumMine || 0;
+      usedFields += user.mines.solarPlant || 0;
+      usedFields += user.mines.fusionReactor || 0;
+    }
+
+    // 시설 레벨 합산
+    if (user.facilities) {
+      usedFields += user.facilities.robotFactory || 0;
+      usedFields += user.facilities.nanoFactory || 0;
+      usedFields += user.facilities.shipyard || 0;
+      usedFields += user.facilities.researchLab || 0;
+      usedFields += user.facilities.terraformer || 0;
+      usedFields += user.facilities.allianceDepot || 0;
+      usedFields += user.facilities.missileSilo || 0;
+      usedFields += user.facilities.lunarBase || 0;
+      usedFields += user.facilities.sensorPhalanx || 0;
+      usedFields += user.facilities.jumpGate || 0;
+    }
+
+    return usedFields;
+  }
+
+  /**
+   * 식민지 사용 필드 계산
+   */
+  private calculateUsedFieldsForPlanet(planet: any): number {
+    let usedFields = 0;
+
+    if (planet.mines) {
+      usedFields += planet.mines.metalMine || 0;
+      usedFields += planet.mines.crystalMine || 0;
+      usedFields += planet.mines.deuteriumMine || 0;
+      usedFields += planet.mines.solarPlant || 0;
+      usedFields += planet.mines.fusionReactor || 0;
+    }
+
+    if (planet.facilities) {
+      usedFields += planet.facilities.robotFactory || 0;
+      usedFields += planet.facilities.nanoFactory || 0;
+      usedFields += planet.facilities.shipyard || 0;
+      usedFields += planet.facilities.researchLab || 0;
+      usedFields += planet.facilities.terraformer || 0;
+      usedFields += planet.facilities.allianceDepot || 0;
+      usedFields += planet.facilities.missileSilo || 0;
+    }
+
+    return usedFields;
   }
 }
 

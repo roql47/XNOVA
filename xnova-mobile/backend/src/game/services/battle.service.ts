@@ -1323,8 +1323,9 @@ export class BattleService {
     }
 
     target.incomingAttack = {
-      targetCoord: attackerCoord, // 출발 좌표 사용
+      targetCoord: attackerCoord, // 공격자 출발 좌표
       targetUserId: attackerId,
+      defendingCoord: targetCoord, // 공격받는 행성 좌표
       fleet: visibleFleet,
       fleetVisibility,
       capacity: 0,
@@ -1439,6 +1440,7 @@ export class BattleService {
         } else {
           result.incomingAttack = {
             attackerCoord: user.incomingAttack.targetCoord,
+            defendingCoord: user.incomingAttack.defendingCoord || null,
             remainingTime: remaining,
             fleet: user.incomingAttack.fleet || {},
             fleetVisibility: user.incomingAttack.fleetVisibility || 'full',
@@ -1447,6 +1449,7 @@ export class BattleService {
       } else {
         result.incomingAttack = {
           attackerCoord: user.incomingAttack.targetCoord,
+          defendingCoord: user.incomingAttack.defendingCoord || null,
           remainingTime: remaining,
           fleet: user.incomingAttack.fleet || {},
           fleetVisibility: user.incomingAttack.fleetVisibility || 'full',
@@ -1669,30 +1672,70 @@ export class BattleService {
     return { metalLoot, crystalLoot, missionId: currentMissionId };
   }
 
-  // 공격 도착 처리
-  async processAttackArrival(attackerId: string): Promise<{ battleResult: BattleResult; attacker: any; defender: any } | null> {
+  // 공격 도착 처리 (다중 함대 지원)
+  async processAttackArrival(attackerId: string, missionId?: string): Promise<{ battleResult: BattleResult; attacker: any; defender: any } | null> {
     const attacker = await this.userModel.findById(attackerId).exec();
-    if (!attacker || !attacker.pendingAttack || attacker.pendingAttack.battleCompleted) {
-      return null;
+    if (!attacker) return null;
+
+    // fleetMissions 배열에서 도착한 attack 미션 찾기
+    const now = Date.now();
+    const mission = missionId
+      ? attacker.fleetMissions?.find((m: any) => m.missionId === missionId && m.missionType === 'attack' && m.phase === 'outbound')
+      : attacker.fleetMissions?.find((m: any) => {
+          if (m.missionType !== 'attack' || m.phase !== 'outbound') return false;
+          return new Date(m.arrivalTime).getTime() <= now;
+        });
+
+    // fleetMissions에서 미션을 찾지 못한 경우 하위 호환성 체크
+    if (!mission) {
+      if (!attacker.pendingAttack || attacker.pendingAttack.battleCompleted) {
+        return null;
+      }
+
+      // 공격 미션이 아닌 경우 여기서 처리하지 않음
+      // - colony: ColonyService에서 처리
+      // - transport: processTransportArrival에서 처리
+      // - deploy: processDeployArrival에서 처리
+      // - recycle: processRecycleArrival에서 처리
+      const missionType = attacker.pendingAttack.missionType;
+      if (missionType === 'colony' || missionType === 'transport' || missionType === 'deploy' || missionType === 'recycle' || !attacker.pendingAttack.targetUserId) {
+        return null;
+      }
+      
+      // 데브리 수확 미션도 제외 (하위 호환성)
+      if (attacker.pendingAttack.targetUserId === 'debris') {
+        return null;
+      }
+
+      // 도착 시간 확인
+      if (attacker.pendingAttack.arrivalTime.getTime() > now) {
+        return null;
+      }
     }
 
-    // 공격 미션이 아닌 경우 여기서 처리하지 않음
-    // - colony: ColonyService에서 처리
-    // - transport: processTransportArrival에서 처리
-    // - deploy: processDeployArrival에서 처리
-    // - recycle: processRecycleArrival에서 처리
-    const missionType = attacker.pendingAttack.missionType;
-    if (missionType === 'colony' || missionType === 'transport' || missionType === 'deploy' || missionType === 'recycle' || !attacker.pendingAttack.targetUserId) {
+    // 미션 데이터 추출 (fleetMissions 우선, 없으면 pendingAttack)
+    const m = mission as any;
+    const pa = m ? {
+      targetCoord: m.targetCoord,
+      targetUserId: m.targetUserId,
+      fleet: m.fleet,
+      capacity: m.capacity,
+      travelTime: m.travelTime,
+      startTime: m.startTime,
+      arrivalTime: m.arrivalTime,
+      originCoord: m.originCoord,
+      originPlanetId: m.originPlanetId,
+      missionType: m.missionType,
+      battleCompleted: false,
+    } : attacker.pendingAttack;
+
+    // 데이터 보정 (일부 데이터가 fleet 객체 안에 잘못 들어가 있는 경우 처리)
+    const currentMissionId = m?.missionId;
+    
+    if (!pa) {
       return null;
     }
     
-    // 데브리 수확 미션도 제외 (하위 호환성)
-    if (attacker.pendingAttack.targetUserId === 'debris') {
-      return null;
-    }
-
-    // 데이터 보정 (일부 데이터가 fleet 객체 안에 잘못 들어가 있는 경우 처리)
-    const pa = attacker.pendingAttack;
     if (pa.fleet && (pa.fleet as any).capacity !== undefined) {
       const fleetObj = pa.fleet as any;
       if (pa.capacity === undefined) pa.capacity = fleetObj.capacity;
@@ -1708,13 +1751,17 @@ export class BattleService {
         }
       }
       pa.fleet = cleanFleet;
-      attacker.markModified('pendingAttack');
+      if (!currentMissionId) {
+        attacker.markModified('pendingAttack');
+      }
     }
 
-    // 도착 시간 확인
-    const arrivalTime = pa.arrivalTime instanceof Date ? pa.arrivalTime : new Date(pa.arrivalTime);
-    if (arrivalTime.getTime() > Date.now()) {
-      return null;
+    // fleetMissions에서 찾은 경우는 이미 도착 시간 확인됨, 아닌 경우만 확인
+    if (!currentMissionId) {
+      const arrivalTime = pa.arrivalTime instanceof Date ? pa.arrivalTime : new Date(pa.arrivalTime);
+      if (arrivalTime.getTime() > Date.now()) {
+        return null;
+      }
     }
 
     // 공격 대상 좌표로 실제 행성 찾기 (모행성 또는 식민지)
@@ -1894,21 +1941,24 @@ export class BattleService {
     // 생존 함대가 있는지 확인
     const hasSurvivingFleet = Object.values(battleResult.survivingAttackerFleet).some(count => count > 0);
 
-    // fleetMissions 배열에서 해당 미션 처리
-    const attackMission = updatedAttacker.fleetMissions?.find(
-      (m: any) => m.missionType === 'attack' && m.phase === 'outbound' && m.targetCoord === targetData.coordinate
-    );
-    const currentMissionId = (attackMission as any)?.missionId;
+    // fleetMissions 배열에서 해당 미션 처리 (currentMissionId가 있으면 사용, 없으면 targetCoord로 찾기)
+    let processingMissionId = currentMissionId;
+    if (!processingMissionId) {
+      const attackMission = updatedAttacker.fleetMissions?.find(
+        (m: any) => m.missionType === 'attack' && m.phase === 'outbound' && m.targetCoord === targetData.coordinate
+      );
+      processingMissionId = (attackMission as any)?.missionId;
+    }
 
     if (hasSurvivingFleet) {
       // 생존 함대가 있으면 귀환 정보 설정
-      if (currentMissionId) {
-        this.setMissionReturning(updatedAttacker, currentMissionId, loot, returnTime, battleResult.survivingAttackerFleet);
+      if (processingMissionId) {
+        this.setMissionReturning(updatedAttacker, processingMissionId, loot, returnTime, battleResult.survivingAttackerFleet);
       }
     } else {
       // 함대 전멸 시 미션 제거
-      if (currentMissionId) {
-        this.removeMission(updatedAttacker, currentMissionId);
+      if (processingMissionId) {
+        this.removeMission(updatedAttacker, processingMissionId);
       }
     }
 

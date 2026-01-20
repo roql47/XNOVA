@@ -10,25 +10,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="fb29376f-86bc-4260-886b-0498e2105846" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/../../DEPLOY.md" beforeDir="false" afterPath="$PROJECT_DIR$/../../DEPLOY.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../README.md" beforeDir="false" afterPath="$PROJECT_DIR$/../../README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../xnova-flutter/lib/core/constants/research_effects.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../../xnova-flutter/lib/core/constants/research_effects.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../xnova-flutter/lib/data/services/token_service.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../../xnova-flutter/lib/data/services/token_service.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../xnova-flutter/lib/presentation/screens/auth/nickname_setup_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../../xnova-flutter/lib/presentation/screens/auth/nickname_setup_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../xnova-flutter/lib/presentation/screens/auth/register_screen.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../../xnova-flutter/lib/presentation/screens/auth/register_screen.dart" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/DEPLOY_LIGHTSAIL.md" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/DEPLOY_LIGHTSAIL.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/deploy.sh" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/deploy.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/ecosystem.config.js" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/ecosystem.config.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/src/auth/schemas/blacklisted-token.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/auth/schemas/blacklisted-token.schema.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/src/auth/schemas/refresh-token.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/auth/schemas/refresh-token.schema.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/src/chat/chat.module.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/chat/chat.module.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/src/chat/chat.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/chat/chat.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/src/chat/schemas/chat-message.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/chat/schemas/chat-message.schema.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/src/galaxy/schemas/debris.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/galaxy/schemas/debris.schema.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/src/game/ranking.controller.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/game/ranking.controller.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/src/game/services/battle-simulator.service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/game/services/battle-simulator.service.ts" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../backend/src/message/schemas/message.schema.ts" beforeDir="false" afterPath="$PROJECT_DIR$/../backend/src/message/schemas/message.schema.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../xnova-flutter/lib/providers/providers.dart" beforeDir="false" afterPath="$PROJECT_DIR$/../../xnova-flutter/lib/providers/providers.dart" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

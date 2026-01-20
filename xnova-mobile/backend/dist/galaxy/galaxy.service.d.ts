@@ -9,6 +9,8 @@ export interface PlanetInfo {
     playerName: string | null;
     playerId: string | null;
     isOwnPlanet: boolean;
+    isColony: boolean;
+    ownerName?: string | null;
     hasDebris: boolean;
     debrisAmount?: {
         metal: number;

@@ -1008,32 +1008,60 @@ class _PlanetRow extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // 행성 이름 + 좌표 (왼쪽)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // 행성 이름
-                        Text(
-                          isEmpty ? '빈 슬롯' : planet.playerName!,
-                          style: TextStyle(
-                            color: isEmpty 
-                                ? AppColors.textMuted
-                                : isOwn
-                                    ? AppColors.accent
-                                    : AppColors.textPrimary,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 13,
+                    Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // 행성 이름 (식민지인 경우 소유자 표시)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  isEmpty ? '빈 슬롯' : planet.playerName!,
+                                  style: TextStyle(
+                                    color: isEmpty 
+                                        ? AppColors.textMuted
+                                        : isOwn
+                                            ? AppColors.accent
+                                            : AppColors.textPrimary,
+                                    fontWeight: FontWeight.w500,
+                                    fontSize: 13,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              // 식민지 표시 (타인의 식민지인 경우만)
+                              if (!isEmpty && planet.isColony && !isOwn)
+                                Container(
+                                  margin: const EdgeInsets.only(left: 4),
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.warning.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(3),
+                                  ),
+                                  child: const Text(
+                                    '식민지',
+                                    style: TextStyle(
+                                      color: AppColors.warning,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
-                        ),
-                        // 좌표
-                        Text(
-                          planet.coordinate,
-                          style: const TextStyle(
-                            color: AppColors.textMuted,
-                            fontSize: 10,
+                          // 좌표
+                          Text(
+                            planet.coordinate,
+                            style: const TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 10,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     // 활동 상태 표시 (바로 옆, 세로 가운데)
                     if (!isEmpty && !isOwn)

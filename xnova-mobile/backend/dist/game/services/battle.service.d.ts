@@ -119,7 +119,7 @@ export declare class BattleService {
         crystalLoot: number;
         missionId: any;
     } | null>;
-    processAttackArrival(attackerId: string): Promise<{
+    processAttackArrival(attackerId: string, missionId?: string): Promise<{
         battleResult: BattleResult;
         attacker: any;
         defender: any;

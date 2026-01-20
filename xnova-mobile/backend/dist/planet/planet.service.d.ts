@@ -45,4 +45,6 @@ export declare class PlanetService {
             resources: any;
         }>;
     }>;
+    private calculateUsedFieldsForUser;
+    private calculateUsedFieldsForPlanet;
 }

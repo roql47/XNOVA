@@ -912,6 +912,7 @@ let BattleService = class BattleService {
         target.incomingAttack = {
             targetCoord: attackerCoord,
             targetUserId: attackerId,
+            defendingCoord: targetCoord,
             fleet: visibleFleet,
             fleetVisibility,
             capacity: 0,
@@ -1011,6 +1012,7 @@ let BattleService = class BattleService {
                 else {
                     result.incomingAttack = {
                         attackerCoord: user.incomingAttack.targetCoord,
+                        defendingCoord: user.incomingAttack.defendingCoord || null,
                         remainingTime: remaining,
                         fleet: user.incomingAttack.fleet || {},
                         fleetVisibility: user.incomingAttack.fleetVisibility || 'full',
@@ -1020,6 +1022,7 @@ let BattleService = class BattleService {
             else {
                 result.incomingAttack = {
                     attackerCoord: user.incomingAttack.targetCoord,
+                    defendingCoord: user.incomingAttack.defendingCoord || null,
                     remainingTime: remaining,
                     fleet: user.incomingAttack.fleet || {},
                     fleetVisibility: user.incomingAttack.fleetVisibility || 'full',
@@ -1188,19 +1191,51 @@ let BattleService = class BattleService {
         });
         return { metalLoot, crystalLoot, missionId: currentMissionId };
     }
-    async processAttackArrival(attackerId) {
+    async processAttackArrival(attackerId, missionId) {
         const attacker = await this.userModel.findById(attackerId).exec();
-        if (!attacker || !attacker.pendingAttack || attacker.pendingAttack.battleCompleted) {
+        if (!attacker)
+            return null;
+        const now = Date.now();
+        const mission = missionId
+            ? attacker.fleetMissions?.find((m) => m.missionId === missionId && m.missionType === 'attack' && m.phase === 'outbound')
+            : attacker.fleetMissions?.find((m) => {
+                if (m.missionType !== 'attack' || m.phase !== 'outbound')
+                    return false;
+                return new Date(m.arrivalTime).getTime() <= now;
+            });
+        if (!mission) {
+            if (!attacker.pendingAttack || attacker.pendingAttack.battleCompleted) {
+                return null;
+            }
+            const missionType = attacker.pendingAttack.missionType;
+            if (missionType === 'colony' || missionType === 'transport' || missionType === 'deploy' || missionType === 'recycle' || !attacker.pendingAttack.targetUserId) {
+                return null;
+            }
+            if (attacker.pendingAttack.targetUserId === 'debris') {
+                return null;
+            }
+            if (attacker.pendingAttack.arrivalTime.getTime() > now) {
+                return null;
+            }
+        }
+        const m = mission;
+        const pa = m ? {
+            targetCoord: m.targetCoord,
+            targetUserId: m.targetUserId,
+            fleet: m.fleet,
+            capacity: m.capacity,
+            travelTime: m.travelTime,
+            startTime: m.startTime,
+            arrivalTime: m.arrivalTime,
+            originCoord: m.originCoord,
+            originPlanetId: m.originPlanetId,
+            missionType: m.missionType,
+            battleCompleted: false,
+        } : attacker.pendingAttack;
+        const currentMissionId = m?.missionId;
+        if (!pa) {
             return null;
         }
-        const missionType = attacker.pendingAttack.missionType;
-        if (missionType === 'colony' || missionType === 'transport' || missionType === 'deploy' || missionType === 'recycle' || !attacker.pendingAttack.targetUserId) {
-            return null;
-        }
-        if (attacker.pendingAttack.targetUserId === 'debris') {
-            return null;
-        }
-        const pa = attacker.pendingAttack;
         if (pa.fleet && pa.fleet.capacity !== undefined) {
             const fleetObj = pa.fleet;
             if (pa.capacity === undefined)
@@ -1218,11 +1253,15 @@ let BattleService = class BattleService {
                 }
             }
             pa.fleet = cleanFleet;
-            attacker.markModified('pendingAttack');
+            if (!currentMissionId) {
+                attacker.markModified('pendingAttack');
+            }
         }
-        const arrivalTime = pa.arrivalTime instanceof Date ? pa.arrivalTime : new Date(pa.arrivalTime);
-        if (arrivalTime.getTime() > Date.now()) {
-            return null;
+        if (!currentMissionId) {
+            const arrivalTime = pa.arrivalTime instanceof Date ? pa.arrivalTime : new Date(pa.arrivalTime);
+            if (arrivalTime.getTime() > Date.now()) {
+                return null;
+            }
         }
         const targetCoord = pa.targetCoord || '';
         const targetResult = await this.findPlanetByCoordinate(targetCoord);
@@ -1352,16 +1391,19 @@ let BattleService = class BattleService {
             await this.galaxyService.updateDebris(targetData.coordinate, battleResult.debris.metal, battleResult.debris.crystal);
         }
         const hasSurvivingFleet = Object.values(battleResult.survivingAttackerFleet).some(count => count > 0);
-        const attackMission = updatedAttacker.fleetMissions?.find((m) => m.missionType === 'attack' && m.phase === 'outbound' && m.targetCoord === targetData.coordinate);
-        const currentMissionId = attackMission?.missionId;
+        let processingMissionId = currentMissionId;
+        if (!processingMissionId) {
+            const attackMission = updatedAttacker.fleetMissions?.find((m) => m.missionType === 'attack' && m.phase === 'outbound' && m.targetCoord === targetData.coordinate);
+            processingMissionId = attackMission?.missionId;
+        }
         if (hasSurvivingFleet) {
-            if (currentMissionId) {
-                this.setMissionReturning(updatedAttacker, currentMissionId, loot, returnTime, battleResult.survivingAttackerFleet);
+            if (processingMissionId) {
+                this.setMissionReturning(updatedAttacker, processingMissionId, loot, returnTime, battleResult.survivingAttackerFleet);
             }
         }
         else {
-            if (currentMissionId) {
-                this.removeMission(updatedAttacker, currentMissionId);
+            if (processingMissionId) {
+                this.removeMission(updatedAttacker, processingMissionId);
             }
         }
         this.syncLegacyFields(updatedAttacker);

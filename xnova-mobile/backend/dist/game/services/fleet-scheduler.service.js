@@ -49,8 +49,37 @@ let FleetSchedulerService = FleetSchedulerService_1 = class FleetSchedulerServic
             let processedCount = 0;
             for (const user of usersWithMissions) {
                 try {
-                    const hasCompletedMission = this.hasCompletedMission(user, now);
-                    if (hasCompletedMission) {
+                    const completedMissionIds = this.getCompletedMissionIds(user, now);
+                    if (completedMissionIds.length > 0 || this.hasLegacyCompletedMission(user, now)) {
+                        for (const missionInfo of completedMissionIds) {
+                            try {
+                                if (missionInfo.phase === 'outbound') {
+                                    switch (missionInfo.missionType) {
+                                        case 'attack':
+                                            await this.battleService.processAttackArrival(user._id.toString(), missionInfo.missionId);
+                                            break;
+                                        case 'recycle':
+                                            await this.battleService.processRecycleArrival(user._id.toString(), missionInfo.missionId);
+                                            break;
+                                        case 'transport':
+                                            await this.battleService.processTransportArrival(user._id.toString(), missionInfo.missionId);
+                                            break;
+                                        case 'deploy':
+                                            await this.battleService.processDeployArrival(user._id.toString(), missionInfo.missionId);
+                                            break;
+                                        case 'colony':
+                                            await this.colonyService.completeColonization(user._id.toString());
+                                            break;
+                                    }
+                                }
+                                else if (missionInfo.phase === 'returning') {
+                                    await this.battleService.processFleetReturn(user._id.toString(), missionInfo.missionId);
+                                }
+                            }
+                            catch (missionError) {
+                                this.logger.warn(`Failed to process mission ${missionInfo.missionId}: ${missionError.message}`);
+                            }
+                        }
                         await this.battleService.processAttackArrival(user._id.toString());
                         await this.battleService.processRecycleArrival(user._id.toString());
                         await this.battleService.processIncomingAttacks(user._id.toString());
@@ -76,21 +105,35 @@ let FleetSchedulerService = FleetSchedulerService_1 = class FleetSchedulerServic
             this.isProcessing = false;
         }
     }
-    hasCompletedMission(user, now) {
+    getCompletedMissionIds(user, now) {
+        const completedMissions = [];
         if (user.fleetMissions && user.fleetMissions.length > 0) {
             for (const mission of user.fleetMissions) {
                 if (mission.phase === 'outbound') {
                     const arrivalTime = new Date(mission.arrivalTime).getTime();
-                    if (arrivalTime <= now)
-                        return true;
+                    if (arrivalTime <= now) {
+                        completedMissions.push({
+                            missionId: mission.missionId,
+                            missionType: mission.missionType,
+                            phase: 'outbound',
+                        });
+                    }
                 }
                 else if (mission.phase === 'returning') {
                     const returnTime = new Date(mission.returnTime).getTime();
-                    if (returnTime && returnTime <= now)
-                        return true;
+                    if (returnTime && returnTime <= now) {
+                        completedMissions.push({
+                            missionId: mission.missionId,
+                            missionType: mission.missionType,
+                            phase: 'returning',
+                        });
+                    }
                 }
             }
         }
+        return completedMissions;
+    }
+    hasLegacyCompletedMission(user, now) {
         if (user.pendingAttack && !user.pendingAttack.battleCompleted) {
             const arrivalTime = new Date(user.pendingAttack.arrivalTime).getTime();
             if (arrivalTime <= now)
@@ -102,6 +145,9 @@ let FleetSchedulerService = FleetSchedulerService_1 = class FleetSchedulerServic
                 return true;
         }
         return false;
+    }
+    hasCompletedMission(user, now) {
+        return this.getCompletedMissionIds(user, now).length > 0 || this.hasLegacyCompletedMission(user, now);
     }
 };
 exports.FleetSchedulerService = FleetSchedulerService;

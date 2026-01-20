@@ -10,5 +10,7 @@ export declare class FleetSchedulerService {
     private isProcessing;
     constructor(userModel: Model<UserDocument>, battleService: BattleService, colonyService: ColonyService);
     handleFleetMissions(): Promise<void>;
+    private getCompletedMissionIds;
+    private hasLegacyCompletedMission;
     private hasCompletedMission;
 }

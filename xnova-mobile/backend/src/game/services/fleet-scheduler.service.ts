@@ -49,10 +49,41 @@ export class FleetSchedulerService {
       for (const user of usersWithMissions) {
         try {
           // 완료된 미션이 있는지 확인
-          const hasCompletedMission = this.hasCompletedMission(user, now);
+          const completedMissionIds = this.getCompletedMissionIds(user, now);
           
-          if (hasCompletedMission) {
-            // 각 미션 타입별 처리
+          if (completedMissionIds.length > 0 || this.hasLegacyCompletedMission(user, now)) {
+            // 완료된 각 미션을 개별적으로 처리
+            for (const missionInfo of completedMissionIds) {
+              try {
+                if (missionInfo.phase === 'outbound') {
+                  // 도착 처리
+                  switch (missionInfo.missionType) {
+                    case 'attack':
+                      await this.battleService.processAttackArrival(user._id.toString(), missionInfo.missionId);
+                      break;
+                    case 'recycle':
+                      await this.battleService.processRecycleArrival(user._id.toString(), missionInfo.missionId);
+                      break;
+                    case 'transport':
+                      await this.battleService.processTransportArrival(user._id.toString(), missionInfo.missionId);
+                      break;
+                    case 'deploy':
+                      await this.battleService.processDeployArrival(user._id.toString(), missionInfo.missionId);
+                      break;
+                    case 'colony':
+                      await this.colonyService.completeColonization(user._id.toString());
+                      break;
+                  }
+                } else if (missionInfo.phase === 'returning') {
+                  // 귀환 처리
+                  await this.battleService.processFleetReturn(user._id.toString(), missionInfo.missionId);
+                }
+              } catch (missionError) {
+                this.logger.warn(`Failed to process mission ${missionInfo.missionId}: ${missionError.message}`);
+              }
+            }
+
+            // 레거시 pendingAttack/pendingReturn 처리 (fleetMissions 없는 경우 호환성)
             await this.battleService.processAttackArrival(user._id.toString());
             await this.battleService.processRecycleArrival(user._id.toString());
             await this.battleService.processIncomingAttacks(user._id.toString());
@@ -80,22 +111,43 @@ export class FleetSchedulerService {
   }
 
   /**
-   * 완료된 미션이 있는지 확인
+   * 완료된 미션 ID 목록 가져오기
    */
-  private hasCompletedMission(user: any, now: number): boolean {
+  private getCompletedMissionIds(user: any, now: number): Array<{ missionId: string; missionType: string; phase: string }> {
+    const completedMissions: Array<{ missionId: string; missionType: string; phase: string }> = [];
+
     // fleetMissions 배열 확인
     if (user.fleetMissions && user.fleetMissions.length > 0) {
       for (const mission of user.fleetMissions) {
         if (mission.phase === 'outbound') {
           const arrivalTime = new Date(mission.arrivalTime).getTime();
-          if (arrivalTime <= now) return true;
+          if (arrivalTime <= now) {
+            completedMissions.push({
+              missionId: mission.missionId,
+              missionType: mission.missionType,
+              phase: 'outbound',
+            });
+          }
         } else if (mission.phase === 'returning') {
           const returnTime = new Date(mission.returnTime).getTime();
-          if (returnTime && returnTime <= now) return true;
+          if (returnTime && returnTime <= now) {
+            completedMissions.push({
+              missionId: mission.missionId,
+              missionType: mission.missionType,
+              phase: 'returning',
+            });
+          }
         }
       }
     }
 
+    return completedMissions;
+  }
+
+  /**
+   * 레거시 완료된 미션이 있는지 확인 (pendingAttack/pendingReturn)
+   */
+  private hasLegacyCompletedMission(user: any, now: number): boolean {
     // 레거시 pendingAttack 확인
     if (user.pendingAttack && !user.pendingAttack.battleCompleted) {
       const arrivalTime = new Date(user.pendingAttack.arrivalTime).getTime();
@@ -109,6 +161,13 @@ export class FleetSchedulerService {
     }
 
     return false;
+  }
+
+  /**
+   * 완료된 미션이 있는지 확인 (하위 호환성 유지)
+   */
+  private hasCompletedMission(user: any, now: number): boolean {
+    return this.getCompletedMissionIds(user, now).length > 0 || this.hasLegacyCompletedMission(user, now);
   }
 }
 
