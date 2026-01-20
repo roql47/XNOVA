@@ -1052,13 +1052,27 @@ class _PlanetRow extends StatelessWidget {
                                 ),
                             ],
                           ),
-                          // 좌표
-                          Text(
-                            planet.coordinate,
-                            style: const TextStyle(
-                              color: AppColors.textMuted,
-                              fontSize: 10,
-                            ),
+                          // 좌표 + 식민지 소유자 (ownerName이 있는 경우)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                planet.coordinate,
+                                style: const TextStyle(
+                                  color: AppColors.textMuted,
+                                  fontSize: 10,
+                                ),
+                              ),
+                              // 식민지 소유자 표시
+                              if (!isEmpty && planet.isColony && planet.ownerName != null && !isOwn)
+                                Text(
+                                  ' · ${planet.ownerName}의 식민지',
+                                  style: TextStyle(
+                                    color: AppColors.warning.withOpacity(0.8),
+                                    fontSize: 10,
+                                  ),
+                                ),
+                            ],
                           ),
                         ],
                       ),
