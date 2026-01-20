@@ -36,6 +36,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     setState(() {
       _isInitialized = true;
     });
+    // 초기화 완료 후 맨 아래로 스크롤
+    _scrollToBottom();
   }
 
   @override
@@ -72,9 +74,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final chatState = ref.watch(chatProvider);
     final currentUserId = ref.read(chatProvider.notifier).currentUserId;
 
-    // 새 메시지가 오면 스크롤
+    // 새 메시지가 오면 스크롤 (처음 로드 또는 새 메시지)
     ref.listen<ChatState>(chatProvider, (previous, next) {
-      if (previous != null && next.messages.length > previous.messages.length) {
+      // 처음 메시지가 로드되거나 새 메시지가 추가된 경우
+      if (previous == null || 
+          (previous.messages.isEmpty && next.messages.isNotEmpty) ||
+          next.messages.length > previous.messages.length) {
         _scrollToBottom();
       }
     });
