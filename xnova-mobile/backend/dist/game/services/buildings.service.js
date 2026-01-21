@@ -201,19 +201,40 @@ let BuildingsService = class BuildingsService {
         let fieldInfo;
         let planetInfo;
         if (isHome) {
-            mines = user.mines || {};
-            facilities = user.facilities || {};
-            constructionProgress = user.constructionProgress;
-            fieldInfo = this.getFieldInfo(user);
-            planetInfo = {
-                temperature: user.planetInfo?.temperature ?? 50,
-                planetType: user.planetInfo?.planetType ?? 'normaltemp',
-                planetName: user.planetInfo?.planetName ?? user.playerName,
-                diameter: user.planetInfo?.diameter ?? 12800,
-            };
+            if (user.constructionProgress && new Date(user.constructionProgress.finishTime).getTime() <= Date.now()) {
+                await this.completeConstructionWithDowngrade(userId);
+                const updatedUser = await this.userModel.findById(userId).exec();
+                if (updatedUser) {
+                    mines = updatedUser.mines || {};
+                    facilities = updatedUser.facilities || {};
+                    constructionProgress = updatedUser.constructionProgress;
+                    fieldInfo = this.getFieldInfo(updatedUser);
+                    planetInfo = {
+                        temperature: updatedUser.planetInfo?.temperature ?? 50,
+                        planetType: updatedUser.planetInfo?.planetType ?? 'normaltemp',
+                        planetName: updatedUser.planetInfo?.planetName ?? updatedUser.playerName,
+                        diameter: updatedUser.planetInfo?.diameter ?? 12800,
+                    };
+                }
+                else {
+                    return null;
+                }
+            }
+            else {
+                mines = user.mines || {};
+                facilities = user.facilities || {};
+                constructionProgress = user.constructionProgress;
+                fieldInfo = this.getFieldInfo(user);
+                planetInfo = {
+                    temperature: user.planetInfo?.temperature ?? 50,
+                    planetType: user.planetInfo?.planetType ?? 'normaltemp',
+                    planetName: user.planetInfo?.planetName ?? user.playerName,
+                    diameter: user.planetInfo?.diameter ?? 12800,
+                };
+            }
         }
         else {
-            const planet = await this.planetModel.findById(user.activePlanetId).exec();
+            let planet = await this.planetModel.findById(user.activePlanetId).exec();
             if (!planet) {
                 mines = user.mines || {};
                 facilities = user.facilities || {};
@@ -227,6 +248,13 @@ let BuildingsService = class BuildingsService {
                 };
             }
             else {
+                if (planet.constructionProgress && new Date(planet.constructionProgress.finishTime).getTime() <= Date.now()) {
+                    await this.completePlanetConstructionInternal(planet);
+                    planet = await this.planetModel.findById(user.activePlanetId).exec();
+                    if (!planet) {
+                        return null;
+                    }
+                }
                 mines = planet.mines || {};
                 facilities = planet.facilities || {};
                 constructionProgress = planet.constructionProgress;
@@ -650,6 +678,40 @@ let BuildingsService = class BuildingsService {
             await planet.save();
             return { completed: true, building: buildingType, newLevel, isDowngrade };
         }
+    }
+    async completePlanetConstructionInternal(planet) {
+        if (!planet.constructionProgress)
+            return;
+        if (new Date(planet.constructionProgress.finishTime).getTime() > Date.now())
+            return;
+        const buildingType = planet.constructionProgress.name;
+        const isDowngrade = planet.constructionProgress.isDowngrade || false;
+        const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+        if (isMine) {
+            if (!planet.mines)
+                planet.mines = {};
+            if (isDowngrade) {
+                planet.mines[buildingType] = Math.max(0, (planet.mines[buildingType] || 0) - 1);
+            }
+            else {
+                planet.mines[buildingType] = (planet.mines[buildingType] || 0) + 1;
+            }
+            planet.markModified('mines');
+        }
+        else {
+            if (!planet.facilities)
+                planet.facilities = {};
+            if (isDowngrade) {
+                planet.facilities[buildingType] = Math.max(0, (planet.facilities[buildingType] || 0) - 1);
+            }
+            else {
+                planet.facilities[buildingType] = (planet.facilities[buildingType] || 0) + 1;
+            }
+            planet.markModified('facilities');
+        }
+        planet.constructionProgress = null;
+        planet.markModified('constructionProgress');
+        await planet.save();
     }
 };
 exports.BuildingsService = BuildingsService;

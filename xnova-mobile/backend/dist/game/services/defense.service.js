@@ -67,7 +67,7 @@ let DefenseService = class DefenseService {
         return this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel) * quantity;
     }
     async getDefense(userId) {
-        const user = await this.userModel.findById(userId).exec();
+        let user = await this.userModel.findById(userId).exec();
         if (!user)
             return null;
         const isHome = this.isHomePlanet(user.activePlanetId, userId);
@@ -75,18 +75,38 @@ let DefenseService = class DefenseService {
         let facilities;
         let defenseProgress;
         if (isHome) {
+            if (user.defenseProgress && new Date(user.defenseProgress.finishTime).getTime() <= Date.now()) {
+                let result = await this.completeBuild(userId);
+                while (result.completed) {
+                    user = await this.userModel.findById(userId).exec();
+                    if (!user?.defenseProgress)
+                        break;
+                    if (new Date(user.defenseProgress.finishTime).getTime() > Date.now())
+                        break;
+                    result = await this.completeBuild(userId);
+                }
+                user = await this.userModel.findById(userId).exec();
+                if (!user)
+                    return null;
+            }
             defense = user.defense || {};
             facilities = user.facilities || {};
             defenseProgress = user.defenseProgress;
         }
         else {
-            const planet = await this.planetModel.findById(user.activePlanetId).exec();
+            let planet = await this.planetModel.findById(user.activePlanetId).exec();
             if (!planet) {
                 defense = user.defense || {};
                 facilities = user.facilities || {};
                 defenseProgress = user.defenseProgress;
             }
             else {
+                if (planet.defenseProgress && new Date(planet.defenseProgress.finishTime).getTime() <= Date.now()) {
+                    await this.completePlanetDefenseBuildInternal(planet);
+                    planet = await this.planetModel.findById(user.activePlanetId).exec();
+                    if (!planet)
+                        return null;
+                }
                 defense = planet.defense || {};
                 facilities = planet.facilities || {};
                 defenseProgress = planet.defenseProgress;
@@ -269,6 +289,39 @@ let DefenseService = class DefenseService {
             await planet.save();
             return { completed: true, defense: defenseType, quantity: 1, remaining: newRemaining };
         }
+    }
+    async completePlanetDefenseBuildInternal(planet) {
+        const now = Date.now();
+        while (planet.defenseProgress && new Date(planet.defenseProgress.finishTime).getTime() <= now) {
+            const defenseType = planet.defenseProgress.name;
+            const remainingQuantity = planet.defenseProgress.quantity || 1;
+            if (!planet.defense)
+                planet.defense = {};
+            planet.defense[defenseType] = (planet.defense[defenseType] || 0) + 1;
+            planet.markModified('defense');
+            const newRemaining = remainingQuantity - 1;
+            if (newRemaining > 0) {
+                const robotFactoryLevel = planet.facilities?.robotFactory || 0;
+                const nanoFactoryLevel = planet.facilities?.nanoFactory || 0;
+                const singleBuildTime = this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel);
+                planet.defenseProgress = {
+                    type: 'defense',
+                    name: defenseType,
+                    quantity: newRemaining,
+                    startTime: new Date(),
+                    finishTime: new Date(Date.now() + singleBuildTime * 1000),
+                };
+                if (new Date(planet.defenseProgress.finishTime).getTime() > now) {
+                    break;
+                }
+            }
+            else {
+                planet.defenseProgress = null;
+                break;
+            }
+        }
+        planet.markModified('defenseProgress');
+        await planet.save();
     }
 };
 exports.DefenseService = DefenseService;

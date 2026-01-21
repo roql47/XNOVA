@@ -111,4 +111,5 @@ export declare class BuildingsService {
         newLevel?: number;
         isDowngrade?: boolean;
     }>;
+    private completePlanetConstructionInternal;
 }

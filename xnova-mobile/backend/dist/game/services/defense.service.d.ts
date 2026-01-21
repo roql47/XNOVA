@@ -54,4 +54,5 @@ export declare class DefenseService {
         quantity?: number;
         remaining?: number;
     }>;
+    private completePlanetDefenseBuildInternal;
 }

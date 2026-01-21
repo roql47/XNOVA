@@ -126,7 +126,7 @@ let BuildSchedulerService = BuildSchedulerService_1 = class BuildSchedulerServic
                     { defenseProgress: { $ne: null } },
                     { constructionProgress: { $ne: null } },
                 ]
-            }).select('_id ownerId fleetProgress defenseProgress constructionProgress').exec();
+            }).exec();
             for (const planet of planetsWithProgress) {
                 try {
                     if (planet.fleetProgress) {
@@ -241,19 +241,33 @@ let BuildSchedulerService = BuildSchedulerService_1 = class BuildSchedulerServic
             return;
         const buildingType = planet.constructionProgress.name;
         const isDowngrade = planet.constructionProgress.isDowngrade || false;
-        if (!planet.facilities)
-            planet.facilities = {};
-        if (isDowngrade) {
-            planet.facilities[buildingType] = Math.max(0, (planet.facilities[buildingType] || 0) - 1);
+        const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+        if (isMine) {
+            if (!planet.mines)
+                planet.mines = {};
+            if (isDowngrade) {
+                planet.mines[buildingType] = Math.max(0, (planet.mines[buildingType] || 0) - 1);
+            }
+            else {
+                planet.mines[buildingType] = (planet.mines[buildingType] || 0) + 1;
+            }
+            planet.markModified('mines');
         }
         else {
-            planet.facilities[buildingType] = (planet.facilities[buildingType] || 0) + 1;
+            if (!planet.facilities)
+                planet.facilities = {};
+            if (isDowngrade) {
+                planet.facilities[buildingType] = Math.max(0, (planet.facilities[buildingType] || 0) - 1);
+            }
+            else {
+                planet.facilities[buildingType] = (planet.facilities[buildingType] || 0) + 1;
+            }
+            planet.markModified('facilities');
         }
         planet.constructionProgress = null;
-        planet.markModified('facilities');
         planet.markModified('constructionProgress');
         await planet.save();
-        this.logger.debug(`Planet construction completed: ${planet._id} - ${buildingType}`);
+        this.logger.debug(`Planet construction completed: ${planet._id} - ${buildingType} (isMine: ${isMine})`);
     }
 };
 exports.BuildSchedulerService = BuildSchedulerService;

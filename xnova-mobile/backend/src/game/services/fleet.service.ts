@@ -78,9 +78,9 @@ export class FleetService {
     return this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel) * quantity;
   }
 
-  // 함대 현황 조회 (활성 행성 기준)
+  // 함대 현황 조회 (활성 행성 기준) - 건조 완료 자동 처리 포함
   async getFleet(userId: string) {
-    const user = await this.userModel.findById(userId).exec();
+    let user = await this.userModel.findById(userId).exec();
     if (!user) return null;
 
     const isHome = this.isHomePlanet(user.activePlanetId, userId);
@@ -89,17 +89,35 @@ export class FleetService {
     let fleetProgress: any;
 
     if (isHome) {
+      // 모행성: 건조 완료 자동 처리
+      if (user.fleetProgress && new Date(user.fleetProgress.finishTime).getTime() <= Date.now()) {
+        let result = await this.completeBuild(userId);
+        while (result.completed) {
+          user = await this.userModel.findById(userId).exec();
+          if (!user?.fleetProgress) break;
+          if (new Date(user.fleetProgress.finishTime).getTime() > Date.now()) break;
+          result = await this.completeBuild(userId);
+        }
+        user = await this.userModel.findById(userId).exec();
+        if (!user) return null;
+      }
       fleet = user.fleet || {};
       facilities = user.facilities || {};
       fleetProgress = user.fleetProgress;
     } else {
-      const planet = await this.planetModel.findById(user.activePlanetId).exec();
+      let planet = await this.planetModel.findById(user.activePlanetId).exec();
       if (!planet) {
         // 폴백
         fleet = user.fleet || {};
         facilities = user.facilities || {};
         fleetProgress = user.fleetProgress;
       } else {
+        // 식민지: 건조 완료 자동 처리
+        if (planet.fleetProgress && new Date(planet.fleetProgress.finishTime).getTime() <= Date.now()) {
+          await this.completePlanetFleetBuildInternal(planet);
+          planet = await this.planetModel.findById(user.activePlanetId).exec();
+          if (!planet) return null;
+        }
         fleet = planet.fleet || {};
         facilities = planet.facilities || {};
         fleetProgress = planet.fleetProgress;
@@ -363,5 +381,50 @@ export class FleetService {
     }
 
     return minSpeed === Infinity ? 10000 : minSpeed;
+  }
+
+  /**
+   * 식민지 함대 건조 완료 내부 처리 (getFleet에서 사용)
+   */
+  private async completePlanetFleetBuildInternal(planet: PlanetDocument): Promise<void> {
+    const now = Date.now();
+    
+    while (planet.fleetProgress && new Date(planet.fleetProgress.finishTime).getTime() <= now) {
+      const fleetType = planet.fleetProgress.name;
+      const remainingQuantity = (planet.fleetProgress as any).quantity || 1;
+
+      // 함대 추가
+      if (!planet.fleet) planet.fleet = {} as any;
+      (planet.fleet as any)[fleetType] = ((planet.fleet as any)[fleetType] || 0) + 1;
+      planet.markModified('fleet');
+
+      const newRemaining = remainingQuantity - 1;
+
+      if (newRemaining > 0) {
+        // 다음 건조 설정
+        const shipyardLevel = planet.facilities?.shipyard || 0;
+        const nanoFactoryLevel = planet.facilities?.nanoFactory || 0;
+        const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
+
+        planet.fleetProgress = {
+          type: 'fleet',
+          name: fleetType,
+          quantity: newRemaining,
+          startTime: new Date(),
+          finishTime: new Date(Date.now() + singleBuildTime * 1000),
+        } as any;
+
+        // 다음 건조가 아직 완료 시간이 안 됐으면 종료
+        if (planet.fleetProgress && new Date(planet.fleetProgress.finishTime).getTime() > now) {
+          break;
+        }
+      } else {
+        planet.fleetProgress = null;
+        break;
+      }
+    }
+
+    planet.markModified('fleetProgress');
+    await planet.save();
   }
 }

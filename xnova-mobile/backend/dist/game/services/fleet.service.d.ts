@@ -56,4 +56,5 @@ export declare class FleetService {
     calculateTotalCapacity(fleet: Record<string, number>): number;
     calculateFuelConsumption(fleet: Record<string, number>, distance: number, duration: number): number;
     getFleetSpeed(fleet: Record<string, number>): number;
+    private completePlanetFleetBuildInternal;
 }

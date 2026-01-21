@@ -245,7 +245,7 @@ export class BuildingsService {
     };
   }
 
-  // 건물 현황 조회 (활성 행성 기준)
+  // 건물 현황 조회 (활성 행성 기준) - 완료된 건설 자동 처리 포함
   async getBuildings(userId: string) {
     const user = await this.userModel.findById(userId).exec();
     if (!user) return null;
@@ -258,20 +258,41 @@ export class BuildingsService {
     let planetInfo: any;
 
     if (isHome) {
-      // 모행성 데이터
-      mines = user.mines || {};
-      facilities = user.facilities || {};
-      constructionProgress = user.constructionProgress;
-      fieldInfo = this.getFieldInfo(user);
-      planetInfo = {
-        temperature: user.planetInfo?.temperature ?? 50,
-        planetType: user.planetInfo?.planetType ?? 'normaltemp',
-        planetName: user.planetInfo?.planetName ?? user.playerName,
-        diameter: user.planetInfo?.diameter ?? 12800,
-      };
+      // 모행성: 건설 완료 자동 처리
+      if (user.constructionProgress && new Date(user.constructionProgress.finishTime).getTime() <= Date.now()) {
+        await this.completeConstructionWithDowngrade(userId);
+        // 완료 후 다시 조회
+        const updatedUser = await this.userModel.findById(userId).exec();
+        if (updatedUser) {
+          mines = updatedUser.mines || {};
+          facilities = updatedUser.facilities || {};
+          constructionProgress = updatedUser.constructionProgress;
+          fieldInfo = this.getFieldInfo(updatedUser);
+          planetInfo = {
+            temperature: updatedUser.planetInfo?.temperature ?? 50,
+            planetType: updatedUser.planetInfo?.planetType ?? 'normaltemp',
+            planetName: updatedUser.planetInfo?.planetName ?? updatedUser.playerName,
+            diameter: updatedUser.planetInfo?.diameter ?? 12800,
+          };
+        } else {
+          return null;
+        }
+      } else {
+        // 모행성 데이터
+        mines = user.mines || {};
+        facilities = user.facilities || {};
+        constructionProgress = user.constructionProgress;
+        fieldInfo = this.getFieldInfo(user);
+        planetInfo = {
+          temperature: user.planetInfo?.temperature ?? 50,
+          planetType: user.planetInfo?.planetType ?? 'normaltemp',
+          planetName: user.planetInfo?.planetName ?? user.playerName,
+          diameter: user.planetInfo?.diameter ?? 12800,
+        };
+      }
     } else {
       // 식민지 데이터
-      const planet = await this.planetModel.findById(user.activePlanetId).exec();
+      let planet = await this.planetModel.findById(user.activePlanetId).exec();
       if (!planet) {
         // 식민지 못찾으면 모행성으로 폴백
         mines = user.mines || {};
@@ -285,6 +306,16 @@ export class BuildingsService {
           diameter: user.planetInfo?.diameter ?? 12800,
         };
       } else {
+        // 식민지: 건설 완료 자동 처리
+        if (planet.constructionProgress && new Date(planet.constructionProgress.finishTime).getTime() <= Date.now()) {
+          await this.completePlanetConstructionInternal(planet);
+          // 완료 후 다시 조회
+          planet = await this.planetModel.findById(user.activePlanetId).exec();
+          if (!planet) {
+            return null;
+          }
+        }
+        
         mines = planet.mines || {};
         facilities = planet.facilities || {};
         constructionProgress = planet.constructionProgress;
@@ -789,5 +820,39 @@ export class BuildingsService {
 
       return { completed: true, building: buildingType, newLevel, isDowngrade };
     }
+  }
+
+  /**
+   * 식민지 건설 완료 내부 처리 (getBuildings에서 사용)
+   */
+  private async completePlanetConstructionInternal(planet: PlanetDocument): Promise<void> {
+    if (!planet.constructionProgress) return;
+    if (new Date(planet.constructionProgress.finishTime).getTime() > Date.now()) return;
+
+    const buildingType = planet.constructionProgress.name;
+    const isDowngrade = (planet.constructionProgress as any).isDowngrade || false;
+    const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
+
+    if (isMine) {
+      if (!planet.mines) planet.mines = {} as any;
+      if (isDowngrade) {
+        (planet.mines as any)[buildingType] = Math.max(0, ((planet.mines as any)[buildingType] || 0) - 1);
+      } else {
+        (planet.mines as any)[buildingType] = ((planet.mines as any)[buildingType] || 0) + 1;
+      }
+      planet.markModified('mines');
+    } else {
+      if (!planet.facilities) planet.facilities = {} as any;
+      if (isDowngrade) {
+        (planet.facilities as any)[buildingType] = Math.max(0, ((planet.facilities as any)[buildingType] || 0) - 1);
+      } else {
+        (planet.facilities as any)[buildingType] = ((planet.facilities as any)[buildingType] || 0) + 1;
+      }
+      planet.markModified('facilities');
+    }
+
+    planet.constructionProgress = null;
+    planet.markModified('constructionProgress');
+    await planet.save();
   }
 }

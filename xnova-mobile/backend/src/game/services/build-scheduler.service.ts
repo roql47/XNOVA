@@ -121,13 +121,14 @@ export class BuildSchedulerService {
       }
 
       // 식민지의 건조/건설 완료 처리
+      // 주의: mines, facilities, fleet, defense도 포함해야 기존 데이터가 유지됨!
       const planetsWithProgress = await this.planetModel.find({
         $or: [
           { fleetProgress: { $ne: null } },
           { defenseProgress: { $ne: null } },
           { constructionProgress: { $ne: null } },
         ]
-      }).select('_id ownerId fleetProgress defenseProgress constructionProgress').exec();
+      }).exec();  // select 제거 - 전체 문서를 가져와야 함
 
       for (const planet of planetsWithProgress) {
         try {
@@ -265,26 +266,40 @@ export class BuildSchedulerService {
   }
 
   /**
-   * 식민지 시설 건설 완료 처리
+   * 식민지 시설/광산 건설 완료 처리
    */
   private async completePlanetConstruction(planet: PlanetDocument): Promise<void> {
     if (!planet.constructionProgress) return;
 
     const buildingType = planet.constructionProgress.name;
     const isDowngrade = (planet.constructionProgress as any).isDowngrade || false;
+    
+    // 광산인지 시설인지 구분
+    const isMine = ['metalMine', 'crystalMine', 'deuteriumMine', 'solarPlant', 'fusionReactor'].includes(buildingType);
 
-    if (!planet.facilities) planet.facilities = {} as any;
-
-    if (isDowngrade) {
-      (planet.facilities as any)[buildingType] = Math.max(0, ((planet.facilities as any)[buildingType] || 0) - 1);
+    if (isMine) {
+      // 광산 처리
+      if (!planet.mines) planet.mines = {} as any;
+      if (isDowngrade) {
+        (planet.mines as any)[buildingType] = Math.max(0, ((planet.mines as any)[buildingType] || 0) - 1);
+      } else {
+        (planet.mines as any)[buildingType] = ((planet.mines as any)[buildingType] || 0) + 1;
+      }
+      planet.markModified('mines');
     } else {
-      (planet.facilities as any)[buildingType] = ((planet.facilities as any)[buildingType] || 0) + 1;
+      // 시설 처리
+      if (!planet.facilities) planet.facilities = {} as any;
+      if (isDowngrade) {
+        (planet.facilities as any)[buildingType] = Math.max(0, ((planet.facilities as any)[buildingType] || 0) - 1);
+      } else {
+        (planet.facilities as any)[buildingType] = ((planet.facilities as any)[buildingType] || 0) + 1;
+      }
+      planet.markModified('facilities');
     }
 
     planet.constructionProgress = null;
-    planet.markModified('facilities');
     planet.markModified('constructionProgress');
     await planet.save();
-    this.logger.debug(`Planet construction completed: ${planet._id} - ${buildingType}`);
+    this.logger.debug(`Planet construction completed: ${planet._id} - ${buildingType} (isMine: ${isMine})`);
   }
 }

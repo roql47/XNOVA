@@ -67,7 +67,7 @@ let FleetService = class FleetService {
         return this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel) * quantity;
     }
     async getFleet(userId) {
-        const user = await this.userModel.findById(userId).exec();
+        let user = await this.userModel.findById(userId).exec();
         if (!user)
             return null;
         const isHome = this.isHomePlanet(user.activePlanetId, userId);
@@ -75,18 +75,38 @@ let FleetService = class FleetService {
         let facilities;
         let fleetProgress;
         if (isHome) {
+            if (user.fleetProgress && new Date(user.fleetProgress.finishTime).getTime() <= Date.now()) {
+                let result = await this.completeBuild(userId);
+                while (result.completed) {
+                    user = await this.userModel.findById(userId).exec();
+                    if (!user?.fleetProgress)
+                        break;
+                    if (new Date(user.fleetProgress.finishTime).getTime() > Date.now())
+                        break;
+                    result = await this.completeBuild(userId);
+                }
+                user = await this.userModel.findById(userId).exec();
+                if (!user)
+                    return null;
+            }
             fleet = user.fleet || {};
             facilities = user.facilities || {};
             fleetProgress = user.fleetProgress;
         }
         else {
-            const planet = await this.planetModel.findById(user.activePlanetId).exec();
+            let planet = await this.planetModel.findById(user.activePlanetId).exec();
             if (!planet) {
                 fleet = user.fleet || {};
                 facilities = user.facilities || {};
                 fleetProgress = user.fleetProgress;
             }
             else {
+                if (planet.fleetProgress && new Date(planet.fleetProgress.finishTime).getTime() <= Date.now()) {
+                    await this.completePlanetFleetBuildInternal(planet);
+                    planet = await this.planetModel.findById(user.activePlanetId).exec();
+                    if (!planet)
+                        return null;
+                }
                 fleet = planet.fleet || {};
                 facilities = planet.facilities || {};
                 fleetProgress = planet.fleetProgress;
@@ -301,6 +321,39 @@ let FleetService = class FleetService {
             }
         }
         return minSpeed === Infinity ? 10000 : minSpeed;
+    }
+    async completePlanetFleetBuildInternal(planet) {
+        const now = Date.now();
+        while (planet.fleetProgress && new Date(planet.fleetProgress.finishTime).getTime() <= now) {
+            const fleetType = planet.fleetProgress.name;
+            const remainingQuantity = planet.fleetProgress.quantity || 1;
+            if (!planet.fleet)
+                planet.fleet = {};
+            planet.fleet[fleetType] = (planet.fleet[fleetType] || 0) + 1;
+            planet.markModified('fleet');
+            const newRemaining = remainingQuantity - 1;
+            if (newRemaining > 0) {
+                const shipyardLevel = planet.facilities?.shipyard || 0;
+                const nanoFactoryLevel = planet.facilities?.nanoFactory || 0;
+                const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
+                planet.fleetProgress = {
+                    type: 'fleet',
+                    name: fleetType,
+                    quantity: newRemaining,
+                    startTime: new Date(),
+                    finishTime: new Date(Date.now() + singleBuildTime * 1000),
+                };
+                if (planet.fleetProgress && new Date(planet.fleetProgress.finishTime).getTime() > now) {
+                    break;
+                }
+            }
+            else {
+                planet.fleetProgress = null;
+                break;
+            }
+        }
+        planet.markModified('fleetProgress');
+        await planet.save();
     }
 };
 exports.FleetService = FleetService;
