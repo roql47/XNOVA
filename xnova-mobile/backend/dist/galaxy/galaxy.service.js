@@ -51,7 +51,7 @@ let GalaxyService = class GalaxyService {
         const expiryDate = new Date(Date.now() - DEBRIS_EXPIRY_MS);
         const [players, colonies, debrisFields] = await Promise.all([
             this.userModel.find({ coordinate: pattern }).exec(),
-            this.planetModel.find({ coordinate: pattern }).populate('ownerId').exec(),
+            this.planetModel.find({ coordinate: pattern }).exec(),
             this.debrisModel.find({
                 coordinate: pattern,
                 createdAt: { $gte: expiryDate },
@@ -59,6 +59,11 @@ let GalaxyService = class GalaxyService {
             this.userModel.findByIdAndUpdate(currentUserId, { lastActivity: new Date() }).exec(),
             this.cleanupExpiredDebris(),
         ]);
+        const colonyOwnerIds = [...new Set(colonies.map(c => c.ownerId))];
+        const colonyOwners = await this.userModel.find({
+            _id: { $in: colonyOwnerIds }
+        }).select('_id playerName').exec();
+        const ownerNameMap = new Map(colonyOwners.map(o => [o._id.toString(), o.playerName]));
         const planets = [];
         for (let position = 1; position <= 15; position++) {
             const coord = `${galaxy}:${system}:${position}`;
@@ -82,9 +87,8 @@ let GalaxyService = class GalaxyService {
                 };
             }
             else if (colony) {
-                const owner = colony.ownerId;
-                const ownerId = typeof owner === 'string' ? owner : owner?._id?.toString() || owner?.toString();
-                const ownerName = typeof owner === 'object' ? owner?.playerName : null;
+                const ownerId = colony.ownerId;
+                const ownerName = ownerNameMap.get(ownerId) || null;
                 info = {
                     position,
                     coordinate: coord,
@@ -92,7 +96,7 @@ let GalaxyService = class GalaxyService {
                     playerId: ownerId,
                     isOwnPlanet: ownerId === currentUserId,
                     isColony: true,
-                    ownerName: ownerName || null,
+                    ownerName: ownerName,
                     hasDebris: !!debris && (debris.metal > 0 || debris.crystal > 0),
                     debrisAmount: debris ? { metal: debris.metal, crystal: debris.crystal } : undefined,
                     hasMoon: false,

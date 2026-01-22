@@ -76,7 +76,7 @@ export class GalaxyService {
     
     const [players, colonies, debrisFields] = await Promise.all([
       this.userModel.find({ coordinate: pattern }).exec(),
-      this.planetModel.find({ coordinate: pattern }).populate('ownerId').exec(),
+      this.planetModel.find({ coordinate: pattern }).exec(),
       // 만료되지 않은 데브리만 조회
       this.debrisModel.find({ 
         coordinate: pattern,
@@ -87,6 +87,13 @@ export class GalaxyService {
       // 백그라운드에서 만료된 데브리 정리
       this.cleanupExpiredDebris(),
     ]);
+
+    // 식민지 소유자들의 playerName 조회
+    const colonyOwnerIds = [...new Set(colonies.map(c => c.ownerId))];
+    const colonyOwners = await this.userModel.find({ 
+      _id: { $in: colonyOwnerIds } 
+    }).select('_id playerName').exec();
+    const ownerNameMap = new Map(colonyOwners.map(o => [o._id.toString(), o.playerName]));
 
     // 행성 포인트 1~15 초기화
     const planets: PlanetInfo[] = [];
@@ -116,9 +123,8 @@ export class GalaxyService {
         };
       } else if (colony) {
         // 식민지 (Planet 기반)
-        const owner = colony.ownerId as any;
-        const ownerId = typeof owner === 'string' ? owner : owner?._id?.toString() || owner?.toString();
-        const ownerName = typeof owner === 'object' ? owner?.playerName : null;
+        const ownerId = colony.ownerId;
+        const ownerName = ownerNameMap.get(ownerId) || null;
         
         info = {
           position,
@@ -127,7 +133,7 @@ export class GalaxyService {
           playerId: ownerId,
           isOwnPlanet: ownerId === currentUserId,
           isColony: true,
-          ownerName: ownerName || null,  // 식민지 소유자 이름
+          ownerName: ownerName,  // 식민지 소유자 이름
           hasDebris: !!debris && (debris.metal > 0 || debris.crystal > 0),
           debrisAmount: debris ? { metal: debris.metal, crystal: debris.crystal } : undefined,
           hasMoon: false,
