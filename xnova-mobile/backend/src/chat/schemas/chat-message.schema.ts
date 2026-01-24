@@ -18,7 +18,7 @@ export class ChatMessage {
   timestamp: Date;
 
   // 연합 채팅용 - null이면 전체 채팅
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   allianceId: string | null;
 }
 
