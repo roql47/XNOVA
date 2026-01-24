@@ -468,20 +468,20 @@ class ApiService {
   // ===== 연합 (Alliance) =====
   // 내 연합 정보 조회 (가입 여부 확인)
   Future<MyAllianceResponse> getMyAlliance() async {
-    final response = await _dio.get('alliance/my-alliance');
+    final response = await _dio.get('alliance');
     return MyAllianceResponse.fromJson(response.data);
   }
 
   // 연합 생성
   Future<Alliance> createAlliance(CreateAllianceRequest request) async {
     final response = await _dio.post('alliance/create', data: request.toJson());
-    return Alliance.fromJson(response.data);
+    return Alliance.fromJson(response.data['alliance'] ?? response.data);
   }
 
-  // 연합 검색
-  Future<List<AllianceSearchResult>> searchAlliances(String query, {int? page, int? limit}) async {
+  // 연합 검색 (빈 쿼리 시 전체 연합 반환)
+  Future<List<AllianceSearchResult>> searchAlliances({String? query, int? page, int? limit}) async {
     final response = await _dio.get('alliance/search', queryParameters: {
-      'query': query,
+      if (query != null && query.isNotEmpty) 'query': query,
       if (page != null) 'page': page,
       if (limit != null) 'limit': limit,
     });
@@ -491,98 +491,139 @@ class ApiService {
   }
 
   // 연합 가입 신청
-  Future<Alliance> applyForAlliance(ApplyForAllianceRequest request) async {
-    final response = await _dio.post('alliance/apply', data: request.toJson());
-    return Alliance.fromJson(response.data);
+  Future<void> applyForAlliance(ApplyForAllianceRequest request) async {
+    await _dio.post('alliance/${request.allianceId}/apply', data: {
+      'message': request.applicationText,
+    });
   }
 
   // 연합 가입 신청 취소
-  Future<Alliance> cancelApplication(String allianceId) async {
-    final response = await _dio.delete('alliance/apply/$allianceId');
-    return Alliance.fromJson(response.data);
+  Future<void> cancelApplication() async {
+    await _dio.delete('alliance/application');
   }
 
   // 특정 연합 정보 조회
   Future<Alliance> getAllianceInfo(String allianceId) async {
-    final response = await _dio.get('alliance/$allianceId');
+    final response = await _dio.get('alliance/info/$allianceId');
     return Alliance.fromJson(response.data);
   }
 
   // 연합 탈퇴
   Future<void> exitAlliance() async {
-    await _dio.post('alliance/exit');
+    await _dio.post('alliance/leave');
   }
 
   // 계급 생성
-  Future<Alliance> createRank(String allianceId, CreateRankRequest request) async {
-    final response = await _dio.post('alliance/$allianceId/ranks', data: request.toJson());
-    return Alliance.fromJson(response.data);
+  Future<void> createRank(CreateRankRequest request) async {
+    await _dio.post('alliance/ranks', data: request.toJson());
   }
 
   // 계급 수정
-  Future<Alliance> updateRank(String allianceId, UpdateRankRequest request) async {
-    final response = await _dio.put('alliance/$allianceId/ranks', data: request.toJson());
-    return Alliance.fromJson(response.data);
+  Future<void> updateRank(String rankName, UpdateRankRequest request) async {
+    await _dio.put('alliance/ranks/$rankName', data: request.toJson());
   }
 
   // 계급 삭제
-  Future<Alliance> deleteRank(String allianceId, String rankId) async {
-    final response = await _dio.delete('alliance/$allianceId/ranks/$rankId');
-    return Alliance.fromJson(response.data);
+  Future<void> deleteRank(String rankName) async {
+    await _dio.delete('alliance/ranks/$rankName');
   }
 
   // 멤버 목록 조회
-  Future<List<AllianceMember>> getAllianceMembers(String allianceId) async {
-    final response = await _dio.get('alliance/$allianceId/members');
-    return (response.data as List<dynamic>)
+  Future<List<AllianceMember>> getAllianceMembers() async {
+    final response = await _dio.get('alliance/members');
+    final members = response.data['members'] ?? response.data;
+    return (members as List<dynamic>)
         .map((e) => AllianceMember.fromJson(e))
         .toList();
   }
 
   // 멤버 계급 변경
-  Future<void> changeMemberRank(String allianceId, ChangeMemberRankRequest request) async {
-    await _dio.put('alliance/$allianceId/members/rank', data: request.toJson());
+  Future<void> changeMemberRank(String memberId, String? rankName) async {
+    await _dio.put('alliance/member/$memberId/rank', data: {
+      'rankName': rankName,
+    });
   }
 
   // 멤버 추방
-  Future<void> kickMember(String allianceId, KickMemberRequest request) async {
-    await _dio.post('alliance/$allianceId/members/kick', data: request.toJson());
+  Future<void> kickMember(String memberId) async {
+    await _dio.delete('alliance/member/$memberId');
   }
 
   // 가입 신청 목록 조회
-  Future<List<AllianceJoinRequest>> getJoinRequests(String allianceId) async {
-    final response = await _dio.get('alliance/$allianceId/requests');
-    return (response.data as List<dynamic>)
-        .map((e) => AllianceJoinRequest.fromJson(e))
+  Future<List<AllianceApplication>> getJoinRequests() async {
+    final response = await _dio.get('alliance/applications');
+    final applications = response.data['applications'] ?? response.data;
+    return (applications as List<dynamic>)
+        .map((e) => AllianceApplication.fromJson(e))
         .toList();
   }
 
-  // 가입 신청 처리 (승인/거절)
-  Future<void> processApplication(String allianceId, ProcessApplicationRequest request) async {
-    await _dio.post('alliance/$allianceId/requests/process', data: request.toJson());
+  // 가입 신청 승인
+  Future<void> acceptApplication(String applicantId) async {
+    await _dio.post('alliance/application/$applicantId/accept');
   }
 
-  // 연합 정보 수정
-  Future<Alliance> updateAllianceInfo(String allianceId, UpdateAllianceInfoRequest request) async {
-    final response = await _dio.put('alliance/$allianceId/info', data: request.toJson());
-    return Alliance.fromJson(response.data);
+  // 가입 신청 거절
+  Future<void> rejectApplication(String applicantId, String? reason) async {
+    await _dio.post('alliance/application/$applicantId/reject', data: {
+      if (reason != null) 'reason': reason,
+    });
   }
 
-  // 연합 이름/태그 변경
-  Future<Alliance> changeAllianceNameTag(String allianceId, ChangeAllianceNameTagRequest request) async {
-    final response = await _dio.put('alliance/$allianceId/name-tag', data: request.toJson());
-    return Alliance.fromJson(response.data);
+  // 연합 설정 수정
+  Future<void> updateAllianceSettings({
+    String? externalText,
+    String? internalText,
+    String? logo,
+    String? website,
+    bool? isOpen,
+    String? ownerTitle,
+  }) async {
+    await _dio.put('alliance/settings', data: {
+      if (externalText != null) 'externalText': externalText,
+      if (internalText != null) 'internalText': internalText,
+      if (logo != null) 'logo': logo,
+      if (website != null) 'website': website,
+      if (isOpen != null) 'isOpen': isOpen,
+      if (ownerTitle != null) 'ownerTitle': ownerTitle,
+    });
+  }
+
+  // 연합 이름 변경
+  Future<void> changeAllianceName(String name) async {
+    await _dio.put('alliance/name', data: {'name': name});
+  }
+
+  // 연합 태그 변경
+  Future<void> changeAllianceTag(String tag) async {
+    await _dio.put('alliance/tag', data: {'tag': tag});
   }
 
   // 연합 양도
-  Future<Alliance> transferAlliance(String allianceId, TransferAllianceRequest request) async {
-    final response = await _dio.post('alliance/$allianceId/transfer', data: request.toJson());
-    return Alliance.fromJson(response.data);
+  Future<void> transferAlliance(String newOwnerId) async {
+    await _dio.post('alliance/transfer', data: {'newOwnerId': newOwnerId});
   }
 
   // 연합 해산
-  Future<void> disbandAlliance(String allianceId) async {
-    await _dio.delete('alliance/$allianceId');
+  Future<void> disbandAlliance() async {
+    await _dio.delete('alliance');
+  }
+
+  // 회람 메시지 발송
+  Future<void> sendCircularMessage(String title, String content) async {
+    await _dio.post('alliance/circular', data: {
+      'title': title,
+      'content': content,
+    });
+  }
+
+  // 계급 목록 조회
+  Future<List<AllianceRank>> getAllianceRanks() async {
+    final response = await _dio.get('alliance/ranks');
+    final ranks = response.data['ranks'] ?? response.data;
+    return (ranks as List<dynamic>)
+        .map((e) => AllianceRank.fromJson(e))
+        .toList();
   }
 }
 

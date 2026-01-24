@@ -11,7 +11,7 @@ class AllianceState {
   final AllianceSearchResult? pendingAlliance;  // 대기 중인 가입 신청 연합
   final List<AllianceSearchResult> searchResults;  // 검색 결과
   final List<AllianceMember> members;  // 연합 멤버 목록
-  final List<AllianceJoinRequest> joinRequests;  // 가입 신청 목록
+  final List<AllianceApplication> applications;  // 가입 신청 목록
   final bool isLoading;
   final String? error;
   final String? successMessage;
@@ -22,7 +22,7 @@ class AllianceState {
     this.pendingAlliance,
     this.searchResults = const [],
     this.members = const [],
-    this.joinRequests = const [],
+    this.applications = const [],
     this.isLoading = false,
     this.error,
     this.successMessage,
@@ -36,7 +36,7 @@ class AllianceState {
     bool clearPendingAlliance = false,
     List<AllianceSearchResult>? searchResults,
     List<AllianceMember>? members,
-    List<AllianceJoinRequest>? joinRequests,
+    List<AllianceApplication>? applications,
     bool? isLoading,
     String? error,
     String? successMessage,
@@ -48,7 +48,7 @@ class AllianceState {
       pendingAlliance: clearPendingAlliance ? null : (pendingAlliance ?? this.pendingAlliance),
       searchResults: searchResults ?? this.searchResults,
       members: members ?? this.members,
-      joinRequests: joinRequests ?? this.joinRequests,
+      applications: applications ?? this.applications,
       isLoading: isLoading ?? this.isLoading,
       error: clearMessages ? null : error,
       successMessage: clearMessages ? null : successMessage,
@@ -115,15 +115,11 @@ class AllianceNotifier extends StateNotifier<AllianceState> {
     }
   }
 
-  // 연합 검색
-  Future<void> searchAlliances(String query) async {
-    if (query.trim().isEmpty) {
-      state = state.copyWith(searchResults: []);
-      return;
-    }
+  // 연합 검색 (빈 쿼리 시 전체 연합 반환)
+  Future<void> searchAlliances([String? query]) async {
     state = state.copyWith(isLoading: true, clearMessages: true);
     try {
-      final results = await _apiService.searchAlliances(query);
+      final results = await _apiService.searchAlliances(query: query);
       state = state.copyWith(searchResults: results, isLoading: false);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: '검색에 실패했습니다.');
@@ -159,11 +155,13 @@ class AllianceNotifier extends StateNotifier<AllianceState> {
   }
 
   // 가입 신청 취소
-  Future<bool> cancelApplication(String allianceId) async {
+  Future<bool> cancelApplication() async {
     state = state.copyWith(isLoading: true, clearMessages: true);
     try {
-      await _apiService.cancelApplication(allianceId);
+      await _apiService.cancelApplication();
       state = state.copyWith(
+        status: 'none',
+        clearPendingAlliance: true,
         isLoading: false,
         successMessage: '가입 신청이 취소되었습니다.',
       );
@@ -204,7 +202,7 @@ class AllianceNotifier extends StateNotifier<AllianceState> {
   Future<void> loadMembers() async {
     if (state.myAlliance == null) return;
     try {
-      final members = await _apiService.getAllianceMembers(state.myAlliance!.id);
+      final members = await _apiService.getAllianceMembers();
       state = state.copyWith(members: members);
     } catch (e) {
       // ignore
@@ -212,34 +210,45 @@ class AllianceNotifier extends StateNotifier<AllianceState> {
   }
 
   // 가입 신청 목록 로드
-  Future<void> loadJoinRequests() async {
+  Future<void> loadApplications() async {
     if (state.myAlliance == null) return;
     try {
-      final requests = await _apiService.getJoinRequests(state.myAlliance!.id);
-      state = state.copyWith(joinRequests: requests);
+      final applications = await _apiService.getJoinRequests();
+      state = state.copyWith(applications: applications);
     } catch (e) {
       // ignore
     }
   }
 
-  // 가입 신청 처리 (승인/거절)
-  Future<bool> processApplication(String requestId, bool approve, {String? rejectionReason}) async {
+  // 가입 신청 승인
+  Future<bool> acceptApplication(String applicantId) async {
     if (state.myAlliance == null) return false;
     state = state.copyWith(isLoading: true, clearMessages: true);
     try {
-      await _apiService.processApplication(
-        state.myAlliance!.id,
-        ProcessApplicationRequest(
-          requestId: requestId,
-          approve: approve,
-          rejectionReason: rejectionReason,
-        ),
-      );
-      await loadJoinRequests();
+      await _apiService.acceptApplication(applicantId);
+      await loadApplications();
       await loadMyAlliance();  // 멤버 수 갱신
       state = state.copyWith(
         isLoading: false,
-        successMessage: approve ? '가입 신청을 승인했습니다.' : '가입 신청을 거절했습니다.',
+        successMessage: '가입 신청을 승인했습니다.',
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '신청 처리에 실패했습니다.');
+      return false;
+    }
+  }
+
+  // 가입 신청 거절
+  Future<bool> rejectApplication(String applicantId, {String? reason}) async {
+    if (state.myAlliance == null) return false;
+    state = state.copyWith(isLoading: true, clearMessages: true);
+    try {
+      await _apiService.rejectApplication(applicantId, reason);
+      await loadApplications();
+      state = state.copyWith(
+        isLoading: false,
+        successMessage: '가입 신청을 거절했습니다.',
       );
       return true;
     } catch (e) {
@@ -253,10 +262,7 @@ class AllianceNotifier extends StateNotifier<AllianceState> {
     if (state.myAlliance == null) return false;
     state = state.copyWith(isLoading: true, clearMessages: true);
     try {
-      await _apiService.kickMember(
-        state.myAlliance!.id,
-        KickMemberRequest(memberId: memberId),
-      );
+      await _apiService.kickMember(memberId);
       await loadMembers();
       await loadMyAlliance();  // 멤버 수 갱신
       state = state.copyWith(
@@ -271,28 +277,27 @@ class AllianceNotifier extends StateNotifier<AllianceState> {
   }
 
   // 연합 정보 수정
-  Future<bool> updateAllianceInfo({
-    String? descriptionExternal,
-    String? descriptionInternal,
+  Future<bool> updateAllianceSettings({
+    String? externalText,
+    String? internalText,
     String? website,
-    String? logoImageUrl,
-    bool? openToApplications,
+    String? logo,
+    bool? isOpen,
+    String? ownerTitle,
   }) async {
     if (state.myAlliance == null) return false;
     state = state.copyWith(isLoading: true, clearMessages: true);
     try {
-      final alliance = await _apiService.updateAllianceInfo(
-        state.myAlliance!.id,
-        UpdateAllianceInfoRequest(
-          descriptionExternal: descriptionExternal,
-          descriptionInternal: descriptionInternal,
-          website: website,
-          logoImageUrl: logoImageUrl,
-          openToApplications: openToApplications,
-        ),
+      await _apiService.updateAllianceSettings(
+        externalText: externalText,
+        internalText: internalText,
+        website: website,
+        logo: logo,
+        isOpen: isOpen,
+        ownerTitle: ownerTitle,
       );
+      await loadMyAlliance();  // 정보 갱신
       state = state.copyWith(
-        myAlliance: alliance,
         isLoading: false,
         successMessage: '연합 정보가 수정되었습니다.',
       );
@@ -303,19 +308,41 @@ class AllianceNotifier extends StateNotifier<AllianceState> {
     }
   }
 
-  // 연합 이름/태그 변경
-  Future<bool> changeAllianceNameTag({String? tag, String? name}) async {
+  // 연합 이름 변경
+  Future<bool> changeAllianceName(String name) async {
     if (state.myAlliance == null) return false;
     state = state.copyWith(isLoading: true, clearMessages: true);
     try {
-      final alliance = await _apiService.changeAllianceNameTag(
-        state.myAlliance!.id,
-        ChangeAllianceNameTagRequest(tag: tag, name: name),
-      );
+      await _apiService.changeAllianceName(name);
+      await loadMyAlliance();
       state = state.copyWith(
-        myAlliance: alliance,
         isLoading: false,
-        successMessage: '연합 정보가 변경되었습니다.',
+        successMessage: '연합 이름이 변경되었습니다.',
+      );
+      return true;
+    } catch (e) {
+      String errorMsg = '변경에 실패했습니다.';
+      if (e is DioException && e.response?.data != null) {
+        final data = e.response!.data;
+        if (data is Map && data['message'] != null) {
+          errorMsg = data['message'].toString();
+        }
+      }
+      state = state.copyWith(isLoading: false, error: errorMsg);
+      return false;
+    }
+  }
+
+  // 연합 태그 변경
+  Future<bool> changeAllianceTag(String tag) async {
+    if (state.myAlliance == null) return false;
+    state = state.copyWith(isLoading: true, clearMessages: true);
+    try {
+      await _apiService.changeAllianceTag(tag);
+      await loadMyAlliance();
+      state = state.copyWith(
+        isLoading: false,
+        successMessage: '연합 태그가 변경되었습니다.',
       );
       return true;
     } catch (e) {
@@ -332,16 +359,13 @@ class AllianceNotifier extends StateNotifier<AllianceState> {
   }
 
   // 연합 양도
-  Future<bool> transferAlliance(String newLeaderId) async {
+  Future<bool> transferAlliance(String newOwnerId) async {
     if (state.myAlliance == null) return false;
     state = state.copyWith(isLoading: true, clearMessages: true);
     try {
-      final alliance = await _apiService.transferAlliance(
-        state.myAlliance!.id,
-        TransferAllianceRequest(newLeaderId: newLeaderId),
-      );
+      await _apiService.transferAlliance(newOwnerId);
+      await loadMyAlliance();
       state = state.copyWith(
-        myAlliance: alliance,
         isLoading: false,
         successMessage: '연합 리더가 변경되었습니다.',
       );
@@ -357,13 +381,13 @@ class AllianceNotifier extends StateNotifier<AllianceState> {
     if (state.myAlliance == null) return false;
     state = state.copyWith(isLoading: true, clearMessages: true);
     try {
-      await _apiService.disbandAlliance(state.myAlliance!.id);
+      await _apiService.disbandAlliance();
       state = state.copyWith(
         status: 'none',
         clearMyAlliance: true,
         clearPendingAlliance: true,
         members: [],
-        joinRequests: [],
+        applications: [],
         isLoading: false,
         successMessage: '연합이 해산되었습니다.',
       );
@@ -379,12 +403,11 @@ class AllianceNotifier extends StateNotifier<AllianceState> {
     if (state.myAlliance == null) return false;
     state = state.copyWith(isLoading: true, clearMessages: true);
     try {
-      final alliance = await _apiService.createRank(
-        state.myAlliance!.id,
+      await _apiService.createRank(
         CreateRankRequest(name: name, permissions: permissions),
       );
+      await loadMyAlliance();  // 계급 목록 갱신
       state = state.copyWith(
-        myAlliance: alliance,
         isLoading: false,
         successMessage: '계급이 생성되었습니다.',
       );
@@ -396,13 +419,13 @@ class AllianceNotifier extends StateNotifier<AllianceState> {
   }
 
   // 계급 삭제
-  Future<bool> deleteRank(String rankId) async {
+  Future<bool> deleteRank(String rankName) async {
     if (state.myAlliance == null) return false;
     state = state.copyWith(isLoading: true, clearMessages: true);
     try {
-      final alliance = await _apiService.deleteRank(state.myAlliance!.id, rankId);
+      await _apiService.deleteRank(rankName);
+      await loadMyAlliance();  // 계급 목록 갱신
       state = state.copyWith(
-        myAlliance: alliance,
         isLoading: false,
         successMessage: '계급이 삭제되었습니다.',
       );
@@ -416,6 +439,24 @@ class AllianceNotifier extends StateNotifier<AllianceState> {
         }
       }
       state = state.copyWith(isLoading: false, error: errorMsg);
+      return false;
+    }
+  }
+
+  // 멤버 계급 변경
+  Future<bool> changeMemberRank(String memberId, String? rankName) async {
+    if (state.myAlliance == null) return false;
+    state = state.copyWith(isLoading: true, clearMessages: true);
+    try {
+      await _apiService.changeMemberRank(memberId, rankName);
+      await loadMembers();
+      state = state.copyWith(
+        isLoading: false,
+        successMessage: '멤버 계급이 변경되었습니다.',
+      );
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: '계급 변경에 실패했습니다.');
       return false;
     }
   }

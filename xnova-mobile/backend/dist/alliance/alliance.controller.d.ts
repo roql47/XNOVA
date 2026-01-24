@@ -36,7 +36,7 @@ export declare class AllianceController {
             createdAt: any;
         };
     }>;
-    searchAlliances(query: string): Promise<{
+    searchAlliances(query?: string): Promise<{
         id: string;
         tag: string;
         name: string;

@@ -49,6 +49,11 @@ class _AllianceTabState extends ConsumerState<AllianceTab> with SingleTickerProv
 
   Future<void> _loadAlliance() async {
     await ref.read(allianceProvider.notifier).loadMyAlliance();
+    // 연합 미가입 시 연합 목록 로드
+    final state = ref.read(allianceProvider);
+    if (!state.hasAlliance && !state.isPending && state.searchResults.isEmpty) {
+      await ref.read(allianceProvider.notifier).searchAlliances();
+    }
   }
 
   @override
@@ -135,7 +140,7 @@ class _AllianceTabState extends ConsumerState<AllianceTab> with SingleTickerProv
                       if (pending != null) {
                         final success = await ref
                             .read(allianceProvider.notifier)
-                            .cancelApplication(pending.id);
+                            .cancelApplication();
                         if (success) {
                           await _loadAlliance();
                         }
@@ -759,7 +764,7 @@ class _AllianceTabState extends ConsumerState<AllianceTab> with SingleTickerProv
   }
 
   void _showRequestsDialog(AllianceState state) async {
-    await ref.read(allianceProvider.notifier).loadJoinRequests();
+    await ref.read(allianceProvider.notifier).loadApplications();
     
     if (!mounted) return;
     
@@ -767,19 +772,19 @@ class _AllianceTabState extends ConsumerState<AllianceTab> with SingleTickerProv
       context: context,
       builder: (context) => Consumer(
         builder: (context, ref, _) {
-          final requests = ref.watch(allianceProvider).joinRequests;
+          final applications = ref.watch(allianceProvider).applications;
           return AlertDialog(
             backgroundColor: AppColors.background,
             title: const Text('가입 신청 목록', style: TextStyle(color: AppColors.textPrimary)),
             content: SizedBox(
               width: double.maxFinite,
               height: 300,
-              child: requests.isEmpty
+              child: applications.isEmpty
                   ? const Center(child: Text('대기 중인 신청이 없습니다.', style: TextStyle(color: AppColors.textSecondary)))
                   : ListView.builder(
-                      itemCount: requests.length,
+                      itemCount: applications.length,
                       itemBuilder: (context, index) {
-                        final request = requests[index];
+                        final application = applications[index];
                         return Card(
                           color: AppColors.surface,
                           margin: const EdgeInsets.only(bottom: 8),
@@ -788,23 +793,23 @@ class _AllianceTabState extends ConsumerState<AllianceTab> with SingleTickerProv
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(request.playerName, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+                                Text(application.playerName, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
                                 const SizedBox(height: 4),
-                                Text(request.applicationText, style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                                Text(application.message, style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
                                 const SizedBox(height: 8),
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.end,
                                   children: [
                                     TextButton(
                                       onPressed: () async {
-                                        await ref.read(allianceProvider.notifier).processApplication(request.id, false);
+                                        await ref.read(allianceProvider.notifier).rejectApplication(application.id);
                                       },
                                       child: const Text('거절', style: TextStyle(color: AppColors.negative)),
                                     ),
                                     const SizedBox(width: 8),
                                     ElevatedButton(
                                       onPressed: () async {
-                                        await ref.read(allianceProvider.notifier).processApplication(request.id, true);
+                                        await ref.read(allianceProvider.notifier).acceptApplication(application.id);
                                       },
                                       style: ElevatedButton.styleFrom(backgroundColor: AppColors.positive),
                                       child: const Text('승인', style: TextStyle(color: Colors.white)),
@@ -891,11 +896,11 @@ class _AllianceTabState extends ConsumerState<AllianceTab> with SingleTickerProv
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              await ref.read(allianceProvider.notifier).updateAllianceInfo(
-                descriptionExternal: _externalTextController.text,
-                descriptionInternal: _internalTextController.text,
+              await ref.read(allianceProvider.notifier).updateAllianceSettings(
+                externalText: _externalTextController.text,
+                internalText: _internalTextController.text,
                 website: _websiteController.text,
-                logoImageUrl: _logoController.text,
+                logo: _logoController.text,
               );
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),

@@ -105,13 +105,18 @@ let AllianceService = class AllianceService {
         };
     }
     async searchAlliances(query, limit = 30) {
-        const regex = new RegExp(query, 'i');
-        const alliances = await this.allianceModel.find({
-            $or: [
-                { tag: regex },
-                { name: regex },
-            ],
-        }).limit(limit).select('tag name members isOpen externalText logo');
+        const filter = query
+            ? {
+                $or: [
+                    { tag: new RegExp(query, 'i') },
+                    { name: new RegExp(query, 'i') },
+                ],
+            }
+            : {};
+        const alliances = await this.allianceModel.find(filter)
+            .limit(limit)
+            .sort({ createdAt: -1 })
+            .select('tag name members isOpen externalText logo');
         return alliances.map(a => ({
             id: a._id.toString(),
             tag: a.tag,

@@ -26,10 +26,7 @@ let AllianceController = class AllianceController {
         return this.allianceService.createAlliance(req.user.userId, dto);
     }
     async searchAlliances(query) {
-        if (!query || query.trim().length === 0) {
-            return [];
-        }
-        return this.allianceService.searchAlliances(query.trim());
+        return this.allianceService.searchAlliances(query?.trim() || '');
     }
     async getAlliancePublic(id) {
         return this.allianceService.getAlliancePublic(id);

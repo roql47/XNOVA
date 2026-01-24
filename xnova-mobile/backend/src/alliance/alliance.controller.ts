@@ -39,13 +39,10 @@ export class AllianceController {
     return this.allianceService.createAlliance(req.user.userId, dto);
   }
 
-  // 연합 검색
+  // 연합 검색 (빈 쿼리 시 전체 연합 반환)
   @Get('search')
-  async searchAlliances(@Query('query') query: string) {
-    if (!query || query.trim().length === 0) {
-      return [];
-    }
-    return this.allianceService.searchAlliances(query.trim());
+  async searchAlliances(@Query('query') query?: string) {
+    return this.allianceService.searchAlliances(query?.trim() || '');
   }
 
   // 특정 연합 정보 조회 (공개)
