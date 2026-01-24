@@ -51,7 +51,7 @@ export class AllianceMember {
   @Prop({ required: true })
   coordinate: string;
 
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   rankName: string | null; // null이면 일반 멤버 (계급 없음)
 
   @Prop({ default: Date.now })

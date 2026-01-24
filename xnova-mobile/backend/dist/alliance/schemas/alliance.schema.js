@@ -90,7 +90,7 @@ __decorate([
     __metadata("design:type", String)
 ], AllianceMember.prototype, "coordinate", void 0);
 __decorate([
-    (0, mongoose_1.Prop)({ default: null }),
+    (0, mongoose_1.Prop)({ type: String, default: null }),
     __metadata("design:type", Object)
 ], AllianceMember.prototype, "rankName", void 0);
 __decorate([
