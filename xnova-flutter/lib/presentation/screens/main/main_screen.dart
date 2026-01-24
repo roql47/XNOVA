@@ -21,6 +21,7 @@ import 'tabs/messages_tab.dart';
 import 'tabs/ranking_tab.dart';
 import 'tabs/techtree_tab.dart';
 import 'tabs/simulator_tab.dart';
+import 'tabs/alliance_tab.dart';
 import '../chat/chat_screen.dart';
 
 extension MainTabExtension on MainTab {
@@ -34,6 +35,7 @@ extension MainTabExtension on MainTab {
       case MainTab.defense: return Icons.shield_outlined;
       case MainTab.fleet: return Icons.flight_outlined;
       case MainTab.galaxy: return Icons.blur_circular_outlined;
+      case MainTab.alliance: return Icons.groups_outlined;
       case MainTab.messages: return Icons.mail_outline;
       case MainTab.ranking: return Icons.leaderboard_outlined;
       case MainTab.techtree: return Icons.account_tree_outlined;
@@ -51,6 +53,7 @@ extension MainTabExtension on MainTab {
       case MainTab.defense: return '방어';
       case MainTab.fleet: return '함대';
       case MainTab.galaxy: return '은하계';
+      case MainTab.alliance: return '연합';
       case MainTab.messages: return '메시지';
       case MainTab.ranking: return '랭킹';
       case MainTab.techtree: return '테크트리';
@@ -777,6 +780,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       case 'defense': return MainTab.defense;
       case 'fleet': return MainTab.fleet;
       case 'galaxy': return MainTab.galaxy;
+      case 'alliance': return MainTab.alliance;
       case 'messages': return MainTab.messages;
       case 'techtree': return MainTab.techtree;
       default: return null;
@@ -1139,6 +1143,8 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
         return const FleetMovementTab();
       case MainTab.galaxy:
         return const GalaxyTab();
+      case MainTab.alliance:
+        return const AllianceTab();
       case MainTab.messages:
         return const MessagesTab();
       case MainTab.ranking:

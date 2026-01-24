@@ -25,6 +25,7 @@ const ranking_module_1 = require("./ranking/ranking.module");
 const socket_module_1 = require("./socket/socket.module");
 const message_module_1 = require("./message/message.module");
 const planet_module_1 = require("./planet/planet.module");
+const alliance_module_1 = require("./alliance/alliance.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -68,6 +69,7 @@ exports.AppModule = AppModule = __decorate([
             socket_module_1.SocketModule,
             message_module_1.MessageModule,
             planet_module_1.PlanetModule,
+            alliance_module_1.AllianceModule,
         ],
         providers: [
             {

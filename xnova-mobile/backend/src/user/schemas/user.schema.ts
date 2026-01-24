@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export type UserDocument = User & Document;
 
@@ -486,6 +486,10 @@ export class User {
 
   @Prop({ default: false })
   isAdmin: boolean;  // 관리자 여부
+
+  // 연합(Alliance) 관련
+  @Prop({ type: Types.ObjectId, ref: 'Alliance', default: null })
+  allianceId: Types.ObjectId | null;  // 소속 연합 ID
 
   @Prop({ type: VacationMode, default: () => ({ isActive: false, startTime: null, minEndTime: null }) })
   vacationMode: VacationMode;

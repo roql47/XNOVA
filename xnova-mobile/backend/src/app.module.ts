@@ -13,6 +13,7 @@ import { RankingModule } from './ranking/ranking.module';
 import { SocketModule } from './socket/socket.module';
 import { MessageModule } from './message/message.module';
 import { PlanetModule } from './planet/planet.module';
+import { AllianceModule } from './alliance/alliance.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { PlanetModule } from './planet/planet.module';
     SocketModule,
     MessageModule,
     PlanetModule,
+    AllianceModule,
   ],
   providers: [
     // 전역 Rate Limiting 가드 적용

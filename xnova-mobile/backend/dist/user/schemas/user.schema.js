@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UserSchema = exports.User = exports.CheckInInfo = exports.VacationMode = exports.FleetMission = exports.ReturnProgress = exports.IncomingAttackProgress = exports.AttackProgress = exports.ProgressInfo = exports.Defense = exports.Fleet = exports.ResearchLevels = exports.PlanetInfo = exports.Facilities = exports.OperationRates = exports.Mines = exports.Resources = void 0;
 const mongoose_1 = require("@nestjs/mongoose");
+const mongoose_2 = require("mongoose");
 let Resources = class Resources {
     metal;
     crystal;
@@ -770,6 +771,7 @@ let User = class User {
     homePlanetId;
     activePlanetId;
     isAdmin;
+    allianceId;
     vacationMode;
     checkIn;
     resources;
@@ -824,6 +826,10 @@ __decorate([
     (0, mongoose_1.Prop)({ default: false }),
     __metadata("design:type", Boolean)
 ], User.prototype, "isAdmin", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: mongoose_2.Types.ObjectId, ref: 'Alliance', default: null }),
+    __metadata("design:type", Object)
+], User.prototype, "allianceId", void 0);
 __decorate([
     (0, mongoose_1.Prop)({ type: VacationMode, default: () => ({ isActive: false, startTime: null, minEndTime: null }) }),
     __metadata("design:type", VacationMode)
