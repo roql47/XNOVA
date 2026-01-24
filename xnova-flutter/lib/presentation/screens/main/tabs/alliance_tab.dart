@@ -75,16 +75,88 @@ class _AllianceTabState extends ConsumerState<AllianceTab> with SingleTickerProv
       }
     });
 
-    if (allianceState.isLoading && allianceState.myAlliance == null) {
+    if (allianceState.isLoading && allianceState.status == 'none') {
       return const Center(child: CircularProgressIndicator());
     }
 
     // 가입 여부에 따라 다른 화면 표시
     if (allianceState.hasAlliance) {
       return _buildMemberView(allianceState);
+    } else if (allianceState.isPending) {
+      return _buildPendingView(allianceState);
     } else {
       return _buildNoAllianceView(allianceState);
     }
+  }
+
+  // ===== 가입 신청 대기 중 화면 =====
+  Widget _buildPendingView(AllianceState state) {
+    final pending = state.pendingAlliance;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.hourglass_empty,
+              size: 64,
+              color: AppColors.warning,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '가입 신청 대기 중',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (pending != null) ...[
+              Text(
+                '[${pending.tag}] ${pending.name}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+            const Text(
+              '연합 관리자의 승인을 기다리고 있습니다.',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: state.isLoading
+                  ? null
+                  : () async {
+                      if (pending != null) {
+                        final success = await ref
+                            .read(allianceProvider.notifier)
+                            .cancelApplication(pending.id);
+                        if (success) {
+                          await _loadAlliance();
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.negative,
+                foregroundColor: Colors.white,
+              ),
+              child: state.isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('신청 취소'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // ===== 미가입 상태 화면 =====

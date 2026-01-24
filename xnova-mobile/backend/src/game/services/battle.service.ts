@@ -196,9 +196,10 @@ export class BattleService {
       mission.phase = 'returning';
       mission.returnStartTime = new Date();
       mission.returnTime = returnTime;
-      mission.loot = loot;
+      mission.loot = { ...loot }; // 깊은 복사로 참조 문제 방지
       if (survivingFleet) {
-        mission.fleet = survivingFleet;
+        // 깊은 복사로 다른 미션과의 참조 공유 방지
+        mission.fleet = { ...survivingFleet };
       }
       user.markModified('fleetMissions');
     }
@@ -219,8 +220,11 @@ export class BattleService {
   private syncLegacyFields(user: UserDocument): void {
     const missions = user.fleetMissions || [];
     
-    // 가장 먼저 시작된 outbound 미션을 pendingAttack으로
-    const outboundMission = missions.find((m: any) => m.phase === 'outbound');
+    // 가장 먼저 시작된 outbound 공격/수확 미션을 pendingAttack으로 (deploy, transport, colony, spy 제외)
+    const outboundMission = missions.find((m: any) => 
+      m.phase === 'outbound' && 
+      (m.missionType === 'attack' || m.missionType === 'recycle')
+    );
     if (outboundMission) {
       const m = outboundMission as any;
       user.pendingAttack = {
@@ -1718,7 +1722,7 @@ export class BattleService {
     const pa = m ? {
       targetCoord: m.targetCoord,
       targetUserId: m.targetUserId,
-      fleet: m.fleet,
+      fleet: { ...m.fleet }, // 깊은 복사로 원본 미션 데이터 보호
       capacity: m.capacity,
       travelTime: m.travelTime,
       startTime: m.startTime,

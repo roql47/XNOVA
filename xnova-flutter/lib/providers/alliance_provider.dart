@@ -6,7 +6,9 @@ import 'providers.dart';
 
 // ===== 연합 상태 =====
 class AllianceState {
+  final String status;  // 'none', 'pending', 'member'
   final Alliance? myAlliance;  // 내가 가입한 연합 정보
+  final AllianceSearchResult? pendingAlliance;  // 대기 중인 가입 신청 연합
   final List<AllianceSearchResult> searchResults;  // 검색 결과
   final List<AllianceMember> members;  // 연합 멤버 목록
   final List<AllianceJoinRequest> joinRequests;  // 가입 신청 목록
@@ -15,7 +17,9 @@ class AllianceState {
   final String? successMessage;
 
   AllianceState({
+    this.status = 'none',
     this.myAlliance,
+    this.pendingAlliance,
     this.searchResults = const [],
     this.members = const [],
     this.joinRequests = const [],
@@ -25,8 +29,11 @@ class AllianceState {
   });
 
   AllianceState copyWith({
+    String? status,
     Alliance? myAlliance,
     bool clearMyAlliance = false,
+    AllianceSearchResult? pendingAlliance,
+    bool clearPendingAlliance = false,
     List<AllianceSearchResult>? searchResults,
     List<AllianceMember>? members,
     List<AllianceJoinRequest>? joinRequests,
@@ -36,7 +43,9 @@ class AllianceState {
     bool clearMessages = false,
   }) {
     return AllianceState(
+      status: status ?? this.status,
       myAlliance: clearMyAlliance ? null : (myAlliance ?? this.myAlliance),
+      pendingAlliance: clearPendingAlliance ? null : (pendingAlliance ?? this.pendingAlliance),
       searchResults: searchResults ?? this.searchResults,
       members: members ?? this.members,
       joinRequests: joinRequests ?? this.joinRequests,
@@ -46,7 +55,8 @@ class AllianceState {
     );
   }
 
-  bool get hasAlliance => myAlliance != null;
+  bool get hasAlliance => status == 'member' && myAlliance != null;
+  bool get isPending => status == 'pending';
   bool get isLeader => myAlliance?.isOwner == true;
 }
 
@@ -59,14 +69,22 @@ class AllianceNotifier extends StateNotifier<AllianceState> {
   Future<void> loadMyAlliance() async {
     state = state.copyWith(isLoading: true, clearMessages: true);
     try {
-      final alliance = await _apiService.getMyAlliance();
+      final response = await _apiService.getMyAlliance();
       state = state.copyWith(
-        myAlliance: alliance,
-        clearMyAlliance: alliance == null,
+        status: response.status,
+        myAlliance: response.alliance,
+        clearMyAlliance: response.alliance == null,
+        pendingAlliance: response.pendingAlliance,
+        clearPendingAlliance: response.pendingAlliance == null,
         isLoading: false,
       );
     } catch (e) {
-      state = state.copyWith(isLoading: false, clearMyAlliance: true);
+      state = state.copyWith(
+        status: 'none',
+        isLoading: false,
+        clearMyAlliance: true,
+        clearPendingAlliance: true,
+      );
     }
   }
 
@@ -78,6 +96,7 @@ class AllianceNotifier extends StateNotifier<AllianceState> {
         CreateAllianceRequest(tag: tag, name: name),
       );
       state = state.copyWith(
+        status: 'member',
         myAlliance: alliance,
         isLoading: false,
         successMessage: '연합 [$tag] $name이 생성되었습니다!',
@@ -161,7 +180,9 @@ class AllianceNotifier extends StateNotifier<AllianceState> {
     try {
       await _apiService.exitAlliance();
       state = state.copyWith(
+        status: 'none',
         clearMyAlliance: true,
+        clearPendingAlliance: true,
         isLoading: false,
         successMessage: '연합에서 탈퇴했습니다.',
       );
@@ -338,7 +359,9 @@ class AllianceNotifier extends StateNotifier<AllianceState> {
     try {
       await _apiService.disbandAlliance(state.myAlliance!.id);
       state = state.copyWith(
+        status: 'none',
         clearMyAlliance: true,
+        clearPendingAlliance: true,
         members: [],
         joinRequests: [],
         isLoading: false,

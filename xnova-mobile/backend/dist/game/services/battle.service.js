@@ -115,9 +115,9 @@ let BattleService = class BattleService {
             mission.phase = 'returning';
             mission.returnStartTime = new Date();
             mission.returnTime = returnTime;
-            mission.loot = loot;
+            mission.loot = { ...loot };
             if (survivingFleet) {
-                mission.fleet = survivingFleet;
+                mission.fleet = { ...survivingFleet };
             }
             user.markModified('fleetMissions');
         }
@@ -130,7 +130,8 @@ let BattleService = class BattleService {
     }
     syncLegacyFields(user) {
         const missions = user.fleetMissions || [];
-        const outboundMission = missions.find((m) => m.phase === 'outbound');
+        const outboundMission = missions.find((m) => m.phase === 'outbound' &&
+            (m.missionType === 'attack' || m.missionType === 'recycle'));
         if (outboundMission) {
             const m = outboundMission;
             user.pendingAttack = {
@@ -1222,7 +1223,7 @@ let BattleService = class BattleService {
         const pa = m ? {
             targetCoord: m.targetCoord,
             targetUserId: m.targetUserId,
-            fleet: m.fleet,
+            fleet: { ...m.fleet },
             capacity: m.capacity,
             travelTime: m.travelTime,
             startTime: m.startTime,

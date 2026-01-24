@@ -467,10 +467,9 @@ class ApiService {
 
   // ===== 연합 (Alliance) =====
   // 내 연합 정보 조회 (가입 여부 확인)
-  Future<Alliance?> getMyAlliance() async {
+  Future<MyAllianceResponse> getMyAlliance() async {
     final response = await _dio.get('alliance/my-alliance');
-    if (response.data == null) return null;
-    return Alliance.fromJson(response.data);
+    return MyAllianceResponse.fromJson(response.data);
   }
 
   // 연합 생성
