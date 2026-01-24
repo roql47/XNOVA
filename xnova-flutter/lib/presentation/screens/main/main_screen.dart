@@ -101,7 +101,7 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     // 앱 Lifecycle 관찰자 등록
     WidgetsBinding.instance.addObserver(this);
     
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       ref.read(gameProvider.notifier).loadAllData();
       ref.read(gameProvider.notifier).loadProfile();
       ref.read(messageProvider.notifier).loadMessages(); // 메시지 로드
@@ -109,7 +109,45 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
       
       // 1초마다 자동 완료 체크 시작
       _startAutoCompleteTimer();
+      
+      // 출석체크 모달 표시
+      await _checkAndShowCheckInModal();
     });
+  }
+  
+  // 출석체크 가능하면 모달 표시
+  Future<void> _checkAndShowCheckInModal() async {
+    await ref.read(gameProvider.notifier).loadCheckInStatus();
+    final checkInStatus = ref.read(gameProvider).checkInStatus;
+    
+    if (checkInStatus != null && checkInStatus.canCheckIn && mounted) {
+      _showCheckInModal();
+    }
+  }
+  
+  // 출석체크 모달 다이얼로그
+  void _showCheckInModal() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => _CheckInModal(
+        onCheckIn: () async {
+          final result = await ref.read(gameProvider.notifier).checkIn();
+          if (mounted) {
+            Navigator.pop(dialogContext);
+            if (result != null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(result.message),
+                  backgroundColor: result.success ? AppColors.positive : AppColors.negative,
+                ),
+              );
+            }
+          }
+        },
+        onClose: () => Navigator.pop(dialogContext),
+      ),
+    );
   }
   
   Future<void> _checkAdminStatus() async {
@@ -191,6 +229,9 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     // 5. 자동 완료 타이머 재시작
     _startAutoCompleteTimer();
     _lastPausedTime = null;
+    
+    // 6. 출석체크 모달 표시
+    await _checkAndShowCheckInModal();
   }
   
   void _startAutoCompleteTimer() {
@@ -1359,6 +1400,330 @@ class _PlanetManageItem extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// 출석체크 모달 다이얼로그
+class _CheckInModal extends ConsumerWidget {
+  final VoidCallback onCheckIn;
+  final VoidCallback onClose;
+
+  const _CheckInModal({
+    required this.onCheckIn,
+    required this.onClose,
+  });
+
+  String _formatNumber(int number) {
+    if (number >= 1000000) {
+      return '${(number / 1000000).toStringAsFixed(1)}M';
+    } else if (number >= 1000) {
+      return '${(number / 1000).toStringAsFixed(1)}K';
+    }
+    return number.toString();
+  }
+
+  // 현재 streak 기준으로 다음 출석할 날인지 체크
+  bool _isNextDay(int dayIndex, int streak) {
+    // streak이 0이면 1일차(index 0)가 다음
+    // streak이 1이면 2일차(index 1)가 다음...
+    return dayIndex == streak;
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(gameProvider).checkInStatus;
+    final dayNames = ['1일', '2일', '3일', '4일', '5일', '6일', '7일'];
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 360),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFF1a1a2e),
+              const Color(0xFF16213e),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppColors.accent.withOpacity(0.5),
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.accent.withOpacity(0.3),
+              blurRadius: 20,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 헤더
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.accent.withOpacity(0.2),
+                    AppColors.positive.withOpacity(0.1),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(18),
+                  topRight: Radius.circular(18),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.calendar_today,
+                      size: 24,
+                      color: AppColors.accent,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '일일 출석체크',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        if (status != null && status.streak > 0)
+                          Text(
+                            '${status.streak}일 연속 출석 중!',
+                            style: const TextStyle(
+                              color: AppColors.positive,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: AppColors.textMuted),
+                    onPressed: onClose,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+            ),
+
+            // 콘텐츠
+            if (status == null)
+              const Padding(
+                padding: EdgeInsets.all(40),
+                child: CircularProgressIndicator(),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    // 일주일 캘린더
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface.withOpacity(0.5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: List.generate(7, (index) {
+                          // index < streak 이면 체크됨
+                          final isChecked = index < status.streak;
+                          final isNextDay = _isNextDay(index, status.streak);
+
+                          return Column(
+                            children: [
+                              Text(
+                                dayNames[index],
+                                style: TextStyle(
+                                  color: isNextDay ? AppColors.accent : AppColors.textMuted,
+                                  fontSize: 11,
+                                  fontWeight: isNextDay ? FontWeight.w600 : FontWeight.normal,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  gradient: isChecked
+                                      ? LinearGradient(
+                                          colors: [AppColors.positive, AppColors.positive.withOpacity(0.7)],
+                                        )
+                                      : null,
+                                  color: isChecked
+                                      ? null
+                                      : isNextDay
+                                          ? AppColors.accent.withOpacity(0.2)
+                                          : AppColors.surface,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isNextDay && !isChecked
+                                        ? AppColors.accent
+                                        : isChecked
+                                            ? AppColors.positive
+                                            : AppColors.panelBorder,
+                                    width: isNextDay ? 2 : 1,
+                                  ),
+                                  boxShadow: isChecked
+                                      ? [
+                                          BoxShadow(
+                                            color: AppColors.positive.withOpacity(0.4),
+                                            blurRadius: 8,
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                child: isChecked
+                                    ? const Icon(Icons.check, size: 20, color: Colors.white)
+                                    : Center(
+                                        child: Text(
+                                          '${index + 1}',
+                                          style: TextStyle(
+                                            color: isNextDay ? AppColors.accent : AppColors.textMuted,
+                                            fontSize: 13,
+                                            fontWeight: isNextDay ? FontWeight.w600 : FontWeight.normal,
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                            ],
+                          );
+                        }),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // 보상 정보
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.warning.withOpacity(0.1),
+                            AppColors.warning.withOpacity(0.05),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.card_giftcard, size: 18, color: AppColors.warning),
+                              const SizedBox(width: 8),
+                              Text(
+                                '오늘의 보상 (${status.rewardHours}시간 생산량)',
+                                style: const TextStyle(
+                                  color: AppColors.warning,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              _buildRewardItem('메탈', status.nextRewardMetal, AppColors.metalColor),
+                              _buildRewardItem('크리스탈', status.nextRewardCrystal, AppColors.crystalColor),
+                              _buildRewardItem('듀테륨', status.nextRewardDeuterium, AppColors.deuteriumColor),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // 출석체크 버튼
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: onCheckIn,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.positive,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 8,
+                          shadowColor: AppColors.positive.withOpacity(0.5),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.touch_app, size: 22),
+                            SizedBox(width: 10),
+                            Text(
+                              '출석체크 하기',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRewardItem(String label, int amount, Color color) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 11,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _formatNumber(amount),
+          style: TextStyle(
+            color: color,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 }

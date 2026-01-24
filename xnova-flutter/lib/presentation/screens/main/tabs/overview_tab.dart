@@ -33,7 +33,6 @@ class _OverviewTabState extends ConsumerState<OverviewTab> {
     return RefreshIndicator(
       onRefresh: () async {
         await ref.read(gameProvider.notifier).loadAllData();
-        await ref.read(gameProvider.notifier).loadCheckInStatus();
       },
       color: AppColors.accent,
       backgroundColor: AppColors.surface,
