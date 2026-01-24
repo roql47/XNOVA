@@ -345,17 +345,13 @@ class _RankingTabState extends ConsumerState<RankingTab> with SingleTickerProvid
 
   Widget _buildRankingItem(PlayerScore player, bool isMe) {
     Color rankColor;
-    IconData? medalIcon;
     
     if (player.rank == 1) {
       rankColor = const Color(0xFFFFD700);
-      medalIcon = Icons.emoji_events;
     } else if (player.rank == 2) {
       rankColor = const Color(0xFFC0C0C0);
-      medalIcon = Icons.emoji_events;
     } else if (player.rank == 3) {
       rankColor = const Color(0xFFCD7F32);
-      medalIcon = Icons.emoji_events;
     } else {
       rankColor = AppColors.textMuted;
     }
@@ -374,29 +370,14 @@ class _RankingTabState extends ConsumerState<RankingTab> with SingleTickerProvid
           // 순위
           SizedBox(
             width: 50,
-            child: medalIcon != null
-                ? Row(
-                    children: [
-                      Icon(medalIcon, color: rankColor, size: 20),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${player.rank}',
-                        style: TextStyle(
-                          color: rankColor,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  )
-                : Text(
-                    '${player.rank}',
-                    style: TextStyle(
-                      color: rankColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+            child: Text(
+              '${player.rank}',
+              style: TextStyle(
+                color: rankColor,
+                fontSize: 14,
+                fontWeight: player.rank <= 3 ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
           ),
           
           // 플레이어 정보
@@ -503,6 +484,19 @@ class _RankingTabState extends ConsumerState<RankingTab> with SingleTickerProvid
               children: [
                 Row(
                   children: [
+                    // 연합명
+                    Flexible(
+                      child: Text(
+                        name,
+                        style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     // 연합 태그
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -517,19 +511,6 @@ class _RankingTabState extends ConsumerState<RankingTab> with SingleTickerProvid
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // 연합명
-                    Flexible(
-                      child: Text(
-                        name,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
