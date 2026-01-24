@@ -44,6 +44,44 @@ let AllianceService = class AllianceService {
         if (existingName) {
             throw new common_1.BadRequestException('이미 사용 중인 연합 이름입니다.');
         }
+        const defaultRanks = [
+            {
+                name: '부리더',
+                delete: false,
+                kick: true,
+                applications: true,
+                memberlist: true,
+                manageApplications: true,
+                administrate: true,
+                onlineStatus: true,
+                mails: true,
+                rightHand: true,
+            },
+            {
+                name: '간부',
+                delete: false,
+                kick: false,
+                applications: true,
+                memberlist: true,
+                manageApplications: true,
+                administrate: false,
+                onlineStatus: true,
+                mails: true,
+                rightHand: false,
+            },
+            {
+                name: '일반',
+                delete: false,
+                kick: false,
+                applications: false,
+                memberlist: true,
+                manageApplications: false,
+                administrate: false,
+                onlineStatus: false,
+                mails: false,
+                rightHand: false,
+            },
+        ];
         const alliance = new this.allianceModel({
             tag: dto.tag.toUpperCase(),
             name: dto.name,
@@ -55,6 +93,7 @@ let AllianceService = class AllianceService {
                     rankName: null,
                     joinedAt: new Date(),
                 }],
+            ranks: defaultRanks,
         });
         await alliance.save();
         user.allianceId = alliance._id;

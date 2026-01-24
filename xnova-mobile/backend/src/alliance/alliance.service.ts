@@ -46,6 +46,46 @@ export class AllianceService {
       throw new BadRequestException('이미 사용 중인 연합 이름입니다.');
     }
 
+    // 기본 계급 생성
+    const defaultRanks: AllianceRank[] = [
+      {
+        name: '부리더',
+        delete: false,
+        kick: true,
+        applications: true,
+        memberlist: true,
+        manageApplications: true,
+        administrate: true,
+        onlineStatus: true,
+        mails: true,
+        rightHand: true,
+      },
+      {
+        name: '간부',
+        delete: false,
+        kick: false,
+        applications: true,
+        memberlist: true,
+        manageApplications: true,
+        administrate: false,
+        onlineStatus: true,
+        mails: true,
+        rightHand: false,
+      },
+      {
+        name: '일반',
+        delete: false,
+        kick: false,
+        applications: false,
+        memberlist: true,
+        manageApplications: false,
+        administrate: false,
+        onlineStatus: false,
+        mails: false,
+        rightHand: false,
+      },
+    ];
+
     // 연합 생성
     const alliance = new this.allianceModel({
       tag: dto.tag.toUpperCase(),
@@ -55,9 +95,10 @@ export class AllianceService {
         userId: new Types.ObjectId(userId),
         playerName: user.playerName,
         coordinate: user.coordinate,
-        rankName: null,
+        rankName: null, // 리더는 rankName이 null이어도 모든 권한을 가짐
         joinedAt: new Date(),
       }],
+      ranks: defaultRanks,
     });
 
     await alliance.save();
