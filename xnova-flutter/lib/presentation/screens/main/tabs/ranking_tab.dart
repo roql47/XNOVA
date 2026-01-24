@@ -463,17 +463,13 @@ class _RankingTabState extends ConsumerState<RankingTab> with SingleTickerProvid
     final totalScore = alliance['totalScore'] ?? 0;
 
     Color rankColor;
-    IconData? medalIcon;
     
     if (rank == 1) {
       rankColor = const Color(0xFFFFD700);
-      medalIcon = Icons.emoji_events;
     } else if (rank == 2) {
       rankColor = const Color(0xFFC0C0C0);
-      medalIcon = Icons.emoji_events;
     } else if (rank == 3) {
       rankColor = const Color(0xFFCD7F32);
-      medalIcon = Icons.emoji_events;
     } else {
       rankColor = AppColors.textMuted;
     }
@@ -490,29 +486,14 @@ class _RankingTabState extends ConsumerState<RankingTab> with SingleTickerProvid
           // 순위
           SizedBox(
             width: 50,
-            child: medalIcon != null
-                ? Row(
-                    children: [
-                      Icon(medalIcon, color: rankColor, size: 20),
-                      const SizedBox(width: 4),
-                      Text(
-                        '$rank',
-                        style: TextStyle(
-                          color: rankColor,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  )
-                : Text(
-                    '$rank',
-                    style: TextStyle(
-                      color: rankColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+            child: Text(
+              '$rank',
+              style: TextStyle(
+                color: rankColor,
+                fontSize: 14,
+                fontWeight: rank <= 3 ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
           ),
           
           // 연합 정보
