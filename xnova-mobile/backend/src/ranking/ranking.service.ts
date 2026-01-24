@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../user/schemas/user.schema';
+import { Alliance, AllianceDocument } from '../alliance/schemas/alliance.schema';
 import { BUILDING_COSTS, FLEET_DATA, DEFENSE_DATA, RESEARCH_DATA } from '../game/constants/game-data';
 
 export interface PlayerScore {
@@ -15,10 +16,20 @@ export interface PlayerScore {
   fleetScore: number;
 }
 
+export interface AllianceScore {
+  rank: number;
+  allianceId: string;
+  tag: string;
+  name: string;
+  memberCount: number;
+  totalScore: number;
+}
+
 @Injectable()
 export class RankingService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(Alliance.name) private allianceModel: Model<AllianceDocument>,
   ) {}
 
   // 건설 점수 계산 - XNOVA.js calculateConstructionScore 마이그레이션
@@ -192,6 +203,76 @@ export class RankingService {
       research: researchRank ? { rank: researchRank.rank, score: researchRank.researchScore } : { rank: -1, score: 0 },
       fleet: fleetRank ? { rank: fleetRank.rank, score: fleetRank.fleetScore } : { rank: -1, score: 0 },
     };
+  }
+
+  // ===== 연합 랭킹 =====
+
+  // 연합 랭킹 조회 (멤버들의 총점수 합)
+  async getAllianceRanking(limit: number = 100): Promise<AllianceScore[]> {
+    const alliances = await this.allianceModel.find().exec();
+    const users = await this.userModel.find().exec();
+
+    // 유저별 점수 맵 생성
+    const userScoreMap = new Map<string, number>();
+    for (const user of users) {
+      const scoreData = this.calculatePlayerScore(user);
+      userScoreMap.set(user._id.toString(), scoreData.totalScore);
+    }
+
+    // 연합별 점수 계산
+    const allianceScores: AllianceScore[] = alliances.map(alliance => {
+      let totalScore = 0;
+      
+      // 모든 멤버의 점수 합산
+      for (const member of alliance.members) {
+        const userId = member.userId.toString();
+        const memberScore = userScoreMap.get(userId) || 0;
+        totalScore += memberScore;
+      }
+
+      return {
+        rank: 0,
+        allianceId: alliance._id.toString(),
+        tag: alliance.tag,
+        name: alliance.name,
+        memberCount: alliance.members.length,
+        totalScore,
+      };
+    });
+
+    // 점수로 정렬
+    allianceScores.sort((a, b) => b.totalScore - a.totalScore);
+
+    // 순위 부여
+    allianceScores.forEach((score, index) => {
+      score.rank = index + 1;
+    });
+
+    return allianceScores.slice(0, limit);
+  }
+
+  // 특정 연합의 랭킹 정보
+  async getAllianceRank(allianceId: string): Promise<{ rank: number; score: number; memberCount: number } | null> {
+    const ranking = await this.getAllianceRanking(1000);
+    const alliance = ranking.find(a => a.allianceId === allianceId);
+    
+    if (!alliance) return null;
+    
+    return {
+      rank: alliance.rank,
+      score: alliance.totalScore,
+      memberCount: alliance.memberCount,
+    };
+  }
+
+  // 외부에서 플레이어 점수 계산에 사용
+  calculatePlayerScores(user: UserDocument): {
+    totalScore: number;
+    constructionScore: number;
+    researchScore: number;
+    fleetScore: number;
+  } {
+    return this.calculatePlayerScore(user);
   }
 }
 

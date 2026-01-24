@@ -12,4 +12,7 @@ export declare class ChatService {
     saveMessage(senderId: string, senderName: string, message: string): Promise<ChatMessageDocument>;
     getRecentMessages(limit?: number): Promise<ChatMessageDto[]>;
     cleanupOldMessages(): Promise<void>;
+    saveAllianceMessage(allianceId: string, senderId: string, senderName: string, message: string): Promise<ChatMessageDocument>;
+    getRecentAllianceMessages(allianceId: string, limit?: number): Promise<ChatMessageDto[]>;
+    cleanupOldAllianceMessages(allianceId: string): Promise<void>;
 }

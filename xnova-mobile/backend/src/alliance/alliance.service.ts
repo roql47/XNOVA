@@ -23,6 +23,11 @@ export class AllianceService {
     @InjectModel(Message.name) private messageModel: Model<MessageDocument>,
   ) {}
 
+  // ID로 연합 조회
+  async findById(allianceId: string): Promise<AllianceDocument | null> {
+    return this.allianceModel.findById(allianceId);
+  }
+
   // ===== 연합 생성 =====
   async createAlliance(userId: string, dto: CreateAllianceDto) {
     const user = await this.userModel.findById(userId);

@@ -32,17 +32,31 @@ class SocketService {
   IO.Socket? _socket;
   final TokenService _tokenService;
   
-  // 스트림 컨트롤러
+  // 스트림 컨트롤러 - 전체 채팅
   final _connectionController = StreamController<bool>.broadcast();
   final _chatMessageController = StreamController<ChatMessage>.broadcast();
   final _chatHistoryController = StreamController<List<ChatMessage>>.broadcast();
   final _userCountController = StreamController<int>.broadcast();
   
-  // 스트림
+  // 스트림 컨트롤러 - 연합 채팅
+  final _allianceChatMessageController = StreamController<ChatMessage>.broadcast();
+  final _allianceChatHistoryController = StreamController<List<ChatMessage>>.broadcast();
+  final _allianceUserCountController = StreamController<int>.broadcast();
+  final _allianceChatJoinedController = StreamController<Map<String, dynamic>>.broadcast();
+  final _allianceChatErrorController = StreamController<String>.broadcast();
+  
+  // 스트림 - 전체 채팅
   Stream<bool> get connectionStream => _connectionController.stream;
   Stream<ChatMessage> get chatMessageStream => _chatMessageController.stream;
   Stream<List<ChatMessage>> get chatHistoryStream => _chatHistoryController.stream;
   Stream<int> get userCountStream => _userCountController.stream;
+  
+  // 스트림 - 연합 채팅
+  Stream<ChatMessage> get allianceChatMessageStream => _allianceChatMessageController.stream;
+  Stream<List<ChatMessage>> get allianceChatHistoryStream => _allianceChatHistoryController.stream;
+  Stream<int> get allianceUserCountStream => _allianceUserCountController.stream;
+  Stream<Map<String, dynamic>> get allianceChatJoinedStream => _allianceChatJoinedController.stream;
+  Stream<String> get allianceChatErrorStream => _allianceChatErrorController.stream;
   
   bool _isConnected = false;
   bool get isConnected => _isConnected;
@@ -141,6 +155,45 @@ class SocketService {
       print('Socket: Received chat_error: $data');
     });
 
+    // ===== 연합 채팅 이벤트 리스너 =====
+    _socket!.on('alliance_chat_history', (data) {
+      print('Socket: Received alliance_chat_history');
+      if (data is List) {
+        final messages = data.map((m) => ChatMessage.fromJson(m as Map<String, dynamic>)).toList();
+        _allianceChatHistoryController.add(messages);
+      }
+    });
+
+    _socket!.on('new_alliance_chat_message', (data) {
+      print('Socket: Received new_alliance_chat_message');
+      if (data is Map<String, dynamic>) {
+        final message = ChatMessage.fromJson(data);
+        _allianceChatMessageController.add(message);
+      }
+    });
+
+    _socket!.on('alliance_chat_user_count', (data) {
+      print('Socket: Received alliance_chat_user_count: $data');
+      if (data is Map<String, dynamic>) {
+        _allianceUserCountController.add(data['count'] ?? 0);
+      }
+    });
+
+    _socket!.on('alliance_chat_joined', (data) {
+      print('Socket: Received alliance_chat_joined: $data');
+      if (data is Map<String, dynamic>) {
+        _allianceUserCountController.add(data['userCount'] ?? 0);
+        _allianceChatJoinedController.add(data);
+      }
+    });
+
+    _socket!.on('alliance_chat_error', (data) {
+      print('Socket: Received alliance_chat_error: $data');
+      if (data is Map<String, dynamic>) {
+        _allianceChatErrorController.add(data['message'] ?? '연합 채팅 오류');
+      }
+    });
+
     _socket!.connect();
   }
 
@@ -181,12 +234,44 @@ class SocketService {
     }
   }
 
+  // ===== 연합 채팅 =====
+  
+  // 연합 채팅방 입장
+  void joinAllianceChat() {
+    print('Socket: joinAllianceChat called, connected: $_isConnected');
+    if (_socket != null && _isConnected) {
+      print('Socket: Emitting join_alliance_chat');
+      _socket!.emit('join_alliance_chat');
+    }
+  }
+
+  // 연합 채팅방 퇴장
+  void leaveAllianceChat() {
+    if (_socket != null && _isConnected) {
+      _socket!.emit('leave_alliance_chat');
+    }
+  }
+
+  // 연합 메시지 전송
+  void sendAllianceChatMessage(String message) {
+    if (_socket != null && _isConnected && message.trim().isNotEmpty) {
+      print('Socket: Sending alliance message: ${message.trim()}');
+      _socket!.emit('send_alliance_chat', {'message': message.trim()});
+    }
+  }
+
   void dispose() {
     disconnect();
     _connectionController.close();
     _chatMessageController.close();
     _chatHistoryController.close();
     _userCountController.close();
+    // 연합 채팅
+    _allianceChatMessageController.close();
+    _allianceChatHistoryController.close();
+    _allianceUserCountController.close();
+    _allianceChatJoinedController.close();
+    _allianceChatErrorController.close();
   }
 }
 

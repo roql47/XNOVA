@@ -12,11 +12,13 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { ChatService } from '../chat/chat.service';
 import { UserService } from '../user/user.service';
+import { AllianceService } from '../alliance/alliance.service';
 
 interface ConnectedUser {
   odId: string;
   userId: string;
   playerName?: string;
+  allianceId?: string;
 }
 
 @WebSocketGateway({
@@ -30,13 +32,15 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   private connectedUsers: Map<string, ConnectedUser> = new Map();
-  private chatUsers: Set<string> = new Set(); // 채팅방에 있는 소켓 ID
+  private chatUsers: Set<string> = new Set(); // 전체 채팅방에 있는 소켓 ID
+  private allianceChatUsers: Map<string, Set<string>> = new Map(); // 연합별 채팅방 소켓 ID
 
   constructor(
     private jwtService: JwtService,
     private configService: ConfigService,
     private chatService: ChatService,
     private userService: UserService,
+    private allianceService: AllianceService,
   ) {}
 
   async handleConnection(client: Socket) {
@@ -57,14 +61,21 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // DB에서 사용자 정보 조회
       const user = await this.userService.findById(userId);
       const playerName = user?.playerName || 'Unknown';
+      const allianceId = user?.allianceId?.toString() || undefined;
       
       // 사용자를 자신의 room에 조인
       client.join(`user:${userId}`);
+      
+      // 연합이 있으면 연합 room에도 조인
+      if (allianceId) {
+        client.join(`alliance:${allianceId}`);
+      }
       
       this.connectedUsers.set(client.id, {
         odId: client.id,
         userId,
         playerName,
+        allianceId,
       });
 
       console.log(`User connected: ${playerName} (${userId}, socket: ${client.id})`);
@@ -178,6 +189,130 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private broadcastChatUserCount() {
     this.server.to('global_chat').emit('chat_user_count', {
       count: this.chatUsers.size,
+    });
+  }
+
+  // ===== 연합 채팅 =====
+
+  // 연합 채팅방 입장
+  @SubscribeMessage('join_alliance_chat')
+  async handleJoinAllianceChat(@ConnectedSocket() client: Socket) {
+    const user = this.connectedUsers.get(client.id);
+    if (!user) {
+      client.emit('alliance_chat_error', { message: '인증이 필요합니다.' });
+      return;
+    }
+
+    if (!user.allianceId) {
+      client.emit('alliance_chat_error', { message: '연합에 가입되어 있지 않습니다.' });
+      return;
+    }
+
+    // 연합 정보 조회
+    let allianceTag = '';
+    try {
+      const alliance = await this.allianceService.findById(user.allianceId);
+      allianceTag = alliance?.tag || '';
+    } catch (e) {
+      // ignore
+    }
+
+    const allianceRoom = `alliance_chat:${user.allianceId}`;
+    client.join(allianceRoom);
+
+    // 연합별 채팅 유저 관리
+    if (!this.allianceChatUsers.has(user.allianceId)) {
+      this.allianceChatUsers.set(user.allianceId, new Set());
+    }
+    this.allianceChatUsers.get(user.allianceId)!.add(client.id);
+
+    console.log(`User ${user.playerName} joined alliance chat (${allianceTag})`);
+
+    // 최근 50개 메시지 전송
+    const recentMessages = await this.chatService.getRecentAllianceMessages(user.allianceId, 50);
+    client.emit('alliance_chat_history', recentMessages);
+
+    // 연합 채팅 유저 수 브로드캐스트
+    this.broadcastAllianceChatUserCount(user.allianceId);
+
+    // 입장 알림
+    client.emit('alliance_chat_joined', { 
+      message: '연합 채팅방에 입장했습니다.',
+      userCount: this.allianceChatUsers.get(user.allianceId)?.size || 0,
+      allianceTag: allianceTag,
+    });
+  }
+
+  // 연합 채팅방 퇴장
+  @SubscribeMessage('leave_alliance_chat')
+  handleLeaveAllianceChat(@ConnectedSocket() client: Socket) {
+    const user = this.connectedUsers.get(client.id);
+    if (user && user.allianceId) {
+      const allianceRoom = `alliance_chat:${user.allianceId}`;
+      client.leave(allianceRoom);
+      
+      if (this.allianceChatUsers.has(user.allianceId)) {
+        this.allianceChatUsers.get(user.allianceId)!.delete(client.id);
+      }
+      
+      console.log(`User ${user.playerName} left alliance chat`);
+      this.broadcastAllianceChatUserCount(user.allianceId);
+    }
+  }
+
+  // 연합 메시지 전송
+  @SubscribeMessage('send_alliance_chat')
+  async handleSendAllianceChat(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { message: string },
+  ) {
+    const user = this.connectedUsers.get(client.id);
+    if (!user) {
+      client.emit('alliance_chat_error', { message: '인증이 필요합니다.' });
+      return;
+    }
+
+    if (!user.allianceId) {
+      client.emit('alliance_chat_error', { message: '연합에 가입되어 있지 않습니다.' });
+      return;
+    }
+
+    if (!data.message || data.message.trim().length === 0) {
+      return;
+    }
+
+    // 메시지 길이 제한 (200자)
+    const message = data.message.trim().substring(0, 200);
+
+    // 메시지 저장
+    const savedMessage = await this.chatService.saveAllianceMessage(
+      user.allianceId,
+      user.userId,
+      user.playerName || 'Unknown',
+      message,
+    );
+
+    // 연합 채팅방에 브로드캐스트
+    const allianceRoom = `alliance_chat:${user.allianceId}`;
+    this.server.to(allianceRoom).emit('new_alliance_chat_message', {
+      senderId: user.userId,
+      senderName: user.playerName,
+      message: message,
+      timestamp: savedMessage.timestamp,
+    });
+
+    // 오래된 메시지 정리
+    this.chatService.cleanupOldAllianceMessages(user.allianceId).catch(err => {
+      console.error('Failed to cleanup old alliance messages:', err);
+    });
+  }
+
+  // 연합 채팅 유저 수 브로드캐스트
+  private broadcastAllianceChatUserCount(allianceId: string) {
+    const allianceRoom = `alliance_chat:${allianceId}`;
+    const userCount = this.allianceChatUsers.get(allianceId)?.size || 0;
+    this.server.to(allianceRoom).emit('alliance_chat_user_count', {
+      count: userCount,
     });
   }
 

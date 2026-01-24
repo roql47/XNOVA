@@ -27,10 +27,10 @@ export class ChatService {
     return chatMessage.save();
   }
 
-  // 최근 메시지 조회 (기본 50개)
+  // 최근 메시지 조회 (전체 채팅 - 기본 50개)
   async getRecentMessages(limit: number = 50): Promise<ChatMessageDto[]> {
     const messages = await this.chatMessageModel
-      .find()
+      .find({ allianceId: null })
       .sort({ timestamp: -1 })
       .limit(limit)
       .exec();
@@ -44,13 +44,64 @@ export class ChatService {
     }));
   }
 
-  // 오래된 메시지 삭제 (최근 50개만 유지)
+  // 오래된 메시지 삭제 (전체 채팅 - 최근 50개만 유지)
   async cleanupOldMessages(): Promise<void> {
-    const count = await this.chatMessageModel.countDocuments();
+    const count = await this.chatMessageModel.countDocuments({ allianceId: null });
     if (count > 50) {
       const messagesToDelete = count - 50;
       const oldMessages = await this.chatMessageModel
-        .find()
+        .find({ allianceId: null })
+        .sort({ timestamp: 1 })
+        .limit(messagesToDelete)
+        .exec();
+
+      const idsToDelete = oldMessages.map(msg => msg._id);
+      await this.chatMessageModel.deleteMany({ _id: { $in: idsToDelete } });
+    }
+  }
+
+  // ===== 연합 채팅 =====
+
+  // 연합 메시지 저장
+  async saveAllianceMessage(
+    allianceId: string,
+    senderId: string,
+    senderName: string,
+    message: string,
+  ): Promise<ChatMessageDocument> {
+    const chatMessage = new this.chatMessageModel({
+      allianceId,
+      senderId,
+      senderName,
+      message,
+      timestamp: new Date(),
+    });
+    return chatMessage.save();
+  }
+
+  // 연합 최근 메시지 조회
+  async getRecentAllianceMessages(allianceId: string, limit: number = 50): Promise<ChatMessageDto[]> {
+    const messages = await this.chatMessageModel
+      .find({ allianceId })
+      .sort({ timestamp: -1 })
+      .limit(limit)
+      .exec();
+
+    return messages.reverse().map(msg => ({
+      senderId: msg.senderId,
+      senderName: msg.senderName,
+      message: msg.message,
+      timestamp: msg.timestamp,
+    }));
+  }
+
+  // 연합 오래된 메시지 삭제 (최근 50개만 유지)
+  async cleanupOldAllianceMessages(allianceId: string): Promise<void> {
+    const count = await this.chatMessageModel.countDocuments({ allianceId });
+    if (count > 50) {
+      const messagesToDelete = count - 50;
+      const oldMessages = await this.chatMessageModel
+        .find({ allianceId })
         .sort({ timestamp: 1 })
         .limit(messagesToDelete)
         .exec();

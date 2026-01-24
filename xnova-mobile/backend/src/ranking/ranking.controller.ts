@@ -29,6 +29,19 @@ export class RankingController {
     return this.rankingService.getPlayerRank(req.user.userId);
   }
 
+  // 연합 랭킹 조회
+  @Get('alliance')
+  async getAllianceRanking(@Query('limit') limit: string = '100') {
+    const limitNum = parseInt(limit) || 100;
+    const ranking = await this.rankingService.getAllianceRanking(limitNum);
+    
+    return {
+      type: 'alliance',
+      ranking,
+      totalAlliances: ranking.length,
+    };
+  }
+
   // 특정 타입의 랭킹
   @Get(':type')
   async getRankingByType(

@@ -325,6 +325,14 @@ class ApiService {
     return RankingResponse.fromJson(response.data);
   }
 
+  // 연합 랭킹 조회
+  Future<Map<String, dynamic>> getAllianceRanking({int limit = 100}) async {
+    final response = await _dio.get('ranking/alliance', queryParameters: {
+      'limit': limit,
+    });
+    return response.data;
+  }
+
   Future<MyRankResponse> getMyRank() async {
     final response = await _dio.get('ranking/my-rank');
     return MyRankResponse.fromJson(response.data);

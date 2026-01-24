@@ -33,6 +33,15 @@ let RankingController = class RankingController {
     async getMyRank(req) {
         return this.rankingService.getPlayerRank(req.user.userId);
     }
+    async getAllianceRanking(limit = '100') {
+        const limitNum = parseInt(limit) || 100;
+        const ranking = await this.rankingService.getAllianceRanking(limitNum);
+        return {
+            type: 'alliance',
+            ranking,
+            totalAlliances: ranking.length,
+        };
+    }
     async getRankingByType(type, limit = '100') {
         const validTypes = ['total', 'construction', 'research', 'fleet'];
         const rankingType = validTypes.includes(type) ? type : 'total';
@@ -61,6 +70,13 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], RankingController.prototype, "getMyRank", null);
+__decorate([
+    (0, common_1.Get)('alliance'),
+    __param(0, (0, common_1.Query)('limit')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], RankingController.prototype, "getAllianceRanking", null);
 __decorate([
     (0, common_1.Get)(':type'),
     __param(0, (0, common_1.Param)('type')),

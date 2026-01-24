@@ -28,6 +28,9 @@ let AllianceService = class AllianceService {
         this.userModel = userModel;
         this.messageModel = messageModel;
     }
+    async findById(allianceId) {
+        return this.allianceModel.findById(allianceId);
+    }
     async createAlliance(userId, dto) {
         const user = await this.userModel.findById(userId);
         if (!user) {

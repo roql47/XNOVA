@@ -123,7 +123,7 @@ class _AllianceTabState extends ConsumerState<AllianceTab> with SingleTickerProv
                 '[${pending.tag}] ${pending.name}',
                 style: const TextStyle(
                   fontSize: 16,
-                  color: AppColors.primary,
+                  color: AppColors.accent,
                 ),
               ),
               const SizedBox(height: 24),

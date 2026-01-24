@@ -8,15 +8,20 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RankingModule = void 0;
 const common_1 = require("@nestjs/common");
+const mongoose_1 = require("@nestjs/mongoose");
 const ranking_service_1 = require("./ranking.service");
 const ranking_controller_1 = require("./ranking.controller");
 const user_module_1 = require("../user/user.module");
+const alliance_schema_1 = require("../alliance/schemas/alliance.schema");
 let RankingModule = class RankingModule {
 };
 exports.RankingModule = RankingModule;
 exports.RankingModule = RankingModule = __decorate([
     (0, common_1.Module)({
-        imports: [user_module_1.UserModule],
+        imports: [
+            user_module_1.UserModule,
+            mongoose_1.MongooseModule.forFeature([{ name: alliance_schema_1.Alliance.name, schema: alliance_schema_1.AllianceSchema }]),
+        ],
         controllers: [ranking_controller_1.RankingController],
         providers: [ranking_service_1.RankingService],
         exports: [ranking_service_1.RankingService],

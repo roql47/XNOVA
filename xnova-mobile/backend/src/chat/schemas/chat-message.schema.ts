@@ -16,12 +16,18 @@ export class ChatMessage {
 
   @Prop({ default: Date.now })
   timestamp: Date;
+
+  // 연합 채팅용 - null이면 전체 채팅
+  @Prop({ default: null })
+  allianceId: string | null;
 }
 
 export const ChatMessageSchema = SchemaFactory.createForClass(ChatMessage);
 
 // 최근 메시지만 유지하기 위한 인덱스 (선택적으로 TTL 사용 가능)
 ChatMessageSchema.index({ timestamp: -1 });
+// 연합 채팅용 인덱스
+ChatMessageSchema.index({ allianceId: 1, timestamp: -1 });
 
 
 

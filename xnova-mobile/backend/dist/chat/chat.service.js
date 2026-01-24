@@ -33,7 +33,7 @@ let ChatService = class ChatService {
     }
     async getRecentMessages(limit = 50) {
         const messages = await this.chatMessageModel
-            .find()
+            .find({ allianceId: null })
             .sort({ timestamp: -1 })
             .limit(limit)
             .exec();
@@ -45,11 +45,47 @@ let ChatService = class ChatService {
         }));
     }
     async cleanupOldMessages() {
-        const count = await this.chatMessageModel.countDocuments();
+        const count = await this.chatMessageModel.countDocuments({ allianceId: null });
         if (count > 50) {
             const messagesToDelete = count - 50;
             const oldMessages = await this.chatMessageModel
-                .find()
+                .find({ allianceId: null })
+                .sort({ timestamp: 1 })
+                .limit(messagesToDelete)
+                .exec();
+            const idsToDelete = oldMessages.map(msg => msg._id);
+            await this.chatMessageModel.deleteMany({ _id: { $in: idsToDelete } });
+        }
+    }
+    async saveAllianceMessage(allianceId, senderId, senderName, message) {
+        const chatMessage = new this.chatMessageModel({
+            allianceId,
+            senderId,
+            senderName,
+            message,
+            timestamp: new Date(),
+        });
+        return chatMessage.save();
+    }
+    async getRecentAllianceMessages(allianceId, limit = 50) {
+        const messages = await this.chatMessageModel
+            .find({ allianceId })
+            .sort({ timestamp: -1 })
+            .limit(limit)
+            .exec();
+        return messages.reverse().map(msg => ({
+            senderId: msg.senderId,
+            senderName: msg.senderName,
+            message: msg.message,
+            timestamp: msg.timestamp,
+        }));
+    }
+    async cleanupOldAllianceMessages(allianceId) {
+        const count = await this.chatMessageModel.countDocuments({ allianceId });
+        if (count > 50) {
+            const messagesToDelete = count - 50;
+            const oldMessages = await this.chatMessageModel
+                .find({ allianceId })
                 .sort({ timestamp: 1 })
                 .limit(messagesToDelete)
                 .exec();

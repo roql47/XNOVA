@@ -1,5 +1,6 @@
 import { Model } from 'mongoose';
 import { UserDocument } from '../user/schemas/user.schema';
+import { AllianceDocument } from '../alliance/schemas/alliance.schema';
 export interface PlayerScore {
     rank: number;
     playerId: string;
@@ -10,9 +11,18 @@ export interface PlayerScore {
     researchScore: number;
     fleetScore: number;
 }
+export interface AllianceScore {
+    rank: number;
+    allianceId: string;
+    tag: string;
+    name: string;
+    memberCount: number;
+    totalScore: number;
+}
 export declare class RankingService {
     private userModel;
-    constructor(userModel: Model<UserDocument>);
+    private allianceModel;
+    constructor(userModel: Model<UserDocument>, allianceModel: Model<AllianceDocument>);
     private calculateConstructionScore;
     private calculateResearchScore;
     private calculateFleetScore;
@@ -41,4 +51,16 @@ export declare class RankingService {
             score: number;
         };
     }>;
+    getAllianceRanking(limit?: number): Promise<AllianceScore[]>;
+    getAllianceRank(allianceId: string): Promise<{
+        rank: number;
+        score: number;
+        memberCount: number;
+    } | null>;
+    calculatePlayerScores(user: UserDocument): {
+        totalScore: number;
+        constructionScore: number;
+        researchScore: number;
+        fleetScore: number;
+    };
 }

@@ -17,11 +17,14 @@ const common_1 = require("@nestjs/common");
 const mongoose_1 = require("@nestjs/mongoose");
 const mongoose_2 = require("mongoose");
 const user_schema_1 = require("../user/schemas/user.schema");
+const alliance_schema_1 = require("../alliance/schemas/alliance.schema");
 const game_data_1 = require("../game/constants/game-data");
 let RankingService = class RankingService {
     userModel;
-    constructor(userModel) {
+    allianceModel;
+    constructor(userModel, allianceModel) {
         this.userModel = userModel;
+        this.allianceModel = allianceModel;
     }
     calculateConstructionScore(user) {
         let score = 0;
@@ -151,11 +154,57 @@ let RankingService = class RankingService {
             fleet: fleetRank ? { rank: fleetRank.rank, score: fleetRank.fleetScore } : { rank: -1, score: 0 },
         };
     }
+    async getAllianceRanking(limit = 100) {
+        const alliances = await this.allianceModel.find().exec();
+        const users = await this.userModel.find().exec();
+        const userScoreMap = new Map();
+        for (const user of users) {
+            const scoreData = this.calculatePlayerScore(user);
+            userScoreMap.set(user._id.toString(), scoreData.totalScore);
+        }
+        const allianceScores = alliances.map(alliance => {
+            let totalScore = 0;
+            for (const member of alliance.members) {
+                const userId = member.userId.toString();
+                const memberScore = userScoreMap.get(userId) || 0;
+                totalScore += memberScore;
+            }
+            return {
+                rank: 0,
+                allianceId: alliance._id.toString(),
+                tag: alliance.tag,
+                name: alliance.name,
+                memberCount: alliance.members.length,
+                totalScore,
+            };
+        });
+        allianceScores.sort((a, b) => b.totalScore - a.totalScore);
+        allianceScores.forEach((score, index) => {
+            score.rank = index + 1;
+        });
+        return allianceScores.slice(0, limit);
+    }
+    async getAllianceRank(allianceId) {
+        const ranking = await this.getAllianceRanking(1000);
+        const alliance = ranking.find(a => a.allianceId === allianceId);
+        if (!alliance)
+            return null;
+        return {
+            rank: alliance.rank,
+            score: alliance.totalScore,
+            memberCount: alliance.memberCount,
+        };
+    }
+    calculatePlayerScores(user) {
+        return this.calculatePlayerScore(user);
+    }
 };
 exports.RankingService = RankingService;
 exports.RankingService = RankingService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(user_schema_1.User.name)),
-    __metadata("design:paramtypes", [mongoose_2.Model])
+    __param(1, (0, mongoose_1.InjectModel)(alliance_schema_1.Alliance.name)),
+    __metadata("design:paramtypes", [mongoose_2.Model,
+        mongoose_2.Model])
 ], RankingService);
 //# sourceMappingURL=ranking.service.js.map

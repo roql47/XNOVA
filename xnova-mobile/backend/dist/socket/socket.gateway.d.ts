@@ -4,15 +4,18 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { ChatService } from '../chat/chat.service';
 import { UserService } from '../user/user.service';
+import { AllianceService } from '../alliance/alliance.service';
 export declare class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     private jwtService;
     private configService;
     private chatService;
     private userService;
+    private allianceService;
     server: Server;
     private connectedUsers;
     private chatUsers;
-    constructor(jwtService: JwtService, configService: ConfigService, chatService: ChatService, userService: UserService);
+    private allianceChatUsers;
+    constructor(jwtService: JwtService, configService: ConfigService, chatService: ChatService, userService: UserService, allianceService: AllianceService);
     handleConnection(client: Socket): Promise<void>;
     handleDisconnect(client: Socket): void;
     handleJoinChat(client: Socket): Promise<void>;
@@ -21,6 +24,12 @@ export declare class SocketGateway implements OnGatewayConnection, OnGatewayDisc
         message: string;
     }): Promise<void>;
     private broadcastChatUserCount;
+    handleJoinAllianceChat(client: Socket): Promise<void>;
+    handleLeaveAllianceChat(client: Socket): void;
+    handleSendAllianceChat(client: Socket, data: {
+        message: string;
+    }): Promise<void>;
+    private broadcastAllianceChatUserCount;
     sendToUser(userId: string, event: string, data: any): void;
     notifyConstructionComplete(userId: string, building: string, newLevel: number): void;
     notifyResearchComplete(userId: string, research: string, newLevel: number): void;

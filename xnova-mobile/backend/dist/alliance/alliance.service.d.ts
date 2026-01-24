@@ -8,6 +8,7 @@ export declare class AllianceService {
     private userModel;
     private messageModel;
     constructor(allianceModel: Model<AllianceDocument>, userModel: Model<UserDocument>, messageModel: Model<MessageDocument>);
+    findById(allianceId: string): Promise<AllianceDocument | null>;
     createAlliance(userId: string, dto: CreateAllianceDto): Promise<{
         success: boolean;
         message: string;

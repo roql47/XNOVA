@@ -5,6 +5,7 @@ export declare class ChatMessage {
     senderName: string;
     message: string;
     timestamp: Date;
+    allianceId: string | null;
 }
 export declare const ChatMessageSchema: import("mongoose").Schema<ChatMessage, import("mongoose").Model<ChatMessage, any, any, any, Document<unknown, any, ChatMessage, any, import("mongoose").DefaultSchemaOptions> & ChatMessage & {
     _id: import("mongoose").Types.ObjectId;
@@ -47,6 +48,15 @@ export declare const ChatMessageSchema: import("mongoose").Schema<ChatMessage, i
         id: string;
     }> | undefined;
     timestamp?: import("mongoose").SchemaDefinitionProperty<Date, ChatMessage, Document<unknown, {}, ChatMessage, {
+        id: string;
+    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<ChatMessage & {
+        _id: import("mongoose").Types.ObjectId;
+    } & {
+        __v: number;
+    }, "id"> & {
+        id: string;
+    }> | undefined;
+    allianceId?: import("mongoose").SchemaDefinitionProperty<string | null, ChatMessage, Document<unknown, {}, ChatMessage, {
         id: string;
     }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<ChatMessage & {
         _id: import("mongoose").Types.ObjectId;

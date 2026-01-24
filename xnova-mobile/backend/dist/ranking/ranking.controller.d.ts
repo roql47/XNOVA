@@ -25,6 +25,11 @@ export declare class RankingController {
             score: number;
         };
     }>;
+    getAllianceRanking(limit?: string): Promise<{
+        type: string;
+        ranking: import("./ranking.service").AllianceScore[];
+        totalAlliances: number;
+    }>;
     getRankingByType(type: string, limit?: string): Promise<{
         type: any;
         ranking: import("./ranking.service").PlayerScore[];

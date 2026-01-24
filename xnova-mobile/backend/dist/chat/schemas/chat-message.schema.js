@@ -16,6 +16,7 @@ let ChatMessage = class ChatMessage {
     senderName;
     message;
     timestamp;
+    allianceId;
 };
 exports.ChatMessage = ChatMessage;
 __decorate([
@@ -34,9 +35,14 @@ __decorate([
     (0, mongoose_1.Prop)({ default: Date.now }),
     __metadata("design:type", Date)
 ], ChatMessage.prototype, "timestamp", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: null }),
+    __metadata("design:type", Object)
+], ChatMessage.prototype, "allianceId", void 0);
 exports.ChatMessage = ChatMessage = __decorate([
     (0, mongoose_1.Schema)({ timestamps: true })
 ], ChatMessage);
 exports.ChatMessageSchema = mongoose_1.SchemaFactory.createForClass(ChatMessage);
 exports.ChatMessageSchema.index({ timestamp: -1 });
+exports.ChatMessageSchema.index({ allianceId: 1, timestamp: -1 });
 //# sourceMappingURL=chat-message.schema.js.map
