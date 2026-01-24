@@ -10,6 +10,8 @@ import type { BattleResult } from './services/battle.service';
 import { BattleSimulatorService } from './services/battle-simulator.service';
 import type { SimulationRequest, SimulationConfig, BattleSlot } from './services/battle-simulator.service';
 import { ColonyService } from './services/colony.service';
+import { GalaxyService } from '../galaxy/galaxy.service';
+import { CheckInService } from './services/check-in.service';
 
 @Controller('game')
 @UseGuards(JwtAuthGuard)
@@ -23,6 +25,8 @@ export class GameController {
     private battleService: BattleService,
     private battleSimulatorService: BattleSimulatorService,
     private colonyService: ColonyService,
+    private galaxyService: GalaxyService,
+    private checkInService: CheckInService,
   ) {}
 
   // ===== 자원 =====
@@ -182,6 +186,8 @@ export class GameController {
     deployResult: any;
     colonyProcessed: boolean;
     colonyResult: any;
+    spyProcessed: boolean;
+    spyResult: any;
   }> {
     // 내가 보낸 공격 처리
     const attackResult = await this.battleService.processAttackArrival(req.user.userId);
@@ -197,6 +203,8 @@ export class GameController {
     const deployResult = await this.battleService.processDeployArrival(req.user.userId);
     // 식민 미션 완료 처리
     const colonyResult = await this.colonyService.completeColonization(req.user.userId);
+    // 정탐 미션 완료 처리
+    const spyResult = await this.galaxyService.processSpyArrival(req.user.userId);
     
     return {
       attackProcessed: attackResult !== null,
@@ -213,6 +221,8 @@ export class GameController {
       deployResult,
       colonyProcessed: colonyResult !== null && colonyResult.success,
       colonyResult,
+      spyProcessed: spyResult !== null,
+      spyResult,
     };
   }
 
@@ -331,5 +341,22 @@ export class GameController {
   @Post('colony/return')
   async completeReturn(@Request() req) {
     return this.colonyService.completeReturn(req.user.userId);
+  }
+
+  // ===== 출석체크 =====
+  /**
+   * 출석체크 상태 조회
+   */
+  @Get('check-in/status')
+  async getCheckInStatus(@Request() req) {
+    return this.checkInService.getCheckInStatus(req.user.userId);
+  }
+
+  /**
+   * 출석체크 수행
+   */
+  @Post('check-in')
+  async checkIn(@Request() req) {
+    return this.checkInService.checkIn(req.user.userId);
   }
 }

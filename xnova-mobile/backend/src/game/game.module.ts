@@ -13,6 +13,7 @@ import { RankingService } from './services/ranking.service';
 import { ColonyService } from './services/colony.service';
 import { FleetSchedulerService } from './services/fleet-scheduler.service';
 import { BuildSchedulerService } from './services/build-scheduler.service';
+import { CheckInService } from './services/check-in.service';
 import { UserModule } from '../user/user.module';
 import { MessageModule } from '../message/message.module';
 import { GalaxyModule } from '../galaxy/galaxy.module';
@@ -34,6 +35,7 @@ import { PlanetModule } from '../planet/planet.module';
     ColonyService,
     FleetSchedulerService,
     BuildSchedulerService,
+    CheckInService,
   ],
   exports: [
     ResourcesService,
@@ -48,6 +50,7 @@ import { PlanetModule } from '../planet/planet.module';
     ColonyService,
     FleetSchedulerService,
     BuildSchedulerService,
+    CheckInService,
   ],
 })
 export class GameModule {}

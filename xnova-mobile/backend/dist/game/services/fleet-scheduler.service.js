@@ -21,16 +21,19 @@ const mongoose_2 = require("mongoose");
 const user_schema_1 = require("../../user/schemas/user.schema");
 const battle_service_1 = require("./battle.service");
 const colony_service_1 = require("./colony.service");
+const galaxy_service_1 = require("../../galaxy/galaxy.service");
 let FleetSchedulerService = FleetSchedulerService_1 = class FleetSchedulerService {
     userModel;
     battleService;
     colonyService;
+    galaxyService;
     logger = new common_1.Logger(FleetSchedulerService_1.name);
     isProcessing = false;
-    constructor(userModel, battleService, colonyService) {
+    constructor(userModel, battleService, colonyService, galaxyService) {
         this.userModel = userModel;
         this.battleService = battleService;
         this.colonyService = colonyService;
+        this.galaxyService = galaxyService;
     }
     async handleFleetMissions() {
         if (this.isProcessing) {
@@ -69,6 +72,9 @@ let FleetSchedulerService = FleetSchedulerService_1 = class FleetSchedulerServic
                                             break;
                                         case 'colony':
                                             await this.colonyService.completeColonization(user._id.toString());
+                                            break;
+                                        case 'spy':
+                                            await this.galaxyService.processSpyArrival(user._id.toString(), missionInfo.missionId);
                                             break;
                                     }
                                 }
@@ -160,8 +166,10 @@ __decorate([
 exports.FleetSchedulerService = FleetSchedulerService = FleetSchedulerService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, mongoose_1.InjectModel)(user_schema_1.User.name)),
+    __param(3, (0, common_1.Inject)((0, common_1.forwardRef)(() => galaxy_service_1.GalaxyService))),
     __metadata("design:paramtypes", [mongoose_2.Model,
         battle_service_1.BattleService,
-        colony_service_1.ColonyService])
+        colony_service_1.ColonyService,
+        galaxy_service_1.GalaxyService])
 ], FleetSchedulerService);
 //# sourceMappingURL=fleet-scheduler.service.js.map

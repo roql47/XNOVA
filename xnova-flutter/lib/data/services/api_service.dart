@@ -450,5 +450,18 @@ class ApiService {
     final response = await _dio.post('auth/kakao-link/generate');
     return response.data;
   }
+
+  // ===== 출석체크 =====
+  // 출석체크 상태 조회
+  Future<CheckInStatus> getCheckInStatus() async {
+    final response = await _dio.get('game/check-in/status');
+    return CheckInStatus.fromJson(response.data);
+  }
+
+  // 출석체크 수행
+  Future<CheckInResult> checkIn() async {
+    final response = await _dio.post('game/check-in');
+    return CheckInResult.fromJson(response.data);
+  }
 }
 

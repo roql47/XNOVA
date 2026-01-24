@@ -413,6 +413,9 @@ class GameState {
   final List<MyPlanet> myPlanets;
   final String? activePlanetId;
 
+  // 출석체크
+  final CheckInStatus? checkInStatus;
+
   GameState({
     this.resources = const GameResources(),
     this.production = const GameProduction(),
@@ -439,6 +442,7 @@ class GameState {
     this.battleStatus,
     this.myPlanets = const [],
     this.activePlanetId,
+    this.checkInStatus,
   });
 
   GameState copyWith({
@@ -472,6 +476,7 @@ class GameState {
     bool clearBattleStatus = false,
     List<MyPlanet>? myPlanets,
     String? activePlanetId,
+    CheckInStatus? checkInStatus,
   }) {
     return GameState(
       resources: resources ?? this.resources,
@@ -499,6 +504,7 @@ class GameState {
       battleStatus: clearBattleStatus ? null : (battleStatus ?? this.battleStatus),
       myPlanets: myPlanets ?? this.myPlanets,
       activePlanetId: activePlanetId ?? this.activePlanetId,
+      checkInStatus: checkInStatus ?? this.checkInStatus,
     );
   }
 }
@@ -651,6 +657,31 @@ class GameNotifier extends StateNotifier<GameState> {
       );
     } catch (e) {
       // ignore
+    }
+  }
+
+  // ===== 출석체크 =====
+  Future<void> loadCheckInStatus() async {
+    try {
+      final status = await _apiService.getCheckInStatus();
+      state = state.copyWith(checkInStatus: status);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  Future<CheckInResult?> checkIn() async {
+    try {
+      final result = await _apiService.checkIn();
+      if (result.success) {
+        // 출석체크 성공 시 상태 및 자원 새로고침
+        await loadCheckInStatus();
+        await loadResources();
+      }
+      return result;
+    } catch (e) {
+      state = state.copyWith(error: '출석체크에 실패했습니다.');
+      return null;
     }
   }
 

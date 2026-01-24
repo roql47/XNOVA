@@ -1792,7 +1792,8 @@ export class BattleService {
     const updatedTargetOwner = await this.userModel.findById(targetOwner._id.toString()).exec();
     const updatedTargetPlanet = isTargetColony ? await this.planetModel.findById(targetPlanet._id.toString()).exec() : null;
     
-    if (!updatedAttacker || !updatedTargetOwner || !updatedAttacker.pendingAttack) return null;
+    // pa는 이미 위에서 mission 또는 pendingAttack에서 추출되었음
+    if (!updatedAttacker || !updatedTargetOwner || !pa) return null;
 
     // 실제 타겟 데이터 결정 (식민지면 식민지, 아니면 모행성)
     const targetData = isTargetColony && updatedTargetPlanet ? {
@@ -1837,7 +1838,7 @@ export class BattleService {
     }
 
     const battleResult = this.simulateBattle(
-      updatedAttacker.pendingAttack.fleet,
+      pa.fleet,  // fleetMissions에서 찾은 미션의 함대 사용
       defenderFleet,
       defenderDefense,
       attackerResearch,
@@ -1853,7 +1854,7 @@ export class BattleService {
         weaponsTech: attackerResearch.weaponsTech,
         shieldTech: attackerResearch.shieldTech,
         armorTech: attackerResearch.armorTech,
-        fleet: { ...updatedAttacker.pendingAttack.fleet },
+        fleet: { ...pa.fleet },
       }],
       defenders: [{
         name: updatedTargetOwner.playerName,
@@ -1926,7 +1927,7 @@ export class BattleService {
     }
 
     // 귀환 정보 설정
-    const travelTime = updatedAttacker.pendingAttack.travelTime || 0;
+    const travelTime = pa.travelTime || 0;
     const returnTime = new Date(Date.now() + travelTime * 1000);
 
     // 데브리 생성

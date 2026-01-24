@@ -184,7 +184,11 @@ class _MainScreenState extends ConsumerState<MainScreen> with WidgetsBindingObse
     await ref.read(gameProvider.notifier).loadProfile();
     await ref.read(messageProvider.notifier).loadMessages();
     
-    // 4. 자동 완료 타이머 재시작
+    // 4. 백그라운드에서 완료된 건조/연구/전투 즉시 처리
+    debugPrint('[MainScreen] 완료된 빌드/전투 처리');
+    await ref.read(gameProvider.notifier).checkAndAutoComplete();
+    
+    // 5. 자동 완료 타이머 재시작
     _startAutoCompleteTimer();
     _lastPausedTime = null;
   }

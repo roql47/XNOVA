@@ -165,6 +165,11 @@ export declare class VacationMode {
     startTime: Date;
     minEndTime: Date;
 }
+export declare class CheckInInfo {
+    lastCheckInDate: string | null;
+    checkInStreak: number;
+    weekStartDate: string | null;
+}
 export declare class User {
     email: string;
     password?: string;
@@ -175,6 +180,7 @@ export declare class User {
     activePlanetId: string | null;
     isAdmin: boolean;
     vacationMode: VacationMode;
+    checkIn: CheckInInfo;
     resources: Resources;
     mines: Mines;
     operationRates: OperationRates;
@@ -280,6 +286,15 @@ export declare const UserSchema: import("mongoose").Schema<User, import("mongoos
         id: string;
     }> | undefined;
     vacationMode?: import("mongoose").SchemaDefinitionProperty<VacationMode, User, Document<unknown, {}, User, {
+        id: string;
+    }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
+        _id: import("mongoose").Types.ObjectId;
+    } & {
+        __v: number;
+    }, "id"> & {
+        id: string;
+    }> | undefined;
+    checkIn?: import("mongoose").SchemaDefinitionProperty<CheckInInfo, User, Document<unknown, {}, User, {
         id: string;
     }, import("mongoose").ResolveSchemaOptions<import("mongoose").DefaultSchemaOptions>> & Omit<User & {
         _id: import("mongoose").Types.ObjectId;

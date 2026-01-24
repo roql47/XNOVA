@@ -447,6 +447,19 @@ export class VacationMode {
   minEndTime: Date;  // 최소 48시간 후
 }
 
+// 출석체크 스키마
+@Schema({ _id: false })
+export class CheckInInfo {
+  @Prop({ type: String, default: null })
+  lastCheckInDate: string | null;  // 'YYYY-MM-DD' 형식
+
+  @Prop({ default: 0 })
+  checkInStreak: number;  // 연속 출석일수 (1-7)
+
+  @Prop({ type: String, default: null })
+  weekStartDate: string | null;  // 주간 시작 날짜
+}
+
 @Schema({ timestamps: true })
 export class User {
   @Prop({ required: true, unique: true })
@@ -476,6 +489,9 @@ export class User {
 
   @Prop({ type: VacationMode, default: () => ({ isActive: false, startTime: null, minEndTime: null }) })
   vacationMode: VacationMode;
+
+  @Prop({ type: CheckInInfo, default: () => ({ lastCheckInDate: null, checkInStreak: 0, weekStartDate: null }) })
+  checkIn: CheckInInfo;
 
   @Prop({ type: Resources, default: () => ({}) })
   resources: Resources;

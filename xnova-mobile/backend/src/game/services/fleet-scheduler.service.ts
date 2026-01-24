@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, forwardRef, Inject } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument } from '../../user/schemas/user.schema';
 import { BattleService } from './battle.service';
 import { ColonyService } from './colony.service';
+import { GalaxyService } from '../../galaxy/galaxy.service';
 
 @Injectable()
 export class FleetSchedulerService {
@@ -15,6 +16,7 @@ export class FleetSchedulerService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private readonly battleService: BattleService,
     private readonly colonyService: ColonyService,
+    @Inject(forwardRef(() => GalaxyService)) private readonly galaxyService: GalaxyService,
   ) {}
 
   /**
@@ -72,6 +74,9 @@ export class FleetSchedulerService {
                       break;
                     case 'colony':
                       await this.colonyService.completeColonization(user._id.toString());
+                      break;
+                    case 'spy':
+                      await this.galaxyService.processSpyArrival(user._id.toString(), missionInfo.missionId);
                       break;
                   }
                 } else if (missionInfo.phase === 'returning') {

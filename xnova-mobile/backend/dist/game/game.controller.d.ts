@@ -8,6 +8,8 @@ import type { BattleResult } from './services/battle.service';
 import { BattleSimulatorService } from './services/battle-simulator.service';
 import type { SimulationRequest, SimulationConfig, BattleSlot } from './services/battle-simulator.service';
 import { ColonyService } from './services/colony.service';
+import { GalaxyService } from '../galaxy/galaxy.service';
+import { CheckInService } from './services/check-in.service';
 export declare class GameController {
     private resourcesService;
     private buildingsService;
@@ -17,7 +19,9 @@ export declare class GameController {
     private battleService;
     private battleSimulatorService;
     private colonyService;
-    constructor(resourcesService: ResourcesService, buildingsService: BuildingsService, researchService: ResearchService, fleetService: FleetService, defenseService: DefenseService, battleService: BattleService, battleSimulatorService: BattleSimulatorService, colonyService: ColonyService);
+    private galaxyService;
+    private checkInService;
+    constructor(resourcesService: ResourcesService, buildingsService: BuildingsService, researchService: ResearchService, fleetService: FleetService, defenseService: DefenseService, battleService: BattleService, battleSimulatorService: BattleSimulatorService, colonyService: ColonyService, galaxyService: GalaxyService, checkInService: CheckInService);
     getResources(req: any): Promise<{
         resources: {
             metal: number;
@@ -309,6 +313,8 @@ export declare class GameController {
         deployResult: any;
         colonyProcessed: boolean;
         colonyResult: any;
+        spyProcessed: boolean;
+        spyResult: any;
     }>;
     simulate(body: SimulationRequest): Promise<import("./services/battle-simulator.service").SimulationResult>;
     simulateSimple(body: {
@@ -386,4 +392,6 @@ export declare class GameController {
         success: boolean;
         message: string;
     }>;
+    getCheckInStatus(req: any): Promise<import("./services/check-in.service").CheckInStatusResponse>;
+    checkIn(req: any): Promise<import("./services/check-in.service").CheckInResult>;
 }

@@ -2,7 +2,7 @@ name: xnova_game
 description: "XNOVA - Space Strategy Game"
 publish_to: 'none'
 
-version: 0.15.0+1
+version: 0.16.0+1
 
 environment:
   sdk: ^3.5.3

@@ -23,6 +23,8 @@ const defense_service_1 = require("./services/defense.service");
 const battle_service_1 = require("./services/battle.service");
 const battle_simulator_service_1 = require("./services/battle-simulator.service");
 const colony_service_1 = require("./services/colony.service");
+const galaxy_service_1 = require("../galaxy/galaxy.service");
+const check_in_service_1 = require("./services/check-in.service");
 let GameController = class GameController {
     resourcesService;
     buildingsService;
@@ -32,7 +34,9 @@ let GameController = class GameController {
     battleService;
     battleSimulatorService;
     colonyService;
-    constructor(resourcesService, buildingsService, researchService, fleetService, defenseService, battleService, battleSimulatorService, colonyService) {
+    galaxyService;
+    checkInService;
+    constructor(resourcesService, buildingsService, researchService, fleetService, defenseService, battleService, battleSimulatorService, colonyService, galaxyService, checkInService) {
         this.resourcesService = resourcesService;
         this.buildingsService = buildingsService;
         this.researchService = researchService;
@@ -41,6 +45,8 @@ let GameController = class GameController {
         this.battleService = battleService;
         this.battleSimulatorService = battleSimulatorService;
         this.colonyService = colonyService;
+        this.galaxyService = galaxyService;
+        this.checkInService = checkInService;
     }
     async getResources(req) {
         return this.resourcesService.getResources(req.user.userId);
@@ -122,6 +128,7 @@ let GameController = class GameController {
         const transportResult = await this.battleService.processTransportArrival(req.user.userId);
         const deployResult = await this.battleService.processDeployArrival(req.user.userId);
         const colonyResult = await this.colonyService.completeColonization(req.user.userId);
+        const spyResult = await this.galaxyService.processSpyArrival(req.user.userId);
         return {
             attackProcessed: attackResult !== null,
             attackResult,
@@ -137,6 +144,8 @@ let GameController = class GameController {
             deployResult,
             colonyProcessed: colonyResult !== null && colonyResult.success,
             colonyResult,
+            spyProcessed: spyResult !== null,
+            spyResult,
         };
     }
     async simulate(body) {
@@ -174,6 +183,12 @@ let GameController = class GameController {
     }
     async completeReturn(req) {
         return this.colonyService.completeReturn(req.user.userId);
+    }
+    async getCheckInStatus(req) {
+        return this.checkInService.getCheckInStatus(req.user.userId);
+    }
+    async checkIn(req) {
+        return this.checkInService.checkIn(req.user.userId);
     }
 };
 exports.GameController = GameController;
@@ -427,6 +442,20 @@ __decorate([
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], GameController.prototype, "completeReturn", null);
+__decorate([
+    (0, common_1.Get)('check-in/status'),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "getCheckInStatus", null);
+__decorate([
+    (0, common_1.Post)('check-in'),
+    __param(0, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], GameController.prototype, "checkIn", null);
 exports.GameController = GameController = __decorate([
     (0, common_1.Controller)('game'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
@@ -437,6 +466,8 @@ exports.GameController = GameController = __decorate([
         defense_service_1.DefenseService,
         battle_service_1.BattleService,
         battle_simulator_service_1.BattleSimulatorService,
-        colony_service_1.ColonyService])
+        colony_service_1.ColonyService,
+        galaxy_service_1.GalaxyService,
+        check_in_service_1.CheckInService])
 ], GameController);
 //# sourceMappingURL=game.controller.js.map

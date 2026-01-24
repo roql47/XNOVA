@@ -1284,7 +1284,7 @@ let BattleService = class BattleService {
         const updatedAttacker = await this.userModel.findById(attackerId).exec();
         const updatedTargetOwner = await this.userModel.findById(targetOwner._id.toString()).exec();
         const updatedTargetPlanet = isTargetColony ? await this.planetModel.findById(targetPlanet._id.toString()).exec() : null;
-        if (!updatedAttacker || !updatedTargetOwner || !updatedAttacker.pendingAttack)
+        if (!updatedAttacker || !updatedTargetOwner || !pa)
             return null;
         const targetData = isTargetColony && updatedTargetPlanet ? {
             resources: updatedTargetPlanet.resources,
@@ -1321,7 +1321,7 @@ let BattleService = class BattleService {
                 defenderDefense[key] = targetDefenseObj[key] || 0;
             }
         }
-        const battleResult = this.simulateBattle(updatedAttacker.pendingAttack.fleet, defenderFleet, defenderDefense, attackerResearch, defenderResearch);
+        const battleResult = this.simulateBattle(pa.fleet, defenderFleet, defenderDefense, attackerResearch, defenderResearch);
         battleResult.before = {
             attackers: [{
                     name: updatedAttacker.playerName,
@@ -1330,7 +1330,7 @@ let BattleService = class BattleService {
                     weaponsTech: attackerResearch.weaponsTech,
                     shieldTech: attackerResearch.shieldTech,
                     armorTech: attackerResearch.armorTech,
-                    fleet: { ...updatedAttacker.pendingAttack.fleet },
+                    fleet: { ...pa.fleet },
                 }],
             defenders: [{
                     name: updatedTargetOwner.playerName,
@@ -1385,7 +1385,7 @@ let BattleService = class BattleService {
                 }
             }
         }
-        const travelTime = updatedAttacker.pendingAttack.travelTime || 0;
+        const travelTime = pa.travelTime || 0;
         const returnTime = new Date(Date.now() + travelTime * 1000);
         if (battleResult.debris.metal > 0 || battleResult.debris.crystal > 0) {
             await this.galaxyService.updateDebris(targetData.coordinate, battleResult.debris.metal, battleResult.debris.crystal);

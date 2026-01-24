@@ -38,8 +38,10 @@ export declare class GalaxyController {
     }>;
     spyOnPlanet(body: SpyRequestDto, req: any): Promise<{
         success: boolean;
-        report: import("./galaxy.service").SpyReport;
         message: string;
+        missionId: string;
+        travelTime: number;
+        arrivalTime: Date;
         error?: undefined;
     } | {
         success: boolean;

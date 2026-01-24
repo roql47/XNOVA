@@ -202,6 +202,25 @@ let GalaxyService = class GalaxyService {
         }
         return { user: null, planet: null, ownerId: null, isColony: false };
     }
+    calculateDistance(coordA, coordB) {
+        const partsA = coordA.split(':').map(Number);
+        const partsB = coordB.split(':').map(Number);
+        const [galaxyA, systemA, planetA] = partsA;
+        const [galaxyB, systemB, planetB] = partsB;
+        if (galaxyA !== galaxyB) {
+            return 20000 * Math.abs(galaxyA - galaxyB);
+        }
+        if (systemA !== systemB) {
+            return 2700 + (95 * Math.abs(systemA - systemB));
+        }
+        if (planetA !== planetB) {
+            return 1000 + (5 * Math.abs(planetA - planetB));
+        }
+        return 0;
+    }
+    generateMissionId() {
+        return `spy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
     async spyOnPlanet(attackerId, targetCoord, probeCount) {
         const attacker = await this.userModel.findById(attackerId).exec();
         if (!attacker) {
@@ -215,14 +234,79 @@ let GalaxyService = class GalaxyService {
         if (!targetResult.ownerId) {
             return { success: false, error: '해당 좌표에 행성이 없습니다.' };
         }
-        const targetOwner = targetResult.user;
-        const targetPlanet = targetResult.planet;
-        const isColony = targetResult.isColony;
         if (targetResult.ownerId === attackerId) {
             return { success: false, error: '자신의 행성은 정찰할 수 없습니다.' };
         }
+        const attackerCoord = attacker.coordinate;
+        const distance = this.calculateDistance(attackerCoord, targetCoord);
+        const probeSpeed = 100000000;
+        const travelTime = (distance / probeSpeed) * 3600;
+        const actualTravelTime = Math.max(30, travelTime);
+        const startTime = new Date();
+        const arrivalTime = new Date(startTime.getTime() + actualTravelTime * 1000);
+        attacker.fleet.espionageProbe -= probeCount;
+        attacker.markModified('fleet');
+        const missionId = this.generateMissionId();
+        const newMission = {
+            missionId,
+            phase: 'outbound',
+            missionType: 'spy',
+            targetCoord,
+            targetUserId: targetResult.ownerId,
+            fleet: { espionageProbe: probeCount },
+            capacity: 0,
+            travelTime: actualTravelTime,
+            startTime,
+            arrivalTime,
+            originCoord: attackerCoord,
+        };
+        if (!attacker.fleetMissions) {
+            attacker.fleetMissions = [];
+        }
+        attacker.fleetMissions.push(newMission);
+        attacker.markModified('fleetMissions');
+        await attacker.save();
+        return {
+            success: true,
+            message: `정찰 위성 ${probeCount}대가 ${targetCoord}로 출발했습니다. 도착까지 ${Math.ceil(actualTravelTime)}초`,
+            missionId,
+            travelTime: actualTravelTime,
+            arrivalTime,
+        };
+    }
+    async processSpyArrival(attackerId, missionId) {
+        const attacker = await this.userModel.findById(attackerId).exec();
+        if (!attacker)
+            return null;
+        const now = Date.now();
+        const mission = missionId
+            ? attacker.fleetMissions?.find((m) => m.missionId === missionId && m.missionType === 'spy' && m.phase === 'outbound')
+            : attacker.fleetMissions?.find((m) => {
+                if (m.missionType !== 'spy' || m.phase !== 'outbound')
+                    return false;
+                return new Date(m.arrivalTime).getTime() <= now;
+            });
+        if (!mission)
+            return null;
+        const m = mission;
+        const targetCoord = m.targetCoord;
+        const probeCount = m.fleet?.espionageProbe || 1;
+        const currentMissionId = m.missionId;
+        const targetResult = await this.findPlanetByCoordinate(targetCoord);
+        if (!targetResult.ownerId) {
+            attacker.fleetMissions = attacker.fleetMissions?.filter((fm) => fm.missionId !== currentMissionId);
+            attacker.markModified('fleetMissions');
+            await attacker.save();
+            return null;
+        }
+        const targetOwner = targetResult.user;
+        const targetPlanet = targetResult.planet;
+        const isColony = targetResult.isColony;
         if (!targetOwner) {
-            return { success: false, error: '대상 행성의 소유자를 찾을 수 없습니다.' };
+            attacker.fleetMissions = attacker.fleetMissions?.filter((fm) => fm.missionId !== currentMissionId);
+            attacker.markModified('fleetMissions');
+            await attacker.save();
+            return null;
         }
         const mySpyLevel = attacker.researchLevels?.espionageTech || 0;
         const targetSpyLevel = targetOwner.researchLevels?.espionageTech || 0;
@@ -251,10 +335,15 @@ let GalaxyService = class GalaxyService {
         if (probesDestroyed) {
             probesLost = probeCount;
             probesSurvived = 0;
-            attacker.fleet.espionageProbe -= probeCount;
             await this.updateDebris(targetCoord, 0, probeCount * 300);
-            await attacker.save();
         }
+        else {
+            attacker.fleet.espionageProbe = (attacker.fleet.espionageProbe || 0) + probeCount;
+            attacker.markModified('fleet');
+        }
+        attacker.fleetMissions = attacker.fleetMissions?.filter((fm) => fm.missionId !== currentMissionId);
+        attacker.markModified('fleetMissions');
+        await attacker.save();
         const report = this.generateSpyReport(targetOwner, targetPlanet, isColony, stScore, probesLost, probesSurvived, targetCoord, mySpyLevel, targetSpyLevel);
         await this.messageService.createMessage({
             receiverId: attackerId,
@@ -277,9 +366,9 @@ let GalaxyService = class GalaxyService {
         return {
             success: true,
             report,
-            message: probesDestroyed
-                ? `정찰 완료. 정찰 위성 ${probesLost}대가 파괴되었습니다.`
-                : `정찰 완료. 정찰 위성 ${probesSurvived}대가 귀환했습니다.`,
+            probesDestroyed,
+            probesLost,
+            probesSurvived,
         };
     }
     getTotalFleetCount(fleet) {

@@ -1404,7 +1404,7 @@ class _IncomingAttackCard extends StatelessWidget {
   }
 }
 
-class _ShipSelector extends StatelessWidget {
+class _ShipSelector extends StatefulWidget {
   final FleetInfo ship;
   final int selectedCount;
   final ValueChanged<int> onChanged;
@@ -1416,6 +1416,55 @@ class _ShipSelector extends StatelessWidget {
   });
 
   @override
+  State<_ShipSelector> createState() => _ShipSelectorState();
+}
+
+class _ShipSelectorState extends State<_ShipSelector> {
+  late TextEditingController _controller;
+  
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.selectedCount.toString());
+  }
+  
+  @override
+  void didUpdateWidget(_ShipSelector oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 외부에서 수량이 변경되면 컨트롤러 업데이트
+    if (oldWidget.selectedCount != widget.selectedCount) {
+      final currentText = _controller.text;
+      final newText = widget.selectedCount.toString();
+      if (currentText != newText) {
+        _controller.text = newText;
+      }
+    }
+  }
+  
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+  
+  void _onTextChanged(String value) {
+    final parsed = int.tryParse(value) ?? 0;
+    // 보유량 초과 방지
+    final clamped = parsed.clamp(0, widget.ship.count);
+    if (clamped != widget.selectedCount) {
+      widget.onChanged(clamped);
+    }
+  }
+  
+  void _onEditingComplete() {
+    // 편집 완료 시 값 정리
+    final parsed = int.tryParse(_controller.text) ?? 0;
+    final clamped = parsed.clamp(0, widget.ship.count);
+    _controller.text = clamped.toString();
+    widget.onChanged(clamped);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -1425,7 +1474,7 @@ class _ShipSelector extends StatelessWidget {
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
-            color: selectedCount > 0 ? AppColors.accent.withOpacity(0.4) : AppColors.panelBorder,
+            color: widget.selectedCount > 0 ? AppColors.accent.withOpacity(0.4) : AppColors.panelBorder,
           ),
         ),
         child: Row(
@@ -1435,7 +1484,7 @@ class _ShipSelector extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    ship.name,
+                    widget.ship.name,
                     style: const TextStyle(
                       color: AppColors.textPrimary,
                       fontWeight: FontWeight.w500,
@@ -1443,7 +1492,7 @@ class _ShipSelector extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '보유: ${ship.count}',
+                    '보유: ${widget.ship.count}',
                     style: const TextStyle(
                       color: AppColors.textMuted,
                       fontSize: 10,
@@ -1456,36 +1505,65 @@ class _ShipSelector extends StatelessWidget {
               children: [
                 IconButton(
                   icon: const Icon(Icons.remove, size: 16),
-                  onPressed: selectedCount > 0 
-                      ? () => onChanged(selectedCount - 1)
+                  onPressed: widget.selectedCount > 0 
+                      ? () {
+                          final newValue = widget.selectedCount - 1;
+                          _controller.text = newValue.toString();
+                          widget.onChanged(newValue);
+                        }
                       : null,
                   color: AppColors.textMuted,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 ),
+                // 수량 직접 입력 필드
                 Container(
-                  width: 40,
-                  alignment: Alignment.center,
-                  child: Text(
-                    '$selectedCount',
+                  width: 60,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: AppColors.panelBackground,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: widget.selectedCount > 0 ? AppColors.accent.withOpacity(0.5) : AppColors.panelBorder,
+                    ),
+                  ),
+                  child: TextField(
+                    controller: _controller,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: selectedCount > 0 ? AppColors.accent : AppColors.textMuted,
+                      color: widget.selectedCount > 0 ? AppColors.accent : AppColors.textMuted,
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
                     ),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                      isDense: true,
+                    ),
+                    onChanged: _onTextChanged,
+                    onEditingComplete: _onEditingComplete,
+                    onTapOutside: (_) => _onEditingComplete(),
                   ),
                 ),
                 IconButton(
                   icon: const Icon(Icons.add, size: 16),
-                  onPressed: selectedCount < ship.count 
-                      ? () => onChanged(selectedCount + 1)
+                  onPressed: widget.selectedCount < widget.ship.count 
+                      ? () {
+                          final newValue = widget.selectedCount + 1;
+                          _controller.text = newValue.toString();
+                          widget.onChanged(newValue);
+                        }
                       : null,
                   color: AppColors.textMuted,
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 ),
                 GestureDetector(
-                  onTap: () => onChanged(ship.count),
+                  onTap: () {
+                    _controller.text = widget.ship.count.toString();
+                    widget.onChanged(widget.ship.count);
+                  },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     child: Text(

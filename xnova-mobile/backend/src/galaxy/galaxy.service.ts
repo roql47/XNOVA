@@ -272,7 +272,38 @@ export class GalaxyService {
     return { user: null, planet: null, ownerId: null, isColony: false };
   }
 
-  // 정찰 미션 수행
+  // 좌표 간 거리 계산
+  private calculateDistance(coordA: string, coordB: string): number {
+    const partsA = coordA.split(':').map(Number);
+    const partsB = coordB.split(':').map(Number);
+
+    const [galaxyA, systemA, planetA] = partsA;
+    const [galaxyB, systemB, planetB] = partsB;
+
+    // 다른 은하
+    if (galaxyA !== galaxyB) {
+      return 20000 * Math.abs(galaxyA - galaxyB);
+    }
+
+    // 같은 은하, 다른 시스템
+    if (systemA !== systemB) {
+      return 2700 + (95 * Math.abs(systemA - systemB));
+    }
+
+    // 같은 시스템, 다른 행성
+    if (planetA !== planetB) {
+      return 1000 + (5 * Math.abs(planetA - planetB));
+    }
+
+    return 0;
+  }
+
+  // 미션 ID 생성
+  private generateMissionId(): string {
+    return `spy_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  // 정찰 미션 시작 (이동 시간 적용)
   async spyOnPlanet(attackerId: string, targetCoord: string, probeCount: number) {
     // 공격자 정보 조회
     const attacker = await this.userModel.findById(attackerId).exec();
@@ -292,17 +323,102 @@ export class GalaxyService {
       return { success: false, error: '해당 좌표에 행성이 없습니다.' };
     }
 
-    const targetOwner = targetResult.user; // 소유자 (연구 레벨용)
-    const targetPlanet = targetResult.planet; // 식민지 (자원/함대/방어용)
-    const isColony = targetResult.isColony;
-
     // 자기 자신 정찰 불가
     if (targetResult.ownerId === attackerId) {
       return { success: false, error: '자신의 행성은 정찰할 수 없습니다.' };
     }
 
+    // 거리 및 이동 시간 계산
+    const attackerCoord = attacker.coordinate;
+    const distance = this.calculateDistance(attackerCoord, targetCoord);
+    
+    // 정찰 위성 속도: 100,000,000 (게임 데이터 기준)
+    const probeSpeed = 100000000;
+    const travelTime = (distance / probeSpeed) * 3600; // 초 단위
+    
+    // 최소 이동 시간 30초 보장
+    const actualTravelTime = Math.max(30, travelTime);
+
+    const startTime = new Date();
+    const arrivalTime = new Date(startTime.getTime() + actualTravelTime * 1000);
+
+    // 정찰 위성 차감
+    attacker.fleet.espionageProbe -= probeCount;
+    attacker.markModified('fleet');
+
+    // fleetMissions에 정탐 미션 추가
+    const missionId = this.generateMissionId();
+    const newMission = {
+      missionId,
+      phase: 'outbound',
+      missionType: 'spy',
+      targetCoord,
+      targetUserId: targetResult.ownerId,
+      fleet: { espionageProbe: probeCount },
+      capacity: 0,
+      travelTime: actualTravelTime,
+      startTime,
+      arrivalTime,
+      originCoord: attackerCoord,
+    };
+
+    if (!attacker.fleetMissions) {
+      attacker.fleetMissions = [];
+    }
+    attacker.fleetMissions.push(newMission as any);
+    attacker.markModified('fleetMissions');
+
+    await attacker.save();
+
+    return {
+      success: true,
+      message: `정찰 위성 ${probeCount}대가 ${targetCoord}로 출발했습니다. 도착까지 ${Math.ceil(actualTravelTime)}초`,
+      missionId,
+      travelTime: actualTravelTime,
+      arrivalTime,
+    };
+  }
+
+  // 정찰 미션 도착 처리
+  async processSpyArrival(attackerId: string, missionId?: string) {
+    const attacker = await this.userModel.findById(attackerId).exec();
+    if (!attacker) return null;
+
+    // fleetMissions에서 도착한 spy 미션 찾기
+    const now = Date.now();
+    const mission = missionId
+      ? attacker.fleetMissions?.find((m: any) => m.missionId === missionId && m.missionType === 'spy' && m.phase === 'outbound')
+      : attacker.fleetMissions?.find((m: any) => {
+          if (m.missionType !== 'spy' || m.phase !== 'outbound') return false;
+          return new Date(m.arrivalTime).getTime() <= now;
+        });
+
+    if (!mission) return null;
+
+    const m = mission as any;
+    const targetCoord = m.targetCoord;
+    const probeCount = m.fleet?.espionageProbe || 1;
+    const currentMissionId = m.missionId;
+
+    // 대상 행성 조회 (모행성 + 식민지)
+    const targetResult = await this.findPlanetByCoordinate(targetCoord);
+    if (!targetResult.ownerId) {
+      // 미션 제거
+      attacker.fleetMissions = attacker.fleetMissions?.filter((fm: any) => fm.missionId !== currentMissionId);
+      attacker.markModified('fleetMissions');
+      await attacker.save();
+      return null;
+    }
+
+    const targetOwner = targetResult.user;
+    const targetPlanet = targetResult.planet;
+    const isColony = targetResult.isColony;
+
     if (!targetOwner) {
-      return { success: false, error: '대상 행성의 소유자를 찾을 수 없습니다.' };
+      attacker.fleetMissions = attacker.fleetMissions?.filter((fm: any) => fm.missionId !== currentMissionId);
+      attacker.markModified('fleetMissions');
+      await attacker.save();
+      return null;
     }
 
     // 정탐 기술 레벨 (소유자 기준)
@@ -333,21 +449,26 @@ export class GalaxyService {
     const spyerChance = Math.random() * 100;
     const probesDestroyed = targetChance >= spyerChance;
 
-    // 파괴된 경우 데브리 생성, 아닌 경우 귀환
+    // 파괴된 경우 데브리 생성
     let probesLost = 0;
     let probesSurvived = probeCount;
     if (probesDestroyed) {
       probesLost = probeCount;
       probesSurvived = 0;
-      // 정찰 위성 소모 (파괴된 경우만)
-      attacker.fleet.espionageProbe -= probeCount;
       // 정찰 위성 1대당 300 크리스탈 잔해
       await this.updateDebris(targetCoord, 0, probeCount * 300);
-      await attacker.save();
+    } else {
+      // 파괴되지 않은 경우: 정찰 위성 귀환 (즉시 반환)
+      attacker.fleet.espionageProbe = (attacker.fleet.espionageProbe || 0) + probeCount;
+      attacker.markModified('fleet');
     }
-    // 파괴되지 않은 경우: 정찰 위성 유지 (귀환)
 
-    // 정찰 보고서 생성 (식민지/모행성에 따라 다른 데이터 전달)
+    // 미션 제거
+    attacker.fleetMissions = attacker.fleetMissions?.filter((fm: any) => fm.missionId !== currentMissionId);
+    attacker.markModified('fleetMissions');
+    await attacker.save();
+
+    // 정찰 보고서 생성
     const report = this.generateSpyReport(
       targetOwner, 
       targetPlanet, 
@@ -385,9 +506,9 @@ export class GalaxyService {
     return {
       success: true,
       report,
-      message: probesDestroyed 
-        ? `정찰 완료. 정찰 위성 ${probesLost}대가 파괴되었습니다.`
-        : `정찰 완료. 정찰 위성 ${probesSurvived}대가 귀환했습니다.`,
+      probesDestroyed,
+      probesLost,
+      probesSurvived,
     };
   }
 

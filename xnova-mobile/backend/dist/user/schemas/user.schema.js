@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UserSchema = exports.User = exports.VacationMode = exports.FleetMission = exports.ReturnProgress = exports.IncomingAttackProgress = exports.AttackProgress = exports.ProgressInfo = exports.Defense = exports.Fleet = exports.ResearchLevels = exports.PlanetInfo = exports.Facilities = exports.OperationRates = exports.Mines = exports.Resources = void 0;
+exports.UserSchema = exports.User = exports.CheckInInfo = exports.VacationMode = exports.FleetMission = exports.ReturnProgress = exports.IncomingAttackProgress = exports.AttackProgress = exports.ProgressInfo = exports.Defense = exports.Fleet = exports.ResearchLevels = exports.PlanetInfo = exports.Facilities = exports.OperationRates = exports.Mines = exports.Resources = void 0;
 const mongoose_1 = require("@nestjs/mongoose");
 let Resources = class Resources {
     metal;
@@ -740,6 +740,27 @@ __decorate([
 exports.VacationMode = VacationMode = __decorate([
     (0, mongoose_1.Schema)({ _id: false })
 ], VacationMode);
+let CheckInInfo = class CheckInInfo {
+    lastCheckInDate;
+    checkInStreak;
+    weekStartDate;
+};
+exports.CheckInInfo = CheckInInfo;
+__decorate([
+    (0, mongoose_1.Prop)({ type: String, default: null }),
+    __metadata("design:type", Object)
+], CheckInInfo.prototype, "lastCheckInDate", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 0 }),
+    __metadata("design:type", Number)
+], CheckInInfo.prototype, "checkInStreak", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: String, default: null }),
+    __metadata("design:type", Object)
+], CheckInInfo.prototype, "weekStartDate", void 0);
+exports.CheckInInfo = CheckInInfo = __decorate([
+    (0, mongoose_1.Schema)({ _id: false })
+], CheckInInfo);
 let User = class User {
     email;
     password;
@@ -750,6 +771,7 @@ let User = class User {
     activePlanetId;
     isAdmin;
     vacationMode;
+    checkIn;
     resources;
     mines;
     operationRates;
@@ -806,6 +828,10 @@ __decorate([
     (0, mongoose_1.Prop)({ type: VacationMode, default: () => ({ isActive: false, startTime: null, minEndTime: null }) }),
     __metadata("design:type", VacationMode)
 ], User.prototype, "vacationMode", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ type: CheckInInfo, default: () => ({ lastCheckInDate: null, checkInStreak: 0, weekStartDate: null }) }),
+    __metadata("design:type", CheckInInfo)
+], User.prototype, "checkIn", void 0);
 __decorate([
     (0, mongoose_1.Prop)({ type: Resources, default: () => ({}) }),
     __metadata("design:type", Resources)

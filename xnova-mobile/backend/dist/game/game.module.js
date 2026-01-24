@@ -22,6 +22,7 @@ const ranking_service_1 = require("./services/ranking.service");
 const colony_service_1 = require("./services/colony.service");
 const fleet_scheduler_service_1 = require("./services/fleet-scheduler.service");
 const build_scheduler_service_1 = require("./services/build-scheduler.service");
+const check_in_service_1 = require("./services/check-in.service");
 const user_module_1 = require("../user/user.module");
 const message_module_1 = require("../message/message.module");
 const galaxy_module_1 = require("../galaxy/galaxy.module");
@@ -46,6 +47,7 @@ exports.GameModule = GameModule = __decorate([
             colony_service_1.ColonyService,
             fleet_scheduler_service_1.FleetSchedulerService,
             build_scheduler_service_1.BuildSchedulerService,
+            check_in_service_1.CheckInService,
         ],
         exports: [
             resources_service_1.ResourcesService,
@@ -60,6 +62,7 @@ exports.GameModule = GameModule = __decorate([
             colony_service_1.ColonyService,
             fleet_scheduler_service_1.FleetSchedulerService,
             build_scheduler_service_1.BuildSchedulerService,
+            check_in_service_1.CheckInService,
         ],
     })
 ], GameModule);

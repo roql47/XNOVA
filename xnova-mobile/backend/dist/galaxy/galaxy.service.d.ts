@@ -72,17 +72,30 @@ export declare class GalaxyService {
     }) | null>;
     getActiveSystems(galaxy: number): Promise<number[]>;
     private findPlanetByCoordinate;
+    private calculateDistance;
+    private generateMissionId;
     spyOnPlanet(attackerId: string, targetCoord: string, probeCount: number): Promise<{
         success: boolean;
         error: string;
-        report?: undefined;
         message?: undefined;
+        missionId?: undefined;
+        travelTime?: undefined;
+        arrivalTime?: undefined;
     } | {
         success: boolean;
-        report: SpyReport;
         message: string;
+        missionId: string;
+        travelTime: number;
+        arrivalTime: Date;
         error?: undefined;
     }>;
+    processSpyArrival(attackerId: string, missionId?: string): Promise<{
+        success: boolean;
+        report: SpyReport;
+        probesDestroyed: boolean;
+        probesLost: number;
+        probesSurvived: any;
+    } | null>;
     private getTotalFleetCount;
     private calculateCurrentResourcesForSpy;
     private generateSpyReport;

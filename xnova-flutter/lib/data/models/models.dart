@@ -1257,3 +1257,72 @@ class MyPlanet {
   }
 }
 
+// ===== 출석체크 =====
+class CheckInStatus {
+  final int streak;           // 현재 연속 출석일수 (1-7)
+  final bool canCheckIn;      // 오늘 출석 가능 여부
+  final List<bool> weekDays;  // 이번 주 출석 현황 [월~일] (7개)
+  final int rewardHours;      // 다음 보상 시간
+  final int nextRewardMetal;
+  final int nextRewardCrystal;
+  final int nextRewardDeuterium;
+  final bool todayCheckedIn;
+
+  CheckInStatus({
+    required this.streak,
+    required this.canCheckIn,
+    required this.weekDays,
+    required this.rewardHours,
+    required this.nextRewardMetal,
+    required this.nextRewardCrystal,
+    required this.nextRewardDeuterium,
+    required this.todayCheckedIn,
+  });
+
+  factory CheckInStatus.fromJson(Map<String, dynamic> json) {
+    final nextReward = json['nextReward'] as Map<String, dynamic>? ?? {};
+    return CheckInStatus(
+      streak: json['streak'] ?? 0,
+      canCheckIn: json['canCheckIn'] ?? false,
+      weekDays: (json['weekDays'] as List<dynamic>?)?.map((e) => e as bool).toList() ?? [false, false, false, false, false, false, false],
+      rewardHours: json['rewardHours'] ?? 2,
+      nextRewardMetal: nextReward['metal'] ?? 0,
+      nextRewardCrystal: nextReward['crystal'] ?? 0,
+      nextRewardDeuterium: nextReward['deuterium'] ?? 0,
+      todayCheckedIn: json['todayCheckedIn'] ?? false,
+    );
+  }
+}
+
+class CheckInResult {
+  final bool success;
+  final int streak;
+  final int rewardHours;
+  final int rewardMetal;
+  final int rewardCrystal;
+  final int rewardDeuterium;
+  final String message;
+
+  CheckInResult({
+    required this.success,
+    required this.streak,
+    required this.rewardHours,
+    required this.rewardMetal,
+    required this.rewardCrystal,
+    required this.rewardDeuterium,
+    required this.message,
+  });
+
+  factory CheckInResult.fromJson(Map<String, dynamic> json) {
+    final reward = json['reward'] as Map<String, dynamic>? ?? {};
+    return CheckInResult(
+      success: json['success'] ?? false,
+      streak: json['streak'] ?? 0,
+      rewardHours: json['rewardHours'] ?? 0,
+      rewardMetal: reward['metal'] ?? 0,
+      rewardCrystal: reward['crystal'] ?? 0,
+      rewardDeuterium: reward['deuterium'] ?? 0,
+      message: json['message'] ?? '',
+    );
+  }
+}
