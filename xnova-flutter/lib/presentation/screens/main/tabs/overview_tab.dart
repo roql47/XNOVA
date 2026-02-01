@@ -1176,6 +1176,7 @@ class _IncomingAttackPanel extends StatelessWidget {
       'recycler': '재활용선',
       'espionageProbe': '정찰 위성',
       'colonyShip': '식민선',
+      'reaper': '리퍼',
     };
     return names[type] ?? type;
   }
@@ -1370,11 +1371,120 @@ class _FleetMissionPanel extends StatelessWidget {
     }
   }
 
+  String _getShipName(String type) {
+    const names = {
+      'smallCargo': '소형 수송선',
+      'largeCargo': '대형 수송선',
+      'lightFighter': '경전투기',
+      'heavyFighter': '중전투기',
+      'cruiser': '순양함',
+      'battleship': '전함',
+      'battlecruiser': '순양전함',
+      'bomber': '폭격기',
+      'destroyer': '구축함',
+      'deathstar': '데스스타',
+      'recycler': '수확선',
+      'espionageProbe': '정찰 위성',
+      'colonyShip': '식민선',
+      'solarSatellite': '태양광 위성',
+      'reaper': '리퍼',
+    };
+    return names[type] ?? type;
+  }
+
+  void _showFleetInfoDialog(BuildContext context) {
+    final missionColor = _getMissionColor();
+    final fleetEntries = mission.fleet.entries.where((e) => e.value > 0).toList();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.panelBackground,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: missionColor.withOpacity(0.3)),
+        ),
+        title: Row(
+          children: [
+            Icon(_getMissionIcon(), color: missionColor, size: 24),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '${mission.missionTitle} 함대',
+                style: TextStyle(
+                  color: missionColor,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              mission.isReturning 
+                  ? '${mission.originCoord ?? "모행성"} → 모행성'
+                  : '모행성 → ${mission.targetCoord}',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                children: fleetEntries.isEmpty
+                    ? [const Text('함대 정보 없음', style: TextStyle(color: AppColors.textMuted))]
+                    : fleetEntries.map((entry) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _getShipName(entry.key),
+                              style: const TextStyle(color: AppColors.textPrimary, fontSize: 13),
+                            ),
+                            Text(
+                              '${entry.value}대',
+                              style: TextStyle(
+                                color: missionColor,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )).toList(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('닫기', style: TextStyle(color: missionColor)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final missionColor = _getMissionColor();
     
-    return Container(
+    return InkWell(
+      onTap: () => _showFleetInfoDialog(context),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -1398,30 +1508,47 @@ class _FleetMissionPanel extends StatelessWidget {
                 Icon(_getMissionIcon(), color: missionColor, size: 20),
                 const SizedBox(width: 8),
                 Expanded(
-                  child: Text(
-                    mission.missionTitle,
-                    style: TextStyle(
-                      color: missionColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        mission.missionTitle,
+                        style: TextStyle(
+                          color: missionColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        mission.isReturning 
+                            ? '${mission.originCoord ?? "모행성"} → 모행성'
+                            : '모행성 → ${mission.targetCoord}',
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
                   ),
+                ),
+                // 시간을 오른쪽에 표시
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.schedule, size: 14, color: missionColor),
+                    const SizedBox(width: 4),
+                    ProgressTimer(
+                      finishTime: mission.finishDateTime,
+                      onComplete: onComplete,
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              mission.isReturning 
-                  ? '출발지: ${mission.originCoord ?? "모행성"}'
-                  : '목표: ${mission.targetCoord}',
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 12,
-              ),
-            ),
             // 귀환 시 전리품 표시
             if (mission.isReturning && mission.loot != null && mission.loot!.isNotEmpty) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   if ((mission.loot!['metal'] ?? 0) > 0)
@@ -1433,20 +1560,10 @@ class _FleetMissionPanel extends StatelessWidget {
                 ],
               ),
             ],
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Icon(Icons.schedule, size: 14, color: missionColor),
-                const SizedBox(width: 6),
-                ProgressTimer(
-                  finishTime: mission.finishDateTime,
-                  onComplete: onComplete,
-                ),
-              ],
-            ),
           ],
         ),
       ),
+    ),
     );
   }
 

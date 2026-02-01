@@ -103,7 +103,7 @@ export const FLEET_DATA = {
       espionageProbe: 1250, solarSatellite: 1250, smallCargo: 250, largeCargo: 250,
       lightFighter: 200, heavyFighter: 100, cruiser: 30, battleship: 5, battlecruiser: 15,
       destroyer: 33, recycler: 250, rocketLauncher: 200, lightLaser: 200,
-      heavyLaser: 100, gaussCannon: 50, ionCannon: 100,
+      heavyLaser: 100, gaussCannon: 50, ionCannon: 100, reaper: 10,
     },
     requirements: { shipyard: 12, hyperspaceDrive: 7, hyperspaceTech: 6, gravitonTech: 1 },
   },
@@ -130,6 +130,12 @@ export const FLEET_DATA = {
     stats: { attack: 50, shield: 100, hull: 30000, speed: 2500, cargo: 7500, fuelConsumption: 1000 },
     rapidFire: { espionageProbe: 5, solarSatellite: 5 },
     requirements: { shipyard: 4, impulseDrive: 3 },
+  },
+  reaper: {
+    cost: { metal: 85000, crystal: 55000, deuterium: 20000 },
+    stats: { attack: 2800, shield: 700, hull: 140000, speed: 12000, cargo: 10000, fuelConsumption: 1100 },
+    rapidFire: { espionageProbe: 5, solarSatellite: 5, cruiser: 7, bomber: 4, battleship: 3 },
+    requirements: { shipyard: 10, hyperspaceDrive: 7, hyperspaceTech: 6, shieldTech: 6 },
   },
 };
 
@@ -158,6 +164,7 @@ export const DEFENSE_DATA = {
   ionCannon: {
     cost: { metal: 5000, crystal: 3000, deuterium: 0 },
     stats: { attack: 150, shield: 500, hull: 8000 },
+    rapidFire: { reaper: 2 },
     requirements: { shipyard: 4, ionTech: 4 },
   },
   plasmaTurret: {
@@ -372,6 +379,7 @@ export const SHIP_ENGINE_DATA = {
   destroyer: { defaultEngine: 'hyperspace', baseSpeed: 5000 },
   deathstar: { defaultEngine: 'hyperspace', baseSpeed: 100 },
   battlecruiser: { defaultEngine: 'hyperspace', baseSpeed: 10000 },
+  reaper: { defaultEngine: 'hyperspace', baseSpeed: 12000 },
   
   // 기타
   solarSatellite: { defaultEngine: 'none', baseSpeed: 0 },
@@ -479,6 +487,7 @@ export const NAME_MAPPING = {
   espionageProbe: '무인정찰기',
   solarSatellite: '태양광인공위성',
   colonyShip: '식민선',
+  reaper: '리퍼',
   
   // 방어시설
   rocketLauncher: '미사일발사대',

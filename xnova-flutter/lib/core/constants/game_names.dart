@@ -82,6 +82,7 @@ const Map<String, String> fleetNames = {
   'espionageProbe': '무인정찰기',
   'solarSatellite': '태양광위성',
   'colonyShip': '식민선',
+  'reaper': '리퍼',
 };
 
 // 함대 이미지 경로
@@ -100,6 +101,7 @@ const Map<String, String> fleetImages = {
   'espionageProbe': 'assets/images/espionage_probe.webp',
   'solarSatellite': 'assets/images/solar_satellite.webp',
   'colonyShip': 'assets/images/colony_ship.webp',
+  'reaper': 'assets/images/reaper.webp',
 };
 
 // 방어시설 한글 이름

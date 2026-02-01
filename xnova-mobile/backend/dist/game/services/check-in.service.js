@@ -52,6 +52,11 @@ let CheckInService = class CheckInService {
         const diffTime = d1.getTime() - d2.getTime();
         return Math.floor(diffTime / (24 * 60 * 60 * 1000));
     }
+    isSameDate(date1, date2) {
+        if (!date1)
+            return false;
+        return date1.substring(0, 10) === date2.substring(0, 10);
+    }
     getRewardHours(streak) {
         if (streak <= 2)
             return 2;
@@ -98,7 +103,7 @@ let CheckInService = class CheckInService {
     calculateWeekDays(lastCheckInDate, streak, weekStartDate) {
         const weekDays = [false, false, false, false, false, false, false];
         const currentWeekStart = this.getWeekStartDateKST();
-        if (!weekStartDate || weekStartDate !== currentWeekStart) {
+        if (!weekStartDate || !this.isSameDate(weekStartDate, currentWeekStart)) {
             return weekDays;
         }
         if (!lastCheckInDate)
@@ -126,12 +131,12 @@ let CheckInService = class CheckInService {
         const today = this.getTodayDateKST();
         const yesterday = this.getYesterdayDateKST();
         const currentWeekStart = this.getWeekStartDateKST();
-        const todayCheckedIn = checkIn.lastCheckInDate === today;
+        const todayCheckedIn = this.isSameDate(checkIn.lastCheckInDate, today);
         let currentStreak = checkIn.checkInStreak || 0;
-        if (checkIn.weekStartDate !== currentWeekStart) {
+        if (!this.isSameDate(checkIn.weekStartDate, currentWeekStart)) {
             currentStreak = 0;
         }
-        else if (!todayCheckedIn && checkIn.lastCheckInDate !== yesterday) {
+        else if (!todayCheckedIn && !this.isSameDate(checkIn.lastCheckInDate, yesterday)) {
             currentStreak = 0;
         }
         const nextStreak = todayCheckedIn ? currentStreak : Math.min(currentStreak + 1, 7);
@@ -164,7 +169,7 @@ let CheckInService = class CheckInService {
         const today = this.getTodayDateKST();
         const yesterday = this.getYesterdayDateKST();
         const currentWeekStart = this.getWeekStartDateKST();
-        if (checkIn.lastCheckInDate === today) {
+        if (this.isSameDate(checkIn.lastCheckInDate, today)) {
             return {
                 success: false,
                 streak: checkIn.checkInStreak,
@@ -174,10 +179,10 @@ let CheckInService = class CheckInService {
             };
         }
         let newStreak = 1;
-        if (checkIn.weekStartDate !== currentWeekStart) {
+        if (!this.isSameDate(checkIn.weekStartDate, currentWeekStart)) {
             newStreak = 1;
         }
-        else if (checkIn.lastCheckInDate === yesterday) {
+        else if (this.isSameDate(checkIn.lastCheckInDate, yesterday)) {
             newStreak = Math.min((checkIn.checkInStreak || 0) + 1, 7);
         }
         else {

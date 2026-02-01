@@ -318,6 +318,7 @@ let Fleet = class Fleet {
     espionageProbe;
     solarSatellite;
     colonyShip;
+    reaper;
 };
 exports.Fleet = Fleet;
 __decorate([
@@ -376,6 +377,10 @@ __decorate([
     (0, mongoose_1.Prop)({ default: 0 }),
     __metadata("design:type", Number)
 ], Fleet.prototype, "colonyShip", void 0);
+__decorate([
+    (0, mongoose_1.Prop)({ default: 0 }),
+    __metadata("design:type", Number)
+], Fleet.prototype, "reaper", void 0);
 exports.Fleet = Fleet = __decorate([
     (0, mongoose_1.Schema)({ _id: false })
 ], Fleet);

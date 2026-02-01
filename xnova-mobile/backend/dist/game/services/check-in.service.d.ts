@@ -32,6 +32,7 @@ export declare class CheckInService {
     private getYesterdayDateKST;
     private getWeekStartDateKST;
     private getDaysDifference;
+    private isSameDate;
     private getRewardHours;
     private calculateHourlyProduction;
     private calculateWeekDays;

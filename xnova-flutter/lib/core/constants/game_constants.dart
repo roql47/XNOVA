@@ -26,6 +26,7 @@ class GameConstants {
     'espionageProbe': '무인정찰기',
     'solarSatellite': '태양광인공위성',
     'colonyShip': '식민선',
+    'reaper': '리퍼',
     
     // 방어시설
     'rocketLauncher': '미사일발사대',
@@ -74,6 +75,7 @@ class GameConstants {
     'espionageProbe': 1000000,
     'solarSatellite': 0,
     'colonyShip': 2500,
+    'reaper': 12000,
   };
 
   // 함선 적재량
@@ -92,6 +94,7 @@ class GameConstants {
     'espionageProbe': 5,
     'solarSatellite': 0,
     'colonyShip': 7500,
+    'reaper': 10000,
   };
 
   // 함선 연료 소비량
@@ -110,6 +113,7 @@ class GameConstants {
     'espionageProbe': 1,
     'solarSatellite': 0,
     'colonyShip': 1000,
+    'reaper': 1100,
   };
 
   // 함선/방어시설 기본 스탯 (공격력, 쉴드, 장갑)
@@ -129,6 +133,7 @@ class GameConstants {
     'espionageProbe': {'attack': 0, 'shield': 0, 'hull': 1000},
     'solarSatellite': {'attack': 1, 'shield': 1, 'hull': 2000},
     'colonyShip': {'attack': 50, 'shield': 100, 'hull': 30000},
+    'reaper': {'attack': 2800, 'shield': 700, 'hull': 140000},
     
     // 방어시설
     'rocketLauncher': {'attack': 80, 'shield': 20, 'hull': 2000},

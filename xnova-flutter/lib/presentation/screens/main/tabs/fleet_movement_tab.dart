@@ -1261,6 +1261,7 @@ class _IncomingAttackCard extends StatelessWidget {
       'recycler': '재활용선',
       'espionageProbe': '정찰 위성',
       'colonyShip': '식민선',
+      'reaper': '리퍼',
     };
     return names[type] ?? type;
   }

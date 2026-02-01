@@ -329,6 +329,7 @@ export declare const FLEET_DATA: {
             heavyLaser: number;
             gaussCannon: number;
             ionCannon: number;
+            reaper: number;
         };
         requirements: {
             shipyard: number;
@@ -421,6 +422,34 @@ export declare const FLEET_DATA: {
             impulseDrive: number;
         };
     };
+    reaper: {
+        cost: {
+            metal: number;
+            crystal: number;
+            deuterium: number;
+        };
+        stats: {
+            attack: number;
+            shield: number;
+            hull: number;
+            speed: number;
+            cargo: number;
+            fuelConsumption: number;
+        };
+        rapidFire: {
+            espionageProbe: number;
+            solarSatellite: number;
+            cruiser: number;
+            bomber: number;
+            battleship: number;
+        };
+        requirements: {
+            shipyard: number;
+            hyperspaceDrive: number;
+            hyperspaceTech: number;
+            shieldTech: number;
+        };
+    };
 };
 export declare const DEFENSE_DATA: {
     rocketLauncher: {
@@ -500,6 +529,9 @@ export declare const DEFENSE_DATA: {
             attack: number;
             shield: number;
             hull: number;
+        };
+        rapidFire: {
+            reaper: number;
         };
         requirements: {
             shipyard: number;
@@ -917,6 +949,10 @@ export declare const SHIP_ENGINE_DATA: {
         defaultEngine: string;
         baseSpeed: number;
     };
+    reaper: {
+        defaultEngine: string;
+        baseSpeed: number;
+    };
     solarSatellite: {
         defaultEngine: string;
         baseSpeed: number;
@@ -968,6 +1004,7 @@ export declare const NAME_MAPPING: {
     espionageProbe: string;
     solarSatellite: string;
     colonyShip: string;
+    reaper: string;
     rocketLauncher: string;
     lightLaser: string;
     heavyLaser: string;

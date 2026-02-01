@@ -268,12 +268,16 @@ export class FleetService {
         const nanoFactoryLevel = user.facilities?.nanoFactory || 0;
         const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
 
+        // 이전 finishTime 기준으로 다음 건조 시간 계산 (백그라운드 복귀 시 연속 완료 지원)
+        const prevFinishTime = user.fleetProgress.finishTime.getTime();
+        const nextFinishTime = new Date(prevFinishTime + singleBuildTime * 1000);
+
         user.fleetProgress = {
           type: 'fleet',
           name: fleetType,
           quantity: newRemaining,
-          startTime: new Date(),
-          finishTime: new Date(Date.now() + singleBuildTime * 1000),
+          startTime: new Date(prevFinishTime),
+          finishTime: nextFinishTime,
         };
       } else {
         user.fleetProgress = null;
@@ -303,12 +307,16 @@ export class FleetService {
         const nanoFactoryLevel = planet.facilities?.nanoFactory || 0;
         const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
 
+        // 이전 finishTime 기준으로 다음 건조 시간 계산 (백그라운드 복귀 시 연속 완료 지원)
+        const prevFinishTime = planet.fleetProgress.finishTime.getTime();
+        const nextFinishTime = new Date(prevFinishTime + singleBuildTime * 1000);
+
         planet.fleetProgress = {
           type: 'fleet',
           name: fleetType,
           quantity: newRemaining,
-          startTime: new Date(),
-          finishTime: new Date(Date.now() + singleBuildTime * 1000),
+          startTime: new Date(prevFinishTime),
+          finishTime: nextFinishTime,
         };
       } else {
         planet.fleetProgress = null;
@@ -401,17 +409,20 @@ export class FleetService {
       const newRemaining = remainingQuantity - 1;
 
       if (newRemaining > 0) {
-        // 다음 건조 설정
+        // 다음 건조 설정 - 이전 finishTime 기준으로 계산
         const shipyardLevel = planet.facilities?.shipyard || 0;
         const nanoFactoryLevel = planet.facilities?.nanoFactory || 0;
         const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
+
+        const prevFinishTime = new Date(planet.fleetProgress.finishTime).getTime();
+        const nextFinishTime = new Date(prevFinishTime + singleBuildTime * 1000);
 
         planet.fleetProgress = {
           type: 'fleet',
           name: fleetType,
           quantity: newRemaining,
-          startTime: new Date(),
-          finishTime: new Date(Date.now() + singleBuildTime * 1000),
+          startTime: new Date(prevFinishTime),
+          finishTime: nextFinishTime,
         } as any;
 
         // 다음 건조가 아직 완료 시간이 안 됐으면 종료

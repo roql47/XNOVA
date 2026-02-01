@@ -243,6 +243,7 @@ class _ShipCardState extends State<_ShipCard> {
       'recycler': 'assets/images/recycler.webp',
       'espionageProbe': 'assets/images/espionage_probe.webp',
       'solarSatellite': 'assets/images/solar_satellite.webp',
+      'reaper': 'assets/images/reaper.webp',
     };
     return shipImages[type];
   }

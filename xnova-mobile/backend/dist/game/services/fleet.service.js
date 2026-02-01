@@ -231,12 +231,14 @@ let FleetService = class FleetService {
                 const shipyardLevel = user.facilities?.shipyard || 0;
                 const nanoFactoryLevel = user.facilities?.nanoFactory || 0;
                 const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
+                const prevFinishTime = user.fleetProgress.finishTime.getTime();
+                const nextFinishTime = new Date(prevFinishTime + singleBuildTime * 1000);
                 user.fleetProgress = {
                     type: 'fleet',
                     name: fleetType,
                     quantity: newRemaining,
-                    startTime: new Date(),
-                    finishTime: new Date(Date.now() + singleBuildTime * 1000),
+                    startTime: new Date(prevFinishTime),
+                    finishTime: nextFinishTime,
                 };
             }
             else {
@@ -263,12 +265,14 @@ let FleetService = class FleetService {
                 const shipyardLevel = planet.facilities?.shipyard || 0;
                 const nanoFactoryLevel = planet.facilities?.nanoFactory || 0;
                 const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
+                const prevFinishTime = planet.fleetProgress.finishTime.getTime();
+                const nextFinishTime = new Date(prevFinishTime + singleBuildTime * 1000);
                 planet.fleetProgress = {
                     type: 'fleet',
                     name: fleetType,
                     quantity: newRemaining,
-                    startTime: new Date(),
-                    finishTime: new Date(Date.now() + singleBuildTime * 1000),
+                    startTime: new Date(prevFinishTime),
+                    finishTime: nextFinishTime,
                 };
             }
             else {
@@ -336,12 +340,14 @@ let FleetService = class FleetService {
                 const shipyardLevel = planet.facilities?.shipyard || 0;
                 const nanoFactoryLevel = planet.facilities?.nanoFactory || 0;
                 const singleBuildTime = this.getSingleBuildTime(fleetType, shipyardLevel, nanoFactoryLevel);
+                const prevFinishTime = new Date(planet.fleetProgress.finishTime).getTime();
+                const nextFinishTime = new Date(prevFinishTime + singleBuildTime * 1000);
                 planet.fleetProgress = {
                     type: 'fleet',
                     name: fleetType,
                     quantity: newRemaining,
-                    startTime: new Date(),
-                    finishTime: new Date(Date.now() + singleBuildTime * 1000),
+                    startTime: new Date(prevFinishTime),
+                    finishTime: nextFinishTime,
                 };
                 if (planet.fleetProgress && new Date(planet.fleetProgress.finishTime).getTime() > now) {
                     break;

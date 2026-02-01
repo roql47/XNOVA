@@ -225,6 +225,9 @@ export class Fleet {
 
   @Prop({ default: 0 })
   colonyShip: number;
+
+  @Prop({ default: 0 })
+  reaper: number;
 }
 
 // 방어시설 스키마

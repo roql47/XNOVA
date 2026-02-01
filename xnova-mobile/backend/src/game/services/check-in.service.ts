@@ -85,6 +85,16 @@ export class CheckInService {
   }
 
   /**
+   * 날짜 비교 (YYYY-MM-DD 부분만 비교)
+   * DB에 저장된 형식이 다를 수 있으므로 날짜 부분만 추출하여 비교
+   */
+  private isSameDate(date1: string | null, date2: string): boolean {
+    if (!date1) return false;
+    // 'YYYY-MM-DD' 부분만 비교 (10글자)
+    return date1.substring(0, 10) === date2.substring(0, 10);
+  }
+
+  /**
    * 보상 시간 계산
    * - 1~2일차: 2시간
    * - 3일차: 3시간
@@ -154,7 +164,7 @@ export class CheckInService {
     const currentWeekStart = this.getWeekStartDateKST();
     
     // 주간 시작일이 다르면 (새로운 주) 모두 false
-    if (!weekStartDate || weekStartDate !== currentWeekStart) {
+    if (!weekStartDate || !this.isSameDate(weekStartDate, currentWeekStart)) {
       return weekDays;
     }
 
@@ -195,15 +205,15 @@ export class CheckInService {
     const currentWeekStart = this.getWeekStartDateKST();
 
     // 오늘 이미 출석했는지 확인
-    const todayCheckedIn = checkIn.lastCheckInDate === today;
+    const todayCheckedIn = this.isSameDate(checkIn.lastCheckInDate, today);
     
     // 연속 출석 계산
     let currentStreak = checkIn.checkInStreak || 0;
     
     // 주간이 바뀌면 streak 리셋
-    if (checkIn.weekStartDate !== currentWeekStart) {
+    if (!this.isSameDate(checkIn.weekStartDate, currentWeekStart)) {
       currentStreak = 0;
-    } else if (!todayCheckedIn && checkIn.lastCheckInDate !== yesterday) {
+    } else if (!todayCheckedIn && !this.isSameDate(checkIn.lastCheckInDate, yesterday)) {
       // 어제 출석 안 했으면 streak 리셋
       currentStreak = 0;
     }
@@ -256,7 +266,7 @@ export class CheckInService {
     const currentWeekStart = this.getWeekStartDateKST();
 
     // 오늘 이미 출석했는지 확인
-    if (checkIn.lastCheckInDate === today) {
+    if (this.isSameDate(checkIn.lastCheckInDate, today)) {
       return {
         success: false,
         streak: checkIn.checkInStreak,
@@ -270,9 +280,9 @@ export class CheckInService {
     let newStreak = 1;
 
     // 주간이 바뀌면 streak 리셋
-    if (checkIn.weekStartDate !== currentWeekStart) {
+    if (!this.isSameDate(checkIn.weekStartDate, currentWeekStart)) {
       newStreak = 1;
-    } else if (checkIn.lastCheckInDate === yesterday) {
+    } else if (this.isSameDate(checkIn.lastCheckInDate, yesterday)) {
       // 어제 출석했으면 streak 증가
       newStreak = Math.min((checkIn.checkInStreak || 0) + 1, 7);
     } else {

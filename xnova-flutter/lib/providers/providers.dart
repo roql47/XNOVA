@@ -935,7 +935,8 @@ class GameNotifier extends StateNotifier<GameState> {
       if (response == null || 
           (response.pendingAttack == null && 
            response.pendingReturn == null && 
-           response.incomingAttack == null)) {
+           response.incomingAttack == null &&
+           response.fleetMissions.isEmpty)) {
         state = state.copyWith(clearBattleStatus: true);
         return;
       }

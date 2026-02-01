@@ -242,12 +242,14 @@ let DefenseService = class DefenseService {
                 const robotFactoryLevel = user.facilities?.robotFactory || 0;
                 const nanoFactoryLevel = user.facilities?.nanoFactory || 0;
                 const singleBuildTime = this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel);
+                const prevFinishTime = user.defenseProgress.finishTime.getTime();
+                const nextFinishTime = new Date(prevFinishTime + singleBuildTime * 1000);
                 user.defenseProgress = {
                     type: 'defense',
                     name: defenseType,
                     quantity: newRemaining,
-                    startTime: new Date(),
-                    finishTime: new Date(Date.now() + singleBuildTime * 1000),
+                    startTime: new Date(prevFinishTime),
+                    finishTime: nextFinishTime,
                 };
             }
             else {
@@ -274,12 +276,14 @@ let DefenseService = class DefenseService {
                 const robotFactoryLevel = planet.facilities?.robotFactory || 0;
                 const nanoFactoryLevel = planet.facilities?.nanoFactory || 0;
                 const singleBuildTime = this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel);
+                const prevFinishTime = planet.defenseProgress.finishTime.getTime();
+                const nextFinishTime = new Date(prevFinishTime + singleBuildTime * 1000);
                 planet.defenseProgress = {
                     type: 'defense',
                     name: defenseType,
                     quantity: newRemaining,
-                    startTime: new Date(),
-                    finishTime: new Date(Date.now() + singleBuildTime * 1000),
+                    startTime: new Date(prevFinishTime),
+                    finishTime: nextFinishTime,
                 };
             }
             else {
@@ -304,12 +308,14 @@ let DefenseService = class DefenseService {
                 const robotFactoryLevel = planet.facilities?.robotFactory || 0;
                 const nanoFactoryLevel = planet.facilities?.nanoFactory || 0;
                 const singleBuildTime = this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel);
+                const prevFinishTime = new Date(planet.defenseProgress.finishTime).getTime();
+                const nextFinishTime = new Date(prevFinishTime + singleBuildTime * 1000);
                 planet.defenseProgress = {
                     type: 'defense',
                     name: defenseType,
                     quantity: newRemaining,
-                    startTime: new Date(),
-                    finishTime: new Date(Date.now() + singleBuildTime * 1000),
+                    startTime: new Date(prevFinishTime),
+                    finishTime: nextFinishTime,
                 };
                 if (new Date(planet.defenseProgress.finishTime).getTime() > now) {
                     break;

@@ -78,6 +78,7 @@ export declare class Fleet {
     espionageProbe: number;
     solarSatellite: number;
     colonyShip: number;
+    reaper: number;
 }
 export declare class Defense {
     rocketLauncher: number;

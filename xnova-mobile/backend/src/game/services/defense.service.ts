@@ -281,12 +281,16 @@ export class DefenseService {
         const nanoFactoryLevel = user.facilities?.nanoFactory || 0;
         const singleBuildTime = this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel);
 
+        // 이전 finishTime 기준으로 다음 건조 시간 계산 (백그라운드 복귀 시 연속 완료 지원)
+        const prevFinishTime = user.defenseProgress.finishTime.getTime();
+        const nextFinishTime = new Date(prevFinishTime + singleBuildTime * 1000);
+
         user.defenseProgress = {
           type: 'defense',
           name: defenseType,
           quantity: newRemaining,
-          startTime: new Date(),
-          finishTime: new Date(Date.now() + singleBuildTime * 1000),
+          startTime: new Date(prevFinishTime),
+          finishTime: nextFinishTime,
         };
       } else {
         user.defenseProgress = null;
@@ -316,12 +320,16 @@ export class DefenseService {
         const nanoFactoryLevel = planet.facilities?.nanoFactory || 0;
         const singleBuildTime = this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel);
 
+        // 이전 finishTime 기준으로 다음 건조 시간 계산 (백그라운드 복귀 시 연속 완료 지원)
+        const prevFinishTime = planet.defenseProgress.finishTime.getTime();
+        const nextFinishTime = new Date(prevFinishTime + singleBuildTime * 1000);
+
         planet.defenseProgress = {
           type: 'defense',
           name: defenseType,
           quantity: newRemaining,
-          startTime: new Date(),
-          finishTime: new Date(Date.now() + singleBuildTime * 1000),
+          startTime: new Date(prevFinishTime),
+          finishTime: nextFinishTime,
         };
       } else {
         planet.defenseProgress = null;
@@ -352,17 +360,20 @@ export class DefenseService {
       const newRemaining = remainingQuantity - 1;
 
       if (newRemaining > 0) {
-        // 다음 건조 설정
+        // 다음 건조 설정 - 이전 finishTime 기준으로 계산
         const robotFactoryLevel = planet.facilities?.robotFactory || 0;
         const nanoFactoryLevel = planet.facilities?.nanoFactory || 0;
         const singleBuildTime = this.getSingleBuildTime(defenseType, robotFactoryLevel, nanoFactoryLevel);
+
+        const prevFinishTime = new Date(planet.defenseProgress.finishTime).getTime();
+        const nextFinishTime = new Date(prevFinishTime + singleBuildTime * 1000);
 
         planet.defenseProgress = {
           type: 'defense',
           name: defenseType,
           quantity: newRemaining,
-          startTime: new Date(),
-          finishTime: new Date(Date.now() + singleBuildTime * 1000),
+          startTime: new Date(prevFinishTime),
+          finishTime: nextFinishTime,
         };
 
         // 다음 건조가 아직 완료 시간이 안 됐으면 종료
