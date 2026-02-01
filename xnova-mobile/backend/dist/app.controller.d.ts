@@ -1,4 +1,6 @@
 export declare class AppController {
+    private readonly MIN_REQUIRED_VERSION;
+    private readonly LATEST_VERSION;
     getHello(): {
         name: string;
         version: string;
@@ -14,4 +16,12 @@ export declare class AppController {
         status: string;
         timestamp: string;
     };
+    checkVersion(currentVersion: string): {
+        minRequiredVersion: string;
+        latestVersion: string;
+        forceUpdate: boolean;
+        updateUrl: string;
+        message: string | null;
+    };
+    private compareVersions;
 }

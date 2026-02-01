@@ -8,10 +8,15 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AppController = void 0;
 const common_1 = require("@nestjs/common");
 let AppController = class AppController {
+    MIN_REQUIRED_VERSION = '0.31.0';
+    LATEST_VERSION = '0.31.0';
     getHello() {
         return {
             name: 'XNOVA API',
@@ -31,6 +36,31 @@ let AppController = class AppController {
             timestamp: new Date().toISOString(),
         };
     }
+    checkVersion(currentVersion) {
+        const forceUpdate = this.compareVersions(currentVersion || '0.0.0', this.MIN_REQUIRED_VERSION) < 0;
+        return {
+            minRequiredVersion: this.MIN_REQUIRED_VERSION,
+            latestVersion: this.LATEST_VERSION,
+            forceUpdate,
+            updateUrl: 'https://play.google.com/store/apps/details?id=com.xnova.game',
+            message: forceUpdate
+                ? '새로운 버전이 출시되었습니다. 업데이트가 필요합니다.'
+                : null,
+        };
+    }
+    compareVersions(v1, v2) {
+        const parts1 = v1.split('.').map(Number);
+        const parts2 = v2.split('.').map(Number);
+        for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+            const num1 = parts1[i] || 0;
+            const num2 = parts2[i] || 0;
+            if (num1 < num2)
+                return -1;
+            if (num1 > num2)
+                return 1;
+        }
+        return 0;
+    }
 };
 exports.AppController = AppController;
 __decorate([
@@ -45,6 +75,13 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], AppController.prototype, "healthCheck", null);
+__decorate([
+    (0, common_1.Get)('version-check'),
+    __param(0, (0, common_1.Query)('version')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], AppController.prototype, "checkVersion", null);
 exports.AppController = AppController = __decorate([
     (0, common_1.Controller)()
 ], AppController);

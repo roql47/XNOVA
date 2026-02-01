@@ -1,6 +1,10 @@
 import 'dart:math' as math;
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../core/constants/api_constants.dart';
 import '../../../core/theme/app_colors.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -26,11 +30,54 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _progressOpacity;
   late Animation<double> _creditOpacity;
 
+  bool _forceUpdateRequired = false;
+  String _updateUrl = '';
+  String _updateMessage = '';
+
   @override
   void initState() {
     super.initState();
     _initAnimations();
     _startAnimations();
+  }
+
+  Future<void> _checkForUpdate() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      final currentVersion = packageInfo.version;
+      
+      // API baseUrl에서 /api/ 제거하여 루트 URL 생성
+      final rootUrl = ApiConstants.baseUrl.replaceAll('/api/', '/');
+      final dio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+      ));
+      
+      final response = await dio.get(
+        '${rootUrl}version-check',
+        queryParameters: {'version': currentVersion},
+      );
+      
+      if (response.data['forceUpdate'] == true) {
+        setState(() {
+          _forceUpdateRequired = true;
+          _updateUrl = response.data['updateUrl'] ?? '';
+          _updateMessage = response.data['message'] ?? '새로운 버전이 출시되었습니다. 업데이트가 필요합니다.';
+        });
+      }
+    } catch (e) {
+      // 버전 체크 실패 시 무시하고 진행
+      debugPrint('Version check failed: $e');
+    }
+  }
+
+  Future<void> _launchUpdateUrl() async {
+    if (_updateUrl.isNotEmpty) {
+      final uri = Uri.parse(_updateUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    }
   }
 
   void _initAnimations() {
@@ -110,9 +157,116 @@ class _SplashScreenState extends State<SplashScreen>
     await Future.delayed(const Duration(milliseconds: 800));
     _progressController.forward();
 
-    // Wait for animations to complete then navigate
+    // 버전 체크 (백그라운드에서 실행)
+    await _checkForUpdate();
+
+    // Wait for animations to complete
     await Future.delayed(const Duration(milliseconds: 2800));
-    widget.onComplete();
+    
+    // 강제 업데이트가 필요하면 다이얼로그 표시, 아니면 다음 화면으로
+    if (_forceUpdateRequired && mounted) {
+      _showForceUpdateDialog();
+    } else {
+      widget.onComplete();
+    }
+  }
+
+  void _showForceUpdateDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          backgroundColor: AppColors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: AppColors.accent.withOpacity(0.5)),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.system_update, color: AppColors.accent, size: 28),
+              const SizedBox(width: 12),
+              Text(
+                '업데이트 필요',
+                style: GoogleFonts.orbitron(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _updateMessage,
+                style: GoogleFonts.exo2(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.warning.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: AppColors.warning, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '계속하려면 최신 버전으로 업데이트해주세요.',
+                        style: GoogleFonts.exo2(
+                          color: AppColors.warning,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _launchUpdateUrl,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.download, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      '지금 업데이트',
+                      style: GoogleFonts.exo2(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -468,7 +622,7 @@ class _SplashScreenState extends State<SplashScreen>
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'v0.30',
+                  'v0.31',
                   style: GoogleFonts.orbitron(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,

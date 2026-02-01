@@ -203,6 +203,9 @@ const Map<String, Map<String, dynamic>> shipTechTree = {
   'battlecruiser': {'name': '순양전함', 'requirements': {
     'shipyard': 8, 'hyperspaceTech': 5, 'hyperspaceDrive': 5, 'laserTech': 12,
   }},
+  'reaper': {'name': '리퍼', 'requirements': {
+    'shipyard': 10, 'hyperspaceDrive': 7, 'hyperspaceTech': 6, 'shieldTech': 6,
+  }},
 };
 
 // 방어시설 테크트리 데이터
